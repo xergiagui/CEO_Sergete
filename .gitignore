@@ -1,0 +1,22 @@
+# Recursos locales para edición — NO sincronizar con git
+musicas/
+superposiciones/
+
+# whisper.cpp (binario + modelo ~3GB) — NO sincronizar
+whisper/
+
+# Entradas y salidas de trabajo
+input/
+transcripciones/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Sistema / editor
+desktop.ini
+.DS_Store
+
+# Configuración local de Claude Code — no subir
+.claude/
