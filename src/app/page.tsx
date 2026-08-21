@@ -18,15 +18,15 @@ function StructuredData() {
         "@type": "WebSite",
         "@id": `${SITE_URL}/#website`,
         url: SITE_URL,
-        name: "Selección · Monje Malo",
+        name: "Selección · Monge Malo",
         description:
-          "Los 4 recursos de Luis Monje Malo para aprender a vender y ganar dinero online.",
+          "Los 4 recursos de Luis Monge Malo para aprender a vender y ganar dinero online.",
         inLanguage: "es-ES",
       },
       {
         "@type": "Person",
-        "@id": `${SITE_URL}/#luis-monje-malo`,
-        name: "Luis Monje Malo",
+        "@id": `${SITE_URL}/#luis-monge-malo`,
+        name: "Luis Monge Malo",
         description: "Referente en ventas y marketing de afiliación en español.",
       },
       {
@@ -42,7 +42,7 @@ function StructuredData() {
             name: p.fullName,
             description: `${p.hook}. ${p.subhook}`,
             category: p.kind,
-            brand: { "@id": `${SITE_URL}/#luis-monje-malo` },
+            brand: { "@id": `${SITE_URL}/#luis-monge-malo` },
             offers: {
               "@type": "Offer",
               price: p.priceValue,

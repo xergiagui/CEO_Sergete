@@ -18,9 +18,9 @@ const fraunces = Fraunces({
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 const TITLE =
-  "Aprende a vender y ganar dinero online · 4 recursos de Luis Monje Malo";
+  "Aprende a vender y ganar dinero online · 4 recursos de Luis Monge Malo";
 const DESCRIPTION =
-  "Los 4 recursos de Luis Monje Malo para vender más y ganar dinero online: la Escuela de Afiliados, el mejor negocio destripado, el curso de objeciones y la mentoría. Elige el tuyo en 30 segundos.";
+  "Los 4 recursos de Luis Monge Malo para vender más y ganar dinero online: la Escuela de Afiliados, el mejor negocio destripado, el curso de objeciones y la mentoría. Elige el tuyo en 30 segundos.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     "marketing de afiliados",
     "ganar dinero online",
     "vender por internet",
-    "Luis Monje Malo",
+    "Luis Monge Malo",
     "escuela de afiliados",
     "curso de ventas",
     "mentoría de ventas",
@@ -72,8 +72,8 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#070a12",
-  colorScheme: "dark",
+  themeColor: "#ffffff",
+  colorScheme: "light",
   width: "device-width",
   initialScale: 1,
 };

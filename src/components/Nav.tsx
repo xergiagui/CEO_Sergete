@@ -10,7 +10,7 @@ export default function Nav() {
             M
           </span>
           <span className="text-[15px] font-semibold tracking-tight">
-            Selección <span className="text-[var(--text-faint)]">· Monje Malo</span>
+            Selección <span className="text-[var(--text-faint)]">· Monge Malo</span>
           </span>
         </a>
         <a href="#productos" className="btn-ghost !py-2 !px-4 text-sm">

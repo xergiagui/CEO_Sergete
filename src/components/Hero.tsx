@@ -11,7 +11,7 @@ export default function Hero() {
         <Reveal>
           <span className="pill">
             <Bolt width={13} height={13} style={{ color: "var(--gold)" }} />
-            Recursos de Luis Monje Malo · nº1 en ventas y afiliación
+            Recursos de Luis Monge Malo · nº1 en ventas y afiliación
           </span>
         </Reveal>
 
@@ -19,9 +19,7 @@ export default function Hero() {
           <h1 className="mt-6 font-display text-[2.6rem] leading-[1.03] tracking-tight sm:text-6xl md:text-[4.25rem]">
             El dinero no llega por suerte.
             <br className="hidden sm:block" /> Llega cuando aprendes a{" "}
-            <span className="relative whitespace-nowrap text-[var(--gold)]">
-              vender.
-            </span>
+            <span className="relative whitespace-nowrap hl">vender.</span>
           </h1>
         </Reveal>
 

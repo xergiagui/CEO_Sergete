@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const alt =
-  "Aprende a vender y ganar dinero online · 4 recursos de Luis Monje Malo";
+  "Aprende a vender y ganar dinero online · 4 recursos de Luis Monge Malo";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -17,8 +17,8 @@ export default function OgImage() {
           justifyContent: "space-between",
           padding: "72px",
           background:
-            "radial-gradient(900px 500px at 82% -10%, rgba(245,184,65,0.22), transparent 60%), radial-gradient(700px 500px at 5% 110%, rgba(52,211,153,0.14), transparent 60%), #070a12",
-          color: "#eef1f8",
+            "radial-gradient(900px 500px at 82% -10%, rgba(245,158,11,0.16), transparent 60%), radial-gradient(700px 500px at 5% 110%, rgba(37,99,235,0.10), transparent 60%), #ffffff",
+          color: "#14171f",
           fontFamily: "sans-serif",
         }}
       >
@@ -39,8 +39,8 @@ export default function OgImage() {
           >
             M
           </div>
-          <div style={{ fontSize: 24, color: "#9aa3ba" }}>
-            Selección · Monje Malo
+          <div style={{ fontSize: 24, color: "#545c6e" }}>
+            Selección · Monge Malo
           </div>
         </div>
 
@@ -57,7 +57,7 @@ export default function OgImage() {
         >
           <div style={{ display: "flex" }}>El dinero no llega por suerte.</div>
           <div style={{ display: "flex" }}>Llega cuando aprendes</div>
-          <div style={{ display: "flex", color: "#f5b841" }}>a vender.</div>
+          <div style={{ display: "flex", color: "#d97706" }}>a vender.</div>
         </div>
 
         <div style={{ display: "flex", gap: 12 }}>
@@ -67,8 +67,8 @@ export default function OgImage() {
                 key={t}
                 style={{
                   fontSize: 22,
-                  color: "#9aa3ba",
-                  border: "1px solid #2a3247",
+                  color: "#545c6e",
+                  border: "1px solid #d7dbe4",
                   borderRadius: 999,
                   padding: "10px 20px",
                 }}

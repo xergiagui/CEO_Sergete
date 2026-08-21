@@ -68,11 +68,12 @@ function Kpi({
 }
 
 const tooltipStyle = {
-  background: "#0f1420",
-  border: "1px solid #2a3247",
+  background: "#ffffff",
+  border: "1px solid #e7e9ef",
   borderRadius: 12,
-  color: "#eef1f8",
+  color: "#14171f",
   fontSize: 13,
+  boxShadow: "0 8px 24px -12px rgba(23,37,84,0.25)",
 };
 
 export default function StatsPage() {
@@ -191,7 +192,7 @@ export default function StatsPage() {
       <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-4">
         <Kpi label="Visitas" value={totals.views} sub={`${totals.uniqueVisitors} únicos`} />
         <Kpi label="Clics en 'Lo quiero'" value={totals.clicks} accent="var(--azure)" />
-        <Kpi label="Emails captados" value={totals.leads} accent="var(--gold)" />
+        <Kpi label="Emails captados" value={totals.leads} accent="var(--gold-ink)" />
         <Kpi
           label="Conversión total"
           value={`${funnel.viewToLead}%`}
@@ -243,13 +244,13 @@ export default function StatsPage() {
         <h2 className="mb-4 font-display text-lg">Últimos 30 días</h2>
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={series} margin={{ left: -18, right: 8, top: 4 }}>
-            <CartesianGrid stroke="#1e2536" vertical={false} />
-            <XAxis dataKey="day" stroke="#5f6982" fontSize={11} tickLine={false} minTickGap={24} />
-            <YAxis stroke="#5f6982" fontSize={11} tickLine={false} axisLine={false} />
+            <CartesianGrid stroke="#e7e9ef" vertical={false} />
+            <XAxis dataKey="day" stroke="#8b93a3" fontSize={11} tickLine={false} minTickGap={24} />
+            <YAxis stroke="#8b93a3" fontSize={11} tickLine={false} axisLine={false} />
             <Tooltip contentStyle={tooltipStyle} />
-            <Line type="monotone" dataKey="views" name="Visitas" stroke="#5b9cff" strokeWidth={2} dot={false} />
-            <Line type="monotone" dataKey="clicks" name="Clics" stroke="#f5b841" strokeWidth={2} dot={false} />
-            <Line type="monotone" dataKey="leads" name="Emails" stroke="#34d399" strokeWidth={2} dot={false} />
+            <Line type="monotone" dataKey="views" name="Visitas" stroke="#2563eb" strokeWidth={2} dot={false} />
+            <Line type="monotone" dataKey="clicks" name="Clics" stroke="#d97706" strokeWidth={2} dot={false} />
+            <Line type="monotone" dataKey="leads" name="Emails" stroke="#059669" strokeWidth={2} dot={false} />
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -260,11 +261,11 @@ export default function StatsPage() {
           <h2 className="mb-4 font-display text-lg">Rendimiento por producto</h2>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={perProduct} margin={{ left: -18, right: 8 }}>
-              <CartesianGrid stroke="#1e2536" vertical={false} />
-              <XAxis dataKey="name" stroke="#5f6982" fontSize={10} tickLine={false} interval={0} height={50} angle={-12} textAnchor="end" />
-              <YAxis stroke="#5f6982" fontSize={11} tickLine={false} axisLine={false} />
-              <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "#141a2860" }} />
-              <Bar dataKey="clicks" name="Clics" radius={[4, 4, 0, 0]} fill="#5b9cff" />
+              <CartesianGrid stroke="#e7e9ef" vertical={false} />
+              <XAxis dataKey="name" stroke="#8b93a3" fontSize={10} tickLine={false} interval={0} height={50} angle={-12} textAnchor="end" />
+              <YAxis stroke="#8b93a3" fontSize={11} tickLine={false} axisLine={false} />
+              <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(20,23,31,0.05)" }} />
+              <Bar dataKey="clicks" name="Clics" radius={[4, 4, 0, 0]} fill="#2563eb" />
               <Bar dataKey="leads" name="Emails" radius={[4, 4, 0, 0]}>
                 {perProduct.map((p) => (
                   <Cell key={p.id} fill={p.accent} />

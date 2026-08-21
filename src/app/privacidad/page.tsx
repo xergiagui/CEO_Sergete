@@ -57,8 +57,15 @@ export default function Privacidad() {
             <h2 className="mb-2 font-display text-xl text-[var(--text)]">Tus derechos</h2>
             <p>
               Puedes solicitar en cualquier momento acceder, rectificar o eliminar
-              tus datos, así como darte de baja de las comunicaciones. Escríbenos y
-              lo resolvemos.
+              tus datos, así como darte de baja de las comunicaciones. Escríbenos
+              desde la{" "}
+              <a
+                href="/contacto"
+                className="font-medium text-[var(--azure)] underline underline-offset-2"
+              >
+                página de contacto
+              </a>{" "}
+              y lo resolvemos.
             </p>
           </section>
 
@@ -67,7 +74,7 @@ export default function Privacidad() {
               Enlaces de afiliado
             </h2>
             <p>
-              Esta página recomienda productos de Luis Monje Malo mediante enlaces de
+              Esta página recomienda productos de Luis Monge Malo mediante enlaces de
               afiliado. Si compras a través de ellos podemos recibir una comisión sin
               coste adicional para ti.
             </p>

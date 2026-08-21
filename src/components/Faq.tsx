@@ -3,7 +3,7 @@ import Reveal from "@/components/Reveal";
 export const FAQS = [
   {
     q: "¿Qué es exactamente esto?",
-    a: "Una selección de los 4 recursos de Luis Monje Malo para aprender a vender y ganar dinero online. Cada uno resuelve un momento distinto: empezar de cero, entender el modelo, cerrar más ventas o tener acompañamiento continuo.",
+    a: "Una selección de los 4 recursos de Luis Monge Malo para aprender a vender y ganar dinero online. Cada uno resuelve un momento distinto: empezar de cero, entender el modelo, cerrar más ventas o tener acompañamiento continuo.",
   },
   {
     q: "¿Necesito experiencia previa?",
@@ -18,7 +18,7 @@ export const FAQS = [
     a: "Solo para enviarte información útil relacionada con el recurso que te interesa y avisarte de ofertas. Sin spam y con baja en un clic cuando quieras.",
   },
   {
-    q: "¿Quién es Luis Monje Malo?",
+    q: "¿Quién es Luis Monge Malo?",
     a: "Uno de los mayores referentes en ventas y marketing de afiliación en español, con miles de alumnos. Los recursos de esta página son suyos; aquí solo te ayudamos a elegir el que mejor encaja contigo.",
   },
 ];

@@ -22,6 +22,24 @@ Guía paso a paso. Tiempo estimado: **15 minutos**.
 > puede escribir en `leads`/`events` y leer recuentos, sin acceso a nada más de tu
 > base de datos. Ideal si la reutilizas de otro proyecto.
 
+7. (Formulario de contacto) Abre [`supabase/contact.sql`](supabase/contact.sql),
+   copia, pega y **Run**. Crea la tabla `messages` para guardar los mensajes.
+
+### Recibir los mensajes de contacto por email (opcional pero recomendado)
+
+El formulario de `/contacto` guarda cada mensaje en Supabase (tabla `messages`) y,
+si configuras **Resend**, además te lo envía por email:
+
+1. Crea una cuenta gratis en <https://resend.com> con tu email (`xergiagui@gmail.com`).
+2. **API Keys → Create** y copia la clave.
+3. En `.env.local` (y en Vercel) pon:
+   - `RESEND_API_KEY=` la clave de Resend
+   - `CONTACT_EMAIL=` tu email (dónde quieres recibir los mensajes; **no se muestra
+     nunca en la web**)
+
+> Sin Resend, los mensajes igualmente se guardan en Supabase (**Table editor →
+> messages**); solo no llega el aviso por email.
+
 ---
 
 ## 2) Configura las variables de entorno

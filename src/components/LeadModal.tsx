@@ -79,7 +79,7 @@ export default function LeadModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-in"
-      style={{ background: "rgba(4,6,12,0.72)", backdropFilter: "blur(6px)" }}
+      style={{ background: "rgba(15,23,42,0.42)", backdropFilter: "blur(5px)" }}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

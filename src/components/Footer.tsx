@@ -11,11 +11,11 @@ export default function Footer() {
             >
               M
             </span>
-            <span className="text-sm font-semibold">Selección · Monje Malo</span>
+            <span className="text-sm font-semibold">Selección · Monge Malo</span>
           </div>
           <p className="mt-3 text-xs leading-relaxed text-[var(--text-faint)]">
             <strong className="text-[var(--text-muted)]">Aviso de afiliación:</strong>{" "}
-            esta página recomienda productos de Luis Monje Malo. Al comprar a través
+            esta página recomienda productos de Luis Monge Malo. Al comprar a través
             de nuestros enlaces podemos recibir una comisión, sin coste adicional
             para ti. No representamos oficialmente a la marca.
           </p>
@@ -26,6 +26,9 @@ export default function Footer() {
           </a>
           <a href="#faq" className="transition-colors hover:text-[var(--text)]">
             Preguntas frecuentes
+          </a>
+          <a href="/contacto" className="transition-colors hover:text-[var(--text)]">
+            Contacto
           </a>
           <a href="/privacidad" className="transition-colors hover:text-[var(--text)]">
             Privacidad

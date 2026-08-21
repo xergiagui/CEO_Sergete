@@ -127,7 +127,7 @@ export default function ProductsSection({ products }: { products: Product[] }) {
         <span className="pill">Elige tu recurso</span>
         <h2 className="mt-5 font-display text-3xl sm:text-4xl md:text-5xl leading-[1.05] tracking-tight">
           4 formas de empezar a{" "}
-          <span className="text-[var(--gold)]">ganar dinero</span> vendiendo
+          <span className="hl">ganar dinero</span> vendiendo
         </h2>
         <p className="mt-4 text-[var(--text-muted)]">
           Del primer euro como afiliado a cerrar ventas de miles. Elige por dónde
