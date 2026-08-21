@@ -5,7 +5,7 @@ export default function Hero() {
   return (
     <section
       id="top"
-      className="bg-aura bg-grid relative overflow-hidden px-5 pt-16 pb-16 sm:pt-24 sm:pb-24"
+      className="bg-aura relative overflow-hidden px-5 pt-16 pb-16 sm:pt-24 sm:pb-24"
     >
       <div className="mx-auto max-w-3xl text-center">
         <Reveal>

@@ -20,7 +20,7 @@
   /* --- Texto (casi negro, como mongemalo) --- */
   --text: #14171f;
   --text-muted: #545c6e;
-  --text-faint: #8b93a3;
+  --text-faint: #6b7385;
 
   /* --- Acentos (legibles sobre blanco) --- */
   --gold: #f59e0b;        /* CTA / relleno de botón (ámbar vivo) */
@@ -112,17 +112,6 @@ body {
     radial-gradient(60rem 40rem at 82% -10%, rgba(245, 158, 11, 0.12), transparent 60%),
     radial-gradient(46rem 32rem at 6% 4%, rgba(37, 99, 235, 0.09), transparent 55%),
     radial-gradient(70rem 50rem at 50% 120%, rgba(5, 150, 105, 0.07), transparent 60%);
-}
-.bg-grid::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background-image:
-    linear-gradient(to right, rgba(20, 23, 31, 0.045) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(20, 23, 31, 0.045) 1px, transparent 1px);
-  background-size: 64px 64px;
-  mask-image: radial-gradient(70% 55% at 50% 22%, #000 30%, transparent 78%);
 }
 
 /* --- Píldora / etiqueta --- */
