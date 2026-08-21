@@ -18,5 +18,7 @@ __pycache__/
 desktop.ini
 .DS_Store
 
-# Configuración local de Claude Code — no subir
-.claude/
+# Configuración local de Claude Code — no subir…
+.claude/*
+# …excepto la skill Editor_Sergio (código versionado; sin secretos dentro)
+!.claude/skills/
