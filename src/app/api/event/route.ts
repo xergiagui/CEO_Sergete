@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseAdmin } from "@/lib/supabase/server";
+import { getSupabaseServer } from "@/lib/supabase/server";
 import { requestMeta } from "@/lib/request-meta";
 
 export const runtime = "nodejs";
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "bad_type" }, { status: 400 });
   }
 
-  const supabase = getSupabaseAdmin();
+  const supabase = getSupabaseServer();
   // Sin Supabase configurado no rompemos: devolvemos ok para no bloquear la UX.
   if (!supabase) return NextResponse.json({ ok: true, stored: false });
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseAdmin } from "@/lib/supabase/server";
+import { getSupabaseServer } from "@/lib/supabase/server";
 import { requestMeta } from "@/lib/request-meta";
 import { getProduct } from "@/lib/products";
 
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "bad_product" }, { status: 400 });
   }
 
-  const supabase = getSupabaseAdmin();
+  const supabase = getSupabaseServer();
   const meta = requestMeta(req);
 
   // Si Supabase está configurado, guardamos lead + evento email_submit.

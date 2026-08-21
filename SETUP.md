@@ -9,12 +9,18 @@ Guía paso a paso. Tiempo estimado: **15 minutos**.
 1. Entra en <https://supabase.com> → **New project** (es gratis).
 2. Ponle nombre (p. ej. `thelanding`) y elige una contraseña de base de datos.
 3. Cuando esté listo, ve a **SQL Editor → New query**.
-4. Abre el archivo [`supabase/schema.sql`](supabase/schema.sql) de este proyecto,
-   copia **todo** su contenido, pégalo y pulsa **Run**.
-   - Esto crea las tablas `leads` (emails) y `events` (analítica) con seguridad activada.
-5. Ve a **Project Settings → API** y copia estos dos valores:
+4. Abre [`supabase/schema.sql`](supabase/schema.sql), copia **todo**, pégalo y **Run**.
+   - Crea las tablas `leads` (emails) y `events` (analítica) con seguridad (RLS) activada.
+5. Abre [`supabase/policies.sql`](supabase/policies.sql), copia **todo**, pégalo y **Run**.
+   - Da permiso a la clave `anon` para **insertar** (no leer) y crea la función de
+     estadísticas agregadas. Imprescindible para que guarde datos y funcione `/stats`.
+6. Ve a **Project Settings → API** y copia estos dos valores:
    - **Project URL** → será tu `SUPABASE_URL`
-   - **service_role** (en *Project API keys*, ⚠️ la secreta, no la `anon`) → tu `SUPABASE_SERVICE_ROLE_KEY`
+   - **anon public** (en *Project API keys*) → tu `SUPABASE_ANON_KEY`
+
+> Usamos la clave **anon** (no la `service_role`) a propósito: así TheLanding solo
+> puede escribir en `leads`/`events` y leer recuentos, sin acceso a nada más de tu
+> base de datos. Ideal si la reutilizas de otro proyecto.
 
 ---
 
@@ -31,11 +37,11 @@ Guía paso a paso. Tiempo estimado: **15 minutos**.
    ```env
    NEXT_PUBLIC_SITE_URL=http://localhost:3000
    SUPABASE_URL=https://TU-PROYECTO.supabase.co
-   SUPABASE_SERVICE_ROLE_KEY=eyJhbGci...   # la service_role
+   SUPABASE_ANON_KEY=eyJhbGci...   # la clave anon public
    STATS_PASSWORD=una-contraseña-que-tú-elijas
    ```
 
-> `.env.local` **nunca** se sube a Git. La `service_role` solo vive en el servidor.
+> `.env.local` **nunca** se sube a Git. La clave anon solo se usa en el servidor.
 
 ---
 
