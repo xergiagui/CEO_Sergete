@@ -1,26 +1,260 @@
 @import "tailwindcss";
 
+/* ============================================================
+   TheLanding · Sistema de diseño
+   Base oscura premium (tinta azulada) + acentos "de dinero".
+   Tipografía editorial (Fraunces display) + grotesca (Geist).
+   Movimiento según emil-design-eng: 160–200ms, easing propio.
+   ============================================================ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* --- Superficies (tinta azul-negra, no negro plano) --- */
+  --bg: #070a12;
+  --bg-2: #0a0e18;
+  --surface: #0f1420;
+  --surface-2: #141a28;
+  --border: #1e2536;
+  --border-strong: #2a3247;
+
+  /* --- Texto --- */
+  --text: #eef1f8;
+  --text-muted: #9aa3ba;
+  --text-faint: #5f6982;
+
+  /* --- Acentos --- */
+  --gold: #f5b841;
+  --gold-strong: #ffcb5c;
+  --azure: #5b9cff;
+  --emerald: #34d399;
+  --rose: #f27e8d;
+
+  /* Acento principal de marca (dinero) */
+  --accent: var(--gold);
+
+  /* --- Movimiento (emil-design-eng) --- */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 160ms;
+  --dur: 200ms;
+
+  --shadow-lift: 0 24px 60px -20px rgba(0, 0, 0, 0.7);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-muted: var(--text-muted);
+  --color-gold: var(--gold);
+  --color-azure: var(--azure);
+  --color-emerald: var(--emerald);
+  --color-rose: var(--rose);
   --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-fraunces);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  border-color: var(--border);
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-feature-settings: "ss01", "cv01";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--gold);
+  color: #1a1206;
+}
+
+.font-display {
+  font-family: var(--font-fraunces), Georgia, "Times New Roman", serif;
+  font-optical-sizing: auto;
+}
+
+/* --- Fondo con resplandor sutil, no gradiente cliché --- */
+.bg-aura {
+  position: relative;
+  isolation: isolate;
+}
+.bg-aura::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(60rem 40rem at 78% -8%, rgba(245, 184, 65, 0.1), transparent 60%),
+    radial-gradient(48rem 34rem at 8% 6%, rgba(91, 156, 255, 0.08), transparent 55%),
+    radial-gradient(70rem 50rem at 50% 118%, rgba(52, 211, 153, 0.06), transparent 60%);
+}
+.bg-grid::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(70% 55% at 50% 22%, #000 30%, transparent 78%);
+}
+
+/* --- Píldora / etiqueta --- */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: color-mix(in oklab, var(--surface) 70%, transparent);
+}
+
+/* --- Botón primario (acento dorado) --- */
+.btn-primary {
+  --btn: var(--accent);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 650;
+  font-size: 0.98rem;
+  color: #1a1206;
+  background: var(--btn);
+  padding: 0.85rem 1.35rem;
+  border-radius: 0.85rem;
+  border: 1px solid color-mix(in oklab, var(--btn) 80%, white 20%);
+  box-shadow: 0 10px 30px -10px color-mix(in oklab, var(--btn) 60%, transparent);
+  transition: transform var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out),
+    filter var(--dur-fast) var(--ease-out);
+  will-change: transform;
+}
+.btn-primary:hover {
+  filter: brightness(1.06);
+  box-shadow: 0 16px 40px -12px color-mix(in oklab, var(--btn) 70%, transparent);
+}
+.btn-primary:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+/* --- Botón secundario / fantasma --- */
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 550;
+  color: var(--text);
+  background: color-mix(in oklab, var(--surface) 60%, transparent);
+  padding: 0.85rem 1.25rem;
+  border-radius: 0.85rem;
+  border: 1px solid var(--border-strong);
+  transition: border-color var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+.btn-ghost:hover {
+  border-color: color-mix(in oklab, var(--text-muted) 50%, var(--border-strong));
+  background: color-mix(in oklab, var(--surface-2) 80%, transparent);
+}
+.btn-ghost:active {
+  transform: translateY(1px);
+}
+
+/* --- Tarjeta --- */
+.card {
+  position: relative;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--bg-2) 100%);
+  border: 1px solid var(--border);
+  border-radius: 1.25rem;
+  transition: transform var(--dur) var(--ease-out),
+    border-color var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out);
+  will-change: transform;
+}
+.card:hover {
+  transform: translateY(-4px);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-lift);
+}
+
+/* --- Reveal al hacer scroll --- */
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+}
+.reveal.is-visible {
+  animation: reveal var(--dur) var(--ease-out) forwards;
+}
+@keyframes reveal {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- Modal --- */
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.backdrop-in { animation: backdrop-in var(--dur-fast) var(--ease-out) forwards; }
+.modal-in { animation: modal-in var(--dur) var(--ease-out) forwards; }
+
+/* --- Marquesina de prueba social --- */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee 32s linear infinite;
+}
+.marquee-mask {
+  mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+}
+
+/* --- Foco accesible --- */
+:where(a, button, input):focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  border-radius: 0.4rem;
+}
+
+/* --- Respeto a "reducir movimiento" --- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
 }
