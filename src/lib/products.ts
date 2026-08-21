@@ -28,6 +28,8 @@ export type Product = {
   href: string;
   /** Color de acento del producto (hex) */
   accent: string;
+  /** Versión más oscura del acento, legible como texto sobre blanco (AA) */
+  accentInk: string;
   /** Nombre del acento en CSS custom property */
   accentVar: string;
   /** Para quién es (mini-guía "cuál elijo") */
@@ -52,6 +54,7 @@ export const PRODUCTS: Product[] = [
     badge: "Más popular",
     href: "https://mongemalo.com/afiliados/?via=sergio-aguilar",
     accent: "#059669",
+    accentInk: "#047857",
     accentVar: "--emerald",
     bestFor: "Empiezas de cero y quieres tu primer ingreso online.",
   },
@@ -71,6 +74,7 @@ export const PRODUCTS: Product[] = [
     priceValue: 120,
     href: "https://mongemalo.com/mejor-negocio-afiliados/?via=sergio-aguilar",
     accent: "#D97706",
+    accentInk: "#B45309",
     accentVar: "--gold",
     bestFor: "Quieres entender el modelo antes de meterte de lleno.",
   },
@@ -90,6 +94,7 @@ export const PRODUCTS: Product[] = [
     priceValue: 450,
     href: "https://mongemalo.com/curso-objeciones-afiliados/?via=sergio-aguilar",
     accent: "#2563EB",
+    accentInk: "#1D4ED8",
     accentVar: "--azure",
     bestFor: "Ya vendes pero se te caen ventas al final.",
   },
@@ -110,6 +115,7 @@ export const PRODUCTS: Product[] = [
     badge: "Premium",
     href: "https://mongemalo.com/mentoria/?via=sergio-aguilar",
     accent: "#E11D48",
+    accentInk: "#BE123C",
     accentVar: "--rose",
     bestFor: "Vas en serio y quieres acompañamiento continuo.",
   },

@@ -95,7 +95,7 @@ export default function LeadModal({
           <span
             className="pill"
             style={{
-              color: product.accent,
+              color: product.accentInk,
               borderColor: `color-mix(in oklab, ${product.accent} 45%, var(--border-strong))`,
             }}
           >

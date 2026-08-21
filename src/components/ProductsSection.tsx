@@ -51,7 +51,7 @@ function ProductCard({
         <span
           className="pill"
           style={{
-            color: product.accent,
+            color: product.accentInk,
             borderColor: `color-mix(in oklab, ${product.accent} 40%, var(--border-strong))`,
             background: `color-mix(in oklab, ${product.accent} 8%, transparent)`,
           }}
