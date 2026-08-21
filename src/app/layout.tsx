@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Fraunces } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
+import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -14,8 +16,6 @@ const fraunces = Fraunces({
   display: "swap",
   axes: ["opsz", "SOFT", "WONK"],
 });
-
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 const TITLE =
   "Aprende a vender y ganar dinero online · 4 recursos de Luis Monge Malo";
@@ -86,7 +86,10 @@ export default function RootLayout({
       lang="es"
       className={`${geistSans.variable} ${fraunces.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <Analytics />
+      </body>
     </html>
   );
 }

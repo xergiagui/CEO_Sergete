@@ -1,6 +1,5 @@
 import type { MetadataRoute } from "next";
-
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+import { SITE_URL } from "@/lib/site";
 
 // Permite el rastreo general y, explícitamente, el de los crawlers de IA
 // (para máxima visibilidad en respuestas de IA). Bloquea solo /stats y /api.

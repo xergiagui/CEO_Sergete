@@ -8,7 +8,7 @@ import Footer from "@/components/Footer";
 import AnalyticsBeacon from "@/components/AnalyticsBeacon";
 import { PRODUCTS } from "@/lib/products";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+import { SITE_URL } from "@/lib/site";
 
 function StructuredData() {
   const graph = {
