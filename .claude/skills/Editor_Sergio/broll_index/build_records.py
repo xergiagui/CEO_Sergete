@@ -5,7 +5,10 @@ import json, glob, os
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-tech = {r["idx"]: r for r in json.loads((HERE/"broll_tech.json").read_text(encoding="utf-8"))}
+tech = {}
+for tf in sorted(glob.glob(str(HERE/"broll_tech*.json"))):
+    for r in json.loads(Path(tf).read_text(encoding="utf-8")):
+        tech[r["idx"]] = r
 
 sem = {}
 for f in sorted(glob.glob(str(HERE/"sem"/"sem_*.json"))):
