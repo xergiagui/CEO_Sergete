@@ -1,6 +1,6 @@
 @echo off
 REM ============================================================
-REM  Descargador de Videos  -  yt-dlp autonomo (sin instalar nada)
+REM  TheDescarga  -  yt-dlp autonomo (sin instalar nada)
 REM  Uso:  descargar.bat "URL"           -> mejor calidad, MP4
 REM        descargar.bat "URL" audio     -> solo audio MP3
 REM        descargar.bat "URL" 720p      -> calidad concreta MP4

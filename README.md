@@ -1,4 +1,7 @@
-# Descargador de Videos
+# TheDescarga
+
+> Departamento de **descarga de vídeo** del sistema **CEO_Sergete**.
+> (Antes «Descargador de Videos».)
 
 Descarga vídeos de **YouTube**, **Instagram** y muchas otras webs con
 [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) — 100% gratis, sin API externa y
