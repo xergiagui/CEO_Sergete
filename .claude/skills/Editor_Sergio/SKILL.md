@@ -2,7 +2,7 @@
 name: Editor_Sergio
 description: Sistema end-to-end (macOS, Linux, Windows) que toma UN link de viral (IG/TikTok/YouTube) y genera adaptaciones con avatar IA. Setup por popups (AskUserQuestion). Avatar HeyGen V (look subido por UI, mejor calidad) o IV (talking_photo, más barato). Salida 100% LOCAL en ~/Desktop/viral_pipeline_output/<Avatar>/<slug>/ (Airtable está fuera del flujo). Procesa POR FASES con gates (audio → HeyGen → edición). B-roll y música desde carpetas LOCALES (superposiciones/ y musicas/), no Pexels. Cuándo invocar — "Editor_Sergio", "editor de Sergio", "viral pipeline", "monta sistema viral", "setup viral", "adaptaciones de este reel".
 argument-hint: [setup|link]
-allowed-tools: AskUserQuestion, Bash, Read, Write, Edit, Grep, Glob
+allowed-tools: AskUserQuestion, Bash, Read, Write, Edit, Grep, Glob, Skill
 ---
 
 # Editor_Sergio — Viral Pipeline (cross-platform — macOS, Linux, Windows)
@@ -26,6 +26,13 @@ Formato markdown obligatorio (nunca el URL pelado): el CTA de IG `[@mariokaizen]
 
 ### Regla 6 — Avisa SIEMPRE la ruta del archivo en el chat
 Cada vez que se cree un archivo (audio, vídeo HeyGen, vídeo final), DÍSELO al usuario en el chat con la ruta EXACTA, en lenguaje claro. Ej: `📁 Audio creado → En tu Escritorio, dentro de: ~/Desktop/viral_pipeline_output/<Avatar>/<slug>/Audio__audio_final.mp3`. Usa el `local_path` que devuelve cada fase (`phase_a/b/c`). NO cambia dónde se guarda nada; solo se menciona explícitamente.
+
+### Regla 7 — El hook de inicio SIEMPRE vía skill `viral-hook-creator`
+El **hook de inicio** (la 1ª frase de cada guion, la que para el scroll) NUNCA se redacta a mano ni se improvisa: se genera **SIEMPRE** invocando la skill `viral-hook-creator` (herramienta `Skill`).
+- **Cuándo**: en el paso 3 del popup `Link del reel`, al reescribir cada uno de los 3 guiones (un hook por ángulo). Si el usuario pide cambios de hook en `Aprobación` ('Other'), se re-genera igualmente con la skill.
+- **Cómo**: pásale el contexto del clip — tema, remate, `env["AVATAR_DESCRIPTION"]` (nicho/audiencia/tono) y el idioma (`es`/`en`) — y pídele varias opciones de hook. Elige la que mejor encaje con el ángulo del guion y úsala como 1ª frase.
+- **Coherencia**: el hook debe respetar el tono de `AVATAR_DESCRIPTION` (promesa/cifra concreta u orden en la 1ª frase) y quedar en el idioma del avatar.
+- Esto aplica **solo al hook de texto/hablado**; el **gancho visual** (mini-vídeo Pexels, `hook_query` de la Fase C) es independiente y NO lo cubre esta skill.
 
 ---
 
@@ -115,7 +122,7 @@ Tras guardar la descripción → lanza popup `Link del reel`.
 Tras este popup:
 1. `step1_download_and_transcribe(<url>)` — descarga (h264+audio) + transcripción
 2. Diseca el patrón narrativo en chat (hook → desarrollo → CTA)
-3. Reescribe usando `env["AVATAR_DESCRIPTION"]` → propone **3 guiones** (mismo patrón, 3 ángulos distintos)
+3. Reescribe usando `env["AVATAR_DESCRIPTION"]` → propone **3 guiones** (mismo patrón, 3 ángulos distintos). ⚠️ El **hook de inicio (1ª frase)** de CADA guion se genera **SIEMPRE** con la skill `viral-hook-creator` (ver Regla 7); nunca lo redactes a mano.
 4. Lanza popup `Aprobación`
 
 ### Popup `Aprobación` (1 pregunta) — elegir cuántos, o pedir cambios
@@ -220,6 +227,7 @@ Si `~/.viral-pipeline/env.json` ya existe → SKIP setup, lanza directamente pop
 - Popups via AskUserQuestion: Config APIs · Voz · Avatar HeyGen (engine V/IV + ID) · Preferencias · Descripción · Link · Aprobación
 - Avatar V (look UI, /v3 avatar_v) o IV (talking_photo, /v2) — dispatcher `heygen_generate_for_env`
 - Procesa POR FASES con gates (A audio → B HeyGen → C edición)
+- Hook de inicio de cada guion SIEMPRE generado con la skill `viral-hook-creator` (Regla 7)
 - Aprobación: avanzar con 1 / 2 / 3 / los 3, o 'Other' para cambios
 - Salida 100% LOCAL en `~/Desktop/viral_pipeline_output/<Avatar>/<slug>/` (Airtable dormido, solo si preguntan)
 - Sin numeración "popup X/Y"; CTA tras 1er vídeo; links cal.com markdown
