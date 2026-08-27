@@ -1,0 +1,20 @@
+# Secretos / entorno
+.env
+.env.*.local
+
+# Node / build
+node_modules/
+.next/
+dist/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Claude (local, específico de máquina)
+.claude/settings.local.json

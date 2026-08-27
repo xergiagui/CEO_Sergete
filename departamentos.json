@@ -1,0 +1,53 @@
+{
+  "$schema": "./departamentos.schema.json",
+  "descripcion": "Registro de departamentos que CEO_Sergete dirige. Cada entrada es una funcionalidad concreta (una subcarpeta hermana en PruebasIA). Para añadir un módulo nuevo: crea la carpeta hermana, añade aquí su entrada y crea su subagente en .claude/agents/.",
+  "raiz_proyectos": "C:\\Users\\ico858\\Desktop\\PruebasIA",
+  "departamentos": [
+    {
+      "id": "descarga",
+      "nombre": "TheDescarga",
+      "ruta": "C:\\Users\\ico858\\Desktop\\PruebasIA\\TheDescarga",
+      "ruta_relativa": "../TheDescarga",
+      "repo": "https://github.com/xergiagui/DescargadorVideos.git",
+      "subagente": "descarga",
+      "que_hace": "Descarga vídeos de YouTube/Instagram/TikTok/etc. con yt-dlp local (sin instalar nada). Salida en TheDescarga/descargas/.",
+      "disparadores": ["descarga", "descárgame", "baja este vídeo", "yt-dlp", "guardar reel", "bajar audio", "mp3 de"],
+      "entrypoint": "tools\\yt-dlp.exe  ·  o  descargar.bat \"URL\" [audio|1080p|720p]",
+      "autonomo": true
+    },
+    {
+      "id": "editor",
+      "nombre": "TheEditor",
+      "ruta": "C:\\Users\\ico858\\Desktop\\PruebasIA\\TheEditor",
+      "ruta_relativa": "../TheEditor",
+      "repo": "https://github.com/xergiagui/TheEditor.git",
+      "subagente": "editor",
+      "que_hace": "Pipeline viral end-to-end: 1 link → adaptaciones con avatar IA (HeyGen) → b-roll semántico + subtítulos + música → vídeo final local. Skill interactiva 'Editor_Sergio' con popups y gates por fases.",
+      "disparadores": ["editor", "viral pipeline", "adaptaciones de este reel", "monta el sistema viral", "avatar", "heygen", "b-roll", "subtítulos"],
+      "entrypoint": ".venv\\Scripts\\python  .claude/skills/Editor_Sergio/generate_from_link.py   (o skill Editor_Sergio para el flujo interactivo)",
+      "assets_locales": ["superposiciones/", "musicas/", "whisper/", "fonts/"],
+      "nota": "Sus rutas de assets son relativas al cwd → el subagente SIEMPRE trabaja dentro de TheEditor. El flujo completo con popups es la skill Editor_Sergio (vive en TheEditor).",
+      "autonomo": false
+    },
+    {
+      "id": "landing",
+      "nombre": "TheLanding",
+      "ruta": "C:\\Users\\ico858\\Desktop\\PruebasIA\\TheLanding",
+      "ruta_relativa": "../TheLanding",
+      "repo": "https://github.com/xergiagui/TheLanding.git",
+      "subagente": "landing",
+      "que_hace": "Landing de afiliación (Monge Malo), Next.js + Supabase, desplegada en Vercel (the-landing-ten.vercel.app). Leads/events/messages en Supabase, panel /stats.",
+      "disparadores": ["landing", "web", "next.js", "vercel", "leads", "formulario", "/stats", "despliega la landing"],
+      "entrypoint": "npm run dev  ·  npm run build  ·  git push (deploy auto en Vercel)",
+      "supabase": "https://akuykrrqmivrcjzcsksj.supabase.co (reutilizado de mis-finanzas)",
+      "autonomo": true
+    }
+  ],
+  "supabase_compartido": {
+    "url": "https://akuykrrqmivrcjzcsksj.supabase.co",
+    "origen": "proyecto reutilizado de 'mis-finanzas' (mismo que TheLanding y el catálogo b-roll de TheEditor)",
+    "tablas_relevantes": ["leads", "events", "messages", "broll_assets", "ceo_tasks"],
+    "rpc": ["match_broll"],
+    "creds": "en .env (SUPABASE_URL + SUPABASE_ANON_KEY), no se sube a git"
+  }
+}
