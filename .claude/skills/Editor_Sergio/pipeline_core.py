@@ -40,6 +40,10 @@ WORK_DIR.mkdir(exist_ok=True)
 # Carpeta de fuentes de la skill (Montserrat) para libass
 SKILL_DIR = Path(__file__).resolve().parent
 FONTS_DIR = SKILL_DIR / "fonts"
+# Raíz del proyecto TheEditor (skills/Editor_Sergio -> skills -> .claude -> TheEditor).
+# Los assets locales (superposiciones/, musicas/) cuelgan de aquí, así que el
+# pipeline funciona sea cual sea el cwd (p. ej. invocado desde CEO_Sergete).
+PROJECT_ROOT = SKILL_DIR.parents[2]
 
 
 # ============================================================
@@ -936,7 +940,7 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
     # B-roll a pantalla completa. Prioridad: superposiciones LOCALES; Pexels
     # solo como fallback.
     if overlays_dir is None:
-        overlays_dir = (env or {}).get("OVERLAYS_DIR") or (Path.cwd() / "superposiciones")
+        overlays_dir = (env or {}).get("OVERLAYS_DIR") or (PROJECT_ROOT / "superposiciones")
     overlays_dir = Path(overlays_dir)
     overlays = _list_overlay_videos(overlays_dir)
 

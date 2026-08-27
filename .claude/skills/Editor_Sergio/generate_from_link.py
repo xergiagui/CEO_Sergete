@@ -18,7 +18,7 @@ import traceback
 from pathlib import Path
 
 from pipeline_core import (
-    load_env, WORK_DIR,
+    load_env, WORK_DIR, PROJECT_ROOT,
     download_reel, transcribe_video,
     tts_elevenlabs, process_audio,
     heygen_generate_for_env, heygen_wait_for_env, burn_subs_and_music,
@@ -105,10 +105,10 @@ def phase_c_edit(env: dict, heygen_path: str, avatar: str, slug: str,
     try:
         print("  [edit] gancho + B-roll (superposiciones locales) + subs ASS + música + de-click...")
         # Recursos locales por defecto (sin depender del setup con APIs):
-        #   música   -> env['MUSIC_DIR']    o <cwd>/musicas
-        #   b-roll    -> env['OVERLAYS_DIR'] o <cwd>/superposiciones
-        music_dir = Path(env.get("MUSIC_DIR") or (Path.cwd() / "musicas"))
-        overlays_dir = Path(env.get("OVERLAYS_DIR") or (Path.cwd() / "superposiciones"))
+        #   música   -> env['MUSIC_DIR']    o <TheEditor>/musicas
+        #   b-roll    -> env['OVERLAYS_DIR'] o <TheEditor>/superposiciones
+        music_dir = Path(env.get("MUSIC_DIR") or (PROJECT_ROOT / "musicas"))
+        overlays_dir = Path(env.get("OVERLAYS_DIR") or (PROJECT_ROOT / "superposiciones"))
         # Gancho: imagen libre online. Si no se pasa query, se deriva del slug.
         if not hook_query:
             hook_query = slug.replace("-", " ").replace("_", " ").strip() or None
