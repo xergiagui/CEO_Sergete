@@ -36,7 +36,8 @@ echo "[bootstrap] instalando deps Python..."
     faster-whisper \
     Pillow \
     imageio-ffmpeg \
-    yt-dlp
+    yt-dlp \
+    fastembed
 
 # 4. Verificar que el ffmpeg bundled tiene libass
 echo "[bootstrap] verificando ffmpeg+libass..."

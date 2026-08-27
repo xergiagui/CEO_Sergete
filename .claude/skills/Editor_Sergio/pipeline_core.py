@@ -793,9 +793,94 @@ def _broll_windows_from_speech(phrases: list[dict], duration: float,
         end = min(start + seg, duration - tail)
         if end - start < min_seg * 0.75:
             continue
-        windows.append((round(start, 3), round(end, 3)))
+        windows.append((round(start, 3), round(end, 3), ph.get("text", "")))
         last_start = start
     return windows
+
+
+# ============================================================
+# 8c. SELECCIÓN SEMÁNTICA DE B-ROLL (Supabase + embeddings locales)
+#
+# Casa cada frase hablada con el b-roll más afín del catálogo `broll_assets`
+# (ver broll_assets.sql en TheLanding). Usa el MISMO modelo con el que se
+# indexó: paraphrase-multilingual-MiniLM-L12-v2 (fastembed, 384d, local).
+# Todo es best-effort: si falta fastembed, Supabase o las claves, devuelve
+# None y el caller cae a selección local al azar.
+# ============================================================
+_EMBED_MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+_embed_model = None
+_broll_aviso_cache = None
+
+
+def _get_embed_model():
+    global _embed_model
+    if _embed_model is None:
+        from fastembed import TextEmbedding
+        _embed_model = TextEmbedding(model_name=_EMBED_MODEL_NAME)
+    return _embed_model
+
+
+def embed_text(text: str) -> list:
+    """Embedding 384d de un texto con el modelo del catálogo (mismo que indexó)."""
+    v = next(iter(_get_embed_model().embed([text])))
+    return [float(x) for x in v]
+
+
+def _supabase_headers(env: dict) -> dict:
+    key = env.get("SUPABASE_ANON_KEY", "")
+    return {"apikey": key, "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json"}
+
+
+def _broll_avisos(env: dict) -> set:
+    """Filenames del catálogo con algún aviso (marca/persona/calidad) → evitar.
+    Cacheado por proceso. Set vacío si Supabase no responde."""
+    global _broll_aviso_cache
+    if _broll_aviso_cache is not None:
+        return _broll_aviso_cache
+    out = set()
+    url = (env or {}).get("SUPABASE_URL", "").rstrip("/")
+    if url and env.get("SUPABASE_ANON_KEY"):
+        try:
+            r = httpx.get(f"{url}/rest/v1/broll_assets",
+                          params={"select": "filename,logical_tags"},
+                          headers=_supabase_headers(env), timeout=20)
+            if r.status_code == 200:
+                for row in r.json():
+                    tags = row.get("logical_tags") or []
+                    if any(str(t).startswith("aviso") for t in tags):
+                        out.add(row["filename"])
+        except Exception:
+            pass
+    _broll_aviso_cache = out
+    return out
+
+
+def broll_match_filename(phrase: str, env: dict, exclude=(),
+                         want_orientation: str = None,
+                         threshold: float = 0.30, k: int = 8):
+    """Filename del b-roll más afín a `phrase` por encima de `threshold`,
+    evitando `exclude` y los clips con aviso. None si nada supera el umbral o
+    si no hay Supabase/embeddings disponibles (→ el caller usa azar)."""
+    url = (env or {}).get("SUPABASE_URL", "").rstrip("/")
+    if not url or not env.get("SUPABASE_ANON_KEY") or not (phrase or "").strip():
+        return None
+    try:
+        body = {"query_embedding": embed_text(phrase), "match_count": k,
+                "want_orientation": want_orientation}
+        r = httpx.post(f"{url}/rest/v1/rpc/match_broll",
+                       headers=_supabase_headers(env), json=body, timeout=20)
+        if r.status_code != 200:
+            return None
+        avisos = _broll_avisos(env)
+        for row in r.json():  # vienen ordenados por similitud desc
+            fn = row.get("filename")
+            if not fn or fn in exclude or fn in avisos:
+                continue
+            return fn if (row.get("similarity") or 0) >= threshold else None
+    except Exception:
+        return None
+    return None
 
 
 # ============================================================
@@ -843,10 +928,10 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
     words = [{"word": _mask_profanidad(w.word.strip()), "start": w.start, "end": w.end}
              for s in segs for w in s.words]
 
-    # Ventanas de b-roll SINCRONIZADAS con la voz (entran al arrancar una frase,
-    # salen en la pausa siguiente); si no hay frases → intervalos (legacy).
+    # Ventanas de b-roll SINCRONIZADAS con la voz: (start, end, texto-de-frase).
+    # Si no hay frases → intervalos (legacy).
     phrases = _phrases_from_words(words)
-    windows = _broll_windows_from_speech(phrases, duration)
+    windows_full = _broll_windows_from_speech(phrases, duration)
 
     # B-roll a pantalla completa. Prioridad: superposiciones LOCALES; Pexels
     # solo como fallback.
@@ -856,13 +941,35 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
     overlays = _list_overlay_videos(overlays_dir)
 
     clips = []
-    if overlays:
-        # 1 clip por ventana de voz (si no hubo frases → ~1 cada 6s, legacy)
-        n = max(1, len(windows)) if windows else max(1, int(duration // 6))
-        pool = overlays[:]
+    windows = []
+    if overlays and windows_full:
+        # SELECCIÓN SEMÁNTICA: por cada ventana (=frase) pedimos a Supabase
+        # (match_broll) el b-roll más afín; si no supera umbral o no hay
+        # Supabase, caemos a uno LOCAL al azar. Evitamos repetir clip y los
+        # marcados 'aviso-*' (marca/persona/calidad).
+        by_name = {p.name: p for p in overlays}
+        avisos = _broll_avisos(env or {})
+        used = set()
+        n_sem = 0
+        for (s, e, text) in windows_full:
+            fn = broll_match_filename(text, env or {}, exclude=used) if (env and text) else None
+            if fn and fn in by_name:
+                clip = by_name[fn]; used.add(fn); src = "sem"; n_sem += 1
+            else:
+                pool = ([o for o in overlays if o.name not in used and o.name not in avisos]
+                        or [o for o in overlays if o.name not in used] or overlays)
+                clip = random.choice(pool); used.add(clip.name); src = "azar"
+            clips.append(clip); windows.append((s, e))
+            print(f"  [broll] {s:.1f}-{e:.1f}s -> {clip.name} ({src})")
+        print(f"  [broll] {len(clips)} cortes sinc. con la voz ({n_sem} por semántica)")
+    elif overlays:
+        # sin frases detectadas → intervalos regulares (legacy), clips al azar
+        avisos = _broll_avisos(env or {})
+        n = max(1, int(duration // 6))
+        pool = [o for o in overlays if o.name not in avisos] or overlays
         random.shuffle(pool)
-        clips = (pool * (n // len(pool) + 1))[:n]  # cicla si hay menos que n
-        print(f"  [broll] {len(clips)} superposiciones locales de {overlays_dir}")
+        clips = (pool * (n // len(pool) + 1))[:n]
+        print(f"  [broll] {len(clips)} superposiciones locales (intervalos, sin frases)")
     else:
         pexels_key = (env or {}).get("PEXELS_API_KEY", "").strip()
         if pexels_key and broll_keywords:
@@ -880,12 +987,9 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
     if clips:
         base_video = heygen_mp4.parent / "with_broll.mp4"
         if windows:
-            use_win = windows[:len(clips)]
-            print(f"  [broll] {len(use_win)} cortes SINCRONIZADOS con la voz")
             _, broll_starts = apply_broll_overlay(
-                heygen_mp4, clips, duration, base_video, windows=use_win)
+                heygen_mp4, clips, duration, base_video, windows=windows)
         else:
-            print(f"  [broll] {len(clips)} cortes a intervalos (sin frases detectadas)")
             _, broll_starts = apply_broll_overlay(
                 heygen_mp4, clips, duration, base_video)
 

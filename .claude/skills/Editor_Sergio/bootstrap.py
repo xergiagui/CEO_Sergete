@@ -57,6 +57,7 @@ def main():
     run([
         PIP, "install", "--quiet",
         "httpx", "faster-whisper", "Pillow", "imageio-ffmpeg", "yt-dlp",
+        "fastembed",  # embeddings locales para selección semántica de b-roll
     ])
 
     # 4. Resolver el ffmpeg bundled
