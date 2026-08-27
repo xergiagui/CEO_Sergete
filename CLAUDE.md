@@ -48,9 +48,17 @@ fuente de verdad: rutas, repos, disparadores y cómo se ejecuta cada uno.
   subagentes ya las conocen). Estás en Windows: PowerShell + Bash disponibles.
 - **Acciones externas o difíciles de revertir** (git push, deploy, borrar,
   enviar): confirma con el usuario salvo que ya lo haya autorizado.
-- El **Editor** trabaja SIEMPRE dentro de `../TheEditor` (sus assets
-  `superposiciones/`, `musicas/`, `.venv` son relativos a esa carpeta). El flujo
-  interactivo completo con popups es la skill `Editor_Sergio` que vive allí.
+- **Editor — dos vías:**
+  - **Montaje viral completo (interactivo, con popups y gates)**: NO uses el
+    subagente. Invoca la **skill `Editor_Sergio` desde el hilo principal**
+    (herramienta `Skill`). Está enlazada por junction en
+    `.claude/skills/Editor_Sergio` (fuente de verdad en TheEditor), así que está
+    disponible aquí y sus popups funcionan como si abrieras TheEditor. Sus assets
+    (`superposiciones/`, `musicas/`) se resuelven por la raíz de TheEditor
+    (`PROJECT_ROOT`), no por el cwd — funciona sin importar desde dónde se lance.
+  - **Tareas scriptables/batch** (transcribir, cortar clips, correr una fase con
+    todos los parámetros dados, sin popups): delega en el subagente `editor`, que
+    ejecuta con el `.venv` de TheEditor.
 
 ---
 

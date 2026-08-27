@@ -18,3 +18,7 @@ Thumbs.db
 
 # Claude (local, específico de máquina)
 .claude/settings.local.json
+
+# Skills enlazadas por junction desde su proyecto de origen (fuente de verdad
+# en TheEditor, etc.). No se versionan aquí para no duplicar.
+.claude/skills/

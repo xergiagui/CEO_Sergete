@@ -24,9 +24,10 @@
       "subagente": "editor",
       "que_hace": "Pipeline viral end-to-end: 1 link → adaptaciones con avatar IA (HeyGen) → b-roll semántico + subtítulos + música → vídeo final local. Skill interactiva 'Editor_Sergio' con popups y gates por fases.",
       "disparadores": ["editor", "viral pipeline", "adaptaciones de este reel", "monta el sistema viral", "avatar", "heygen", "b-roll", "subtítulos"],
-      "entrypoint": ".venv\\Scripts\\python  .claude/skills/Editor_Sergio/generate_from_link.py   (o skill Editor_Sergio para el flujo interactivo)",
+      "entrypoint": "Montaje interactivo → skill Editor_Sergio desde el hilo principal (Skill). Batch/scripts → subagente 'editor' con .venv/Scripts/python.",
       "assets_locales": ["superposiciones/", "musicas/", "whisper/", "fonts/"],
-      "nota": "Sus rutas de assets son relativas al cwd → el subagente SIEMPRE trabaja dentro de TheEditor. El flujo completo con popups es la skill Editor_Sergio (vive en TheEditor).",
+      "skill_interactiva": "Editor_Sergio (enlazada por junction en CEO_Sergete/.claude/skills/, fuente de verdad en TheEditor). Disponible desde el hilo principal de CEO_Sergete; sus popups funcionan igual que en TheEditor.",
+      "nota": "Assets resueltos por PROJECT_ROOT (raíz de TheEditor), no por el cwd → el montaje funciona desde cualquier carpeta. El flujo completo con popups va por la skill (hilo principal), no por el subagente.",
       "autonomo": false
     },
     {
