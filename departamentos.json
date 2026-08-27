@@ -13,6 +13,8 @@
       "que_hace": "Descarga vídeos de YouTube/Instagram/TikTok/etc. con yt-dlp local (sin instalar nada). Salida en TheDescarga/descargas/.",
       "disparadores": ["descarga", "descárgame", "baja este vídeo", "yt-dlp", "guardar reel", "bajar audio", "mp3 de"],
       "entrypoint": "tools\\yt-dlp.exe  ·  o  descargar.bat \"URL\" [audio|1080p|720p]",
+      "salida": "TheDescarga\\descargas\\<video>.mp4",
+      "handoff": "Los vídeos bajados se tratan luego en TheEditor: descargas/ -> TheEditor/input/ (buzón). El subagente 'editor' hace la ingesta.",
       "autonomo": true
     },
     {
@@ -25,6 +27,8 @@
       "que_hace": "Pipeline viral end-to-end: 1 link → adaptaciones con avatar IA (HeyGen) → b-roll semántico + subtítulos + música → vídeo final local. Skill interactiva 'Editor_Sergio' con popups y gates por fases.",
       "disparadores": ["editor", "viral pipeline", "adaptaciones de este reel", "monta el sistema viral", "avatar", "heygen", "b-roll", "subtítulos"],
       "entrypoint": "Montaje interactivo → skill Editor_Sergio desde el hilo principal (Skill). Batch/scripts → subagente 'editor' con .venv/Scripts/python.",
+      "buzon_entrada": "TheEditor\\input\\  (aquí llegan los vídeos de TheDescarga para tratarse)",
+      "flujo_video_local": "transcribir.py -> (elegir momentos) -> clips.py -> editar_clips.py. Nota: clips.py/editar_clips.py tienen nombre+timestamps a mano; adaptarlos por vídeo.",
       "assets_locales": ["superposiciones/", "musicas/", "whisper/", "fonts/"],
       "skill_interactiva": "Editor_Sergio (enlazada por junction en CEO_Sergete/.claude/skills/, fuente de verdad en TheEditor). Disponible desde el hilo principal de CEO_Sergete; sus popups funcionan igual que en TheEditor.",
       "nota": "Assets resueltos por PROJECT_ROOT (raíz de TheEditor), no por el cwd → el montaje funciona desde cualquier carpeta. El flujo completo con popups va por la skill (hilo principal), no por el subagente.",

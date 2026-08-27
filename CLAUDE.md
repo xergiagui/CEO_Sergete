@@ -62,6 +62,43 @@ fuente de verdad: rutas, repos, disparadores y cómo se ejecuta cada uno.
 
 ---
 
+## Flujo descarga → editor (encadenado principal)
+
+Los vídeos que baja **TheDescarga** se **tratan después en TheEditor**. Handoff:
+
+```
+TheDescarga/descargas/<video>.mp4   →   TheEditor/input/<video>.mp4   →   tratamiento
+```
+
+`TheEditor/input/` es el **buzón** del editor. El editor tiene DOS tratamientos
+según lo que se quiera:
+
+1. **Vídeo local largo → clips verticales editados** (lo típico para un vídeo ya
+   descargado): `transcribir.py` (→ .txt/.srt/.json) → elegir momentos con gancho
+   → `clips.py` (recorte 9:16 + quita silencios) → `editar_clips.py` (b-roll +
+   música + subs, Fase C de Editor_Sergio). **Este es el flujo para los vídeos de
+   TheDescarga.**
+2. **Adaptaciones con avatar IA** (pipeline viral, skill `Editor_Sergio`): parte
+   del **LINK**, no del archivo — se descarga solo. Si el usuario quiere avatar a
+   partir de un reel, pásale la **URL** a la skill (no hace falta TheDescarga).
+
+**Orquestación de «descarga esto y trátalo/edítalo»:**
+1. Delega en el subagente `descarga` con la URL → devuelve la ruta del MP4 en
+   `TheDescarga/descargas/`.
+2. Delega en el subagente `editor` con esa ruta → copia el MP4 a
+   `TheEditor/input/` y ejecuta el tratamiento (empezando por `transcribir.py`).
+3. Reporta al usuario las rutas de salida (`transcripciones/<video>/…`,
+   `…/clips/`, `…/finales/`).
+
+> Nota honesta: `clips.py` y `editar_clips.py` hoy tienen el nombre del vídeo y
+> los timestamps de los cortes **fijados a mano** (para «Mi Adicción»). La
+> transcripción es genérica; la **selección de momentos** aún requiere criterio
+> (tú o el editor eligiendo los cortes). Se puede generalizar para que acepten
+> vídeo + timestamps por argumento — proponlo si el usuario quiere el flujo 100%
+> automático.
+
+---
+
 ## Supabase (compartido)
 
 Un único proyecto Supabase reutilizado (`akuykrrqmivrcjzcsksj.supabase.co`,

@@ -37,6 +37,22 @@ la raíz de TheEditor (`PROJECT_ROOT` en `pipeline_core.py`), **no** por el cwd 
 así que el montaje funciona aunque se lance desde otra carpeta. Aun así, para los
 scripts sueltos conviene el cwd en TheEditor.
 
+## Ingesta de vídeos descargados (buzón `input/`)
+Los vídeos que baja **TheDescarga** (`../TheDescarga/descargas/<video>.mp4`) se
+tratan aquí. Cuando el CEO te pase una ruta de vídeo para tratar/editar:
+1. **Cópialo al buzón**: `cp "../TheDescarga/descargas/<video>.mp4" "input/<video>.mp4"`
+   (así lo ven `clips.py`/`editar_clips.py`, que leen de `input/`).
+2. **Transcribe**: `.venv/Scripts/python transcribir.py "input/<video>.mp4"`
+   → genera `transcripciones/<video>/<video>.{txt,srt,json}`.
+3. **Clips + edición** (si se pide vídeo final): elige los momentos con gancho a
+   partir de la transcripción, y aplica `clips.py` (recorte 9:16 + quita
+   silencios) → `editar_clips.py` (Fase C: b-roll + música + subs).
+   ⚠️ Hoy `clips.py` y `editar_clips.py` tienen el **nombre del vídeo y los
+   timestamps fijados a mano**. Para un vídeo nuevo hay que adaptarlos (o pedir
+   al CEO/usuario que confirme los cortes). Avisa de esto; no inventes cortes.
+`transcribir.py` acepta cualquier ruta, así que para SOLO transcribir puedes
+pasar directamente `../TheDescarga/descargas/<video>.mp4` sin copiar.
+
 ## Cómo trabajas
 1. **Tareas puntuales scriptables** (transcribir, cortar clips, revisar SRT):
    corre el script correspondiente con `.venv/Scripts/python` desde TheEditor.
