@@ -39,7 +39,12 @@ scripts sueltos conviene el cwd en TheEditor.
 
 ## Ingesta de vídeos descargados (buzón `input/`)
 Los vídeos que baja **TheDescarga** (`../TheDescarga/descargas/<video>.mp4`) se
-tratan aquí. Cuando el CEO te pase una ruta de vídeo para tratar/editar:
+tratan aquí. Si el CEO te pasa una ruta y un encargo de «clips editados», haz
+**toda la cadena de un tirón** (copia → transcribe → `cortes.json` → `clips.py` →
+`editar_clips.py`) y devuelve las rutas de `finales/`. **Nº de clips por
+defecto** si no te lo dan: ~1 por cada 3 min, mín. 3 y máx. 6.
+
+Cuando el CEO te pase una ruta de vídeo para tratar/editar:
 1. **Cópialo al buzón**: `cp "../TheDescarga/descargas/<video>.mp4" "input/<video>.mp4"`
    (así lo ven `clips.py`/`editar_clips.py`, que leen de `input/`).
 2. **Transcribe**: `.venv/Scripts/python transcribir.py "input/<video>.mp4"`

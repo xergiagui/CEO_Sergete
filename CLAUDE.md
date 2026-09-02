@@ -99,6 +99,28 @@ según lo que se quiera:
 > `editar_clips.py` son genéricos: no se edita código por vídeo. Si el usuario
 > quiere revisar/ajustar los cortes antes de renderizar, que edite `cortes.json`.
 
+### Receta: «una sola orden» (URL → clips editados)
+
+Cuando el usuario diga algo como *«descarga esto y sácame N clips»* (o solo pegue
+una URL pidiendo clips), **ejecuta toda la cadena sin volver a preguntar** salvo
+que falte información esencial:
+
+1. **`descarga`** (subagente) baja la URL → ruta del MP4 en `TheDescarga/descargas/`.
+2. **`editor`** (subagente), en un solo encargo, hace:
+   `input/` ← copia · `transcribir.py` · **genera `cortes.json`** · `clips.py` ·
+   `editar_clips.py` → `finales/`.
+3. Reporta al usuario: nº de clips, rutas de `finales/` y un resumen de los
+   momentos elegidos (para que pueda pedir ajustes).
+
+**Nº de clips por defecto:** si el usuario no lo dice, elige según duración del
+vídeo — orientación: **1 clip por cada ~3 min**, mínimo 3 y máximo 6. Si el
+usuario da un número, respétalo.
+
+**Antes de renderizar, punto de control ligero:** si el vídeo es largo o el
+usuario parece querer control, ofrécele ver el `cortes.json` propuesto antes de
+lanzar `editar_clips.py` (que es lo más costoso). Si pidió que sea directo, tira
+del tirón.
+
 ---
 
 ## Supabase (compartido)
