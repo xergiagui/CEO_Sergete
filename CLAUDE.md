@@ -74,10 +74,12 @@ TheDescarga/descargas/<video>.mp4   →   TheEditor/input/<video>.mp4   →   tr
 según lo que se quiera:
 
 1. **Vídeo local largo → clips verticales editados** (lo típico para un vídeo ya
-   descargado): `transcribir.py` (→ .txt/.srt/.json) → elegir momentos con gancho
-   → `clips.py` (recorte 9:16 + quita silencios) → `editar_clips.py` (b-roll +
-   música + subs, Fase C de Editor_Sergio). **Este es el flujo para los vídeos de
-   TheDescarga.**
+   descargado): `transcribir.py` (→ .txt/.srt/.json) → **el editor genera
+   `cortes.json`** eligiendo los momentos con gancho desde la transcripción →
+   `clips.py` (recorte 9:16 + quita silencios) → `editar_clips.py` (b-roll +
+   música + subs, Fase C). **Este es el flujo para los vídeos de TheDescarga**, y
+   es **100% automático**: los scripts son genéricos y leen `cortes.json`; no se
+   edita código por vídeo.
 2. **Adaptaciones con avatar IA** (pipeline viral, skill `Editor_Sergio`): parte
    del **LINK**, no del archivo — se descarga solo. Si el usuario quiere avatar a
    partir de un reel, pásale la **URL** a la skill (no hace falta TheDescarga).
@@ -86,16 +88,16 @@ según lo que se quiera:
 1. Delega en el subagente `descarga` con la URL → devuelve la ruta del MP4 en
    `TheDescarga/descargas/`.
 2. Delega en el subagente `editor` con esa ruta → copia el MP4 a
-   `TheEditor/input/` y ejecuta el tratamiento (empezando por `transcribir.py`).
+   `TheEditor/input/`, transcribe, **genera `cortes.json`** (elige los momentos
+   con las reglas de Sergio) y ejecuta `clips.py` → `editar_clips.py`.
 3. Reporta al usuario las rutas de salida (`transcripciones/<video>/…`,
    `…/clips/`, `…/finales/`).
 
-> Nota honesta: `clips.py` y `editar_clips.py` hoy tienen el nombre del vídeo y
-> los timestamps de los cortes **fijados a mano** (para «Mi Adicción»). La
-> transcripción es genérica; la **selección de momentos** aún requiere criterio
-> (tú o el editor eligiendo los cortes). Se puede generalizar para que acepten
-> vídeo + timestamps por argumento — proponlo si el usuario quiere el flujo 100%
-> automático.
+> El único paso con criterio es **elegir los momentos de corte**, y lo hace el
+> subagente `editor` (LLM) leyendo la transcripción y escribiendo `cortes.json`
+> (esquema en `TheEditor/cortes.example.json`). Los scripts `clips.py` /
+> `editar_clips.py` son genéricos: no se edita código por vídeo. Si el usuario
+> quiere revisar/ajustar los cortes antes de renderizar, que edite `cortes.json`.
 
 ---
 

@@ -44,14 +44,27 @@ tratan aquí. Cuando el CEO te pase una ruta de vídeo para tratar/editar:
    (así lo ven `clips.py`/`editar_clips.py`, que leen de `input/`).
 2. **Transcribe**: `.venv/Scripts/python transcribir.py "input/<video>.mp4"`
    → genera `transcripciones/<video>/<video>.{txt,srt,json}`.
-3. **Clips + edición** (si se pide vídeo final): elige los momentos con gancho a
-   partir de la transcripción, y aplica `clips.py` (recorte 9:16 + quita
-   silencios) → `editar_clips.py` (Fase C: b-roll + música + subs).
-   ⚠️ Hoy `clips.py` y `editar_clips.py` tienen el **nombre del vídeo y los
-   timestamps fijados a mano**. Para un vídeo nuevo hay que adaptarlos (o pedir
-   al CEO/usuario que confirme los cortes). Avisa de esto; no inventes cortes.
+3. **Genera `cortes.json`** (el paso "inteligente", 100% tuyo): lee la
+   transcripción (usa el `.json`/`.srt`, que traen tiempos) y **elige los mejores
+   momentos** aplicando las reglas de Sergio (empezar tarde/terminar pronto, el
+   hook cumple la promesa, unidad de sentido). Escríbelo en
+   `transcripciones/<video>/cortes.json` con este esquema (ver también
+   `cortes.example.json` en la raíz de TheEditor):
+   ```json
+   [{"nombre":"01_gancho","inicio":42.0,"fin":66.7,
+     "titulo":"...","hook_query":"stock query en inglés para la imagen-gancho"}]
+   ```
+4. **Clips + edición** (los scripts YA son genéricos, no se edita código):
+   - `.venv/Scripts/python clips.py "<video>"` → clips 9:16 sin silencios en
+     `transcripciones/<video>/clips/`.
+   - `.venv/Scripts/python editar_clips.py "<video>"` → Fase C (b-roll + gancho +
+     música + subs) → `transcripciones/<video>/finales/`.
+   Ambos aceptan también una ruta directa y `--cortes <ruta>`.
 `transcribir.py` acepta cualquier ruta, así que para SOLO transcribir puedes
 pasar directamente `../TheDescarga/descargas/<video>.mp4` sin copiar.
+
+Regla: **no inventes cortes al azar**; básate en la transcripción y en las reglas
+de recorte/hook. Si el usuario pidió un nº concreto de clips, respétalo.
 
 ## Cómo trabajas
 1. **Tareas puntuales scriptables** (transcribir, cortar clips, revisar SRT):

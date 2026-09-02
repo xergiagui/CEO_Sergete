@@ -28,7 +28,7 @@
       "disparadores": ["editor", "viral pipeline", "adaptaciones de este reel", "monta el sistema viral", "avatar", "heygen", "b-roll", "subtítulos"],
       "entrypoint": "Montaje interactivo → skill Editor_Sergio desde el hilo principal (Skill). Batch/scripts → subagente 'editor' con .venv/Scripts/python.",
       "buzon_entrada": "TheEditor\\input\\  (aquí llegan los vídeos de TheDescarga para tratarse)",
-      "flujo_video_local": "transcribir.py -> (elegir momentos) -> clips.py -> editar_clips.py. Nota: clips.py/editar_clips.py tienen nombre+timestamps a mano; adaptarlos por vídeo.",
+      "flujo_video_local": "transcribir.py -> el editor genera cortes.json (elige momentos) -> clips.py \"<video>\" -> editar_clips.py \"<video>\". 100% automatico: scripts genericos que leen cortes.json (esquema en TheEditor/cortes.example.json), sin editar codigo por video.",
       "assets_locales": ["superposiciones/", "musicas/", "whisper/", "fonts/"],
       "skill_interactiva": "Editor_Sergio (enlazada por junction en CEO_Sergete/.claude/skills/, fuente de verdad en TheEditor). Disponible desde el hilo principal de CEO_Sergete; sus popups funcionan igual que en TheEditor.",
       "nota": "Assets resueltos por PROJECT_ROOT (raíz de TheEditor), no por el cwd → el montaje funciona desde cualquier carpeta. El flujo completo con popups va por la skill (hilo principal), no por el subagente.",
