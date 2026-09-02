@@ -23,8 +23,25 @@ from pipeline_core import (
     tts_elevenlabs, process_audio,
     heygen_generate_for_env, heygen_wait_for_env, burn_subs_and_music,
     save_local, slugify, bump_success_counter, audio_params_for_env,
-    get_ffmpeg_exe, _get_duration,
+    get_ffmpeg_exe, _get_duration, store_viral_phrases,
 )
+
+
+# ============================================================
+# STEP 1b — banco de frases virales (tras transcribir, antes de guiones)
+#   El agente selecciona las frases más virales/interesantes del clip y las
+#   guarda en Supabase (tabla viral_phrases) para MÁS ADELANTE crear historias
+#   de IG. De momento SOLO se almacenan. Best-effort: no rompe el flujo.
+# ============================================================
+def step1b_store_viral_phrases(env: dict, phrases, source_url: str,
+                               lang: str, avatar: str = None) -> dict:
+    res = store_viral_phrases(env, phrases, source_url=source_url,
+                              lang=lang, avatar=avatar)
+    if res.get("ok"):
+        print(f"  [frases] guardadas {res['stored']} frase(s) virales en Supabase.")
+    else:
+        print(f"  [frases] no guardadas ({res.get('reason')}).")
+    return res
 
 
 # ============================================================

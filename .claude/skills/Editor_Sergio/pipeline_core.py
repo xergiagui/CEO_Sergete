@@ -888,6 +888,105 @@ def broll_match_filename(phrase: str, env: dict, exclude=(),
 
 
 # ============================================================
+# 8b. BANCO DE FRASES VIRALES (Supabase `viral_phrases`)
+#
+# Al analizar un viral (tras descargar + transcribir), el agente selecciona
+# las frases más virales/interesantes del clip y las guarda aquí para MÁS
+# ADELANTE crear historias de Instagram. De momento SOLO se almacenan.
+# Tabla + policies: viral_phrases.sql (en TheLanding/supabase).
+# Todo best-effort: si faltan Supabase o las claves, NO rompe el flujo.
+# ============================================================
+def _normalize_phrase(text: str) -> str:
+    """Minúsculas, sin acentos ni puntuación, espacios colapsados — para dedup."""
+    import unicodedata
+    t = unicodedata.normalize("NFKD", (text or "").lower())
+    t = t.encode("ascii", "ignore").decode("ascii")
+    t = re.sub(r"[^a-z0-9 ]", " ", t)
+    return re.sub(r"\s+", " ", t).strip()
+
+
+def _phrase_hash(text: str) -> str:
+    import hashlib
+    return hashlib.md5(_normalize_phrase(text).encode("utf-8")).hexdigest()
+
+
+def _detect_platform(url: str) -> str:
+    u = (url or "").lower()
+    if "instagram." in u:
+        return "instagram"
+    if "tiktok." in u:
+        return "tiktok"
+    if "youtube." in u or "youtu.be" in u:
+        return "youtube"
+    return "otro" if u else None
+
+
+def store_viral_phrases(env: dict, phrases, source_url: str = None,
+                        lang: str = None, avatar: str = None) -> dict:
+    """Guarda (upsert por phrase_hash) las frases virales en Supabase.
+
+    `phrases`: lista de str (solo el texto) o de dict con claves:
+        phrase (obligatoria), category, angle, tags (list), virality (int 1..100),
+        rationale. Las que aporte el agente al disecar el clip.
+
+    Devuelve {ok, stored, skipped, reason}. Best-effort: si no hay
+    SUPABASE_URL/ANON_KEY, devuelve ok=False sin lanzar (no rompe el pipeline).
+    Añade un `embedding` (384d) por frase si fastembed está disponible.
+    """
+    url = (env or {}).get("SUPABASE_URL", "").rstrip("/")
+    if not url or not env.get("SUPABASE_ANON_KEY"):
+        return {"ok": False, "stored": 0, "skipped": 0, "reason": "sin Supabase"}
+
+    platform = _detect_platform(source_url)
+    rows, seen = [], set()
+    for item in (phrases or []):
+        if isinstance(item, str):
+            item = {"phrase": item}
+        phrase = (item.get("phrase") or "").strip()
+        if not phrase:
+            continue
+        h = _phrase_hash(phrase)
+        if h in seen:                      # dedup dentro del mismo lote
+            continue
+        seen.add(h)
+        row = {
+            "phrase": phrase,
+            "phrase_hash": h,
+            "source_url": source_url,
+            "source_platform": platform,
+            "lang": lang,
+            "avatar_name": avatar,
+            "category": item.get("category"),
+            "angle": item.get("angle"),
+            "tags": item.get("tags") or [],
+            "virality": item.get("virality"),
+            "rationale": item.get("rationale"),
+        }
+        try:                                # embedding opcional (best-effort)
+            vec = embed_text(phrase)
+            row["embedding"] = "[" + ",".join(str(x) for x in vec) + "]"
+        except Exception:
+            pass
+        rows.append(row)
+
+    if not rows:
+        return {"ok": False, "stored": 0, "skipped": 0, "reason": "sin frases"}
+
+    endpoint = f"{url}/rest/v1/viral_phrases?on_conflict=phrase_hash"
+    headers = dict(_supabase_headers(env))
+    headers["Prefer"] = "resolution=merge-duplicates,return=minimal"
+    try:
+        r = httpx.post(endpoint, headers=headers, json=rows, timeout=30)
+        if r.status_code >= 400:
+            return {"ok": False, "stored": 0, "skipped": len(rows),
+                    "reason": f"HTTP {r.status_code}: {r.text[:300]}"}
+    except Exception as e:
+        return {"ok": False, "stored": 0, "skipped": len(rows),
+                "reason": str(e)}
+    return {"ok": True, "stored": len(rows), "skipped": 0, "reason": None}
+
+
+# ============================================================
 # 8. RENDER FINAL (subs ASS karaoke + música + de-click + B-roll opcional)
 # ============================================================
 def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,

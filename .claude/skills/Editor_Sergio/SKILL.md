@@ -27,6 +27,14 @@ Formato markdown obligatorio (nunca el URL pelado): el CTA de IG `[@mariokaizen]
 ### Regla 6 — Avisa SIEMPRE la ruta del archivo en el chat
 Cada vez que se cree un archivo (audio, vídeo HeyGen, vídeo final), DÍSELO al usuario en el chat con la ruta EXACTA, en lenguaje claro. Ej: `📁 Audio creado → En tu Escritorio, dentro de: ~/Desktop/viral_pipeline_output/<Avatar>/<slug>/Audio__audio_final.mp3`. Usa el `local_path` que devuelve cada fase (`phase_a/b/c`). NO cambia dónde se guarda nada; solo se menciona explícitamente.
 
+### Regla 8 — Al analizar un viral, guarda SIEMPRE sus frases virales
+Cada vez que se **analiza un viral** (tras `step1_download_and_transcribe`, sobre la transcripción del clip **original**, no del avatar), extrae las **frases más virales o interesantes** del clip y **almacénalas** en la tabla Supabase `viral_phrases` — es un banco para **más adelante** crear historias de Instagram. **De momento SOLO se almacenan; NO se generan historias** ni se muestran como entregable.
+- **Qué frases**: 2-6 por clip, **verbatim** del transcript (limpias de muletillas), las que paran el scroll: hooks, remates, datos rotundos, frases lapidarias. No inventes frases nuevas.
+- **Cómo**: llama a `store_viral_phrases(env, phrases, source_url=<link>, lang=<es|en>, avatar=env.get("AVATAR_NAME"))`. `phrases` es una lista de dict `{phrase, category, angle, tags, virality, rationale}` (solo `phrase` es obligatoria; `angle` ∈ hook/remate/dato/frase-lapidaria; `virality` 1..100 tu estimación; `rationale` por qué engancha). El wrapper `step1b_store_viral_phrases(...)` hace lo mismo e imprime el resultado.
+- **Cuándo**: en el paso 2 del popup `Link del reel` (al disecar el patrón), antes de reescribir los guiones. Va **una sola vez por link**.
+- **Dedup y robustez**: se hace UPSERT por `phrase_hash` (misma frase no se duplica entre ejecuciones). Es **best-effort**: si no hay `SUPABASE_URL`/`SUPABASE_ANON_KEY`, no pasa nada y el flujo sigue. Requiere haber ejecutado `viral_phrases.sql` (en TheLanding/supabase) una vez.
+- **NO** menciones esto como un entregable al usuario; basta un aviso breve tipo "🗂️ Guardadas N frases virales en el banco (para historias IG más adelante)".
+
 ### Regla 7 — El hook de inicio SIEMPRE vía skill `viral-hook-creator`
 El **hook de inicio** (la 1ª frase de cada guion, la que para el scroll) NUNCA se redacta a mano ni se improvisa: se genera **SIEMPRE** invocando la skill `viral-hook-creator` (herramienta `Skill`).
 - **Cuándo**: en el paso 3 del popup `Link del reel`, al reescribir cada uno de los 3 guiones (un hook por ángulo). Si el usuario pide cambios de hook en `Aprobación` ('Other'), se re-genera igualmente con la skill.
@@ -121,7 +129,7 @@ Tras guardar la descripción → lanza popup `Link del reel`.
 ```
 Tras este popup:
 1. `step1_download_and_transcribe(<url>)` — descarga (h264+audio) + transcripción
-2. Diseca el patrón narrativo en chat (hook → desarrollo → CTA)
+2. Diseca el patrón narrativo en chat (hook → desarrollo → CTA). **Aquí mismo**, extrae las **frases más virales** del clip y guárdalas con `store_viral_phrases(...)` / `step1b_store_viral_phrases(...)` en el banco `viral_phrases` (ver **Regla 8**) — banco para historias IG futuras; hoy SOLO se almacenan.
 3. Reescribe usando `env["AVATAR_DESCRIPTION"]` → propone **3 guiones** (mismo patrón, 3 ángulos distintos). ⚠️ El **hook de inicio (1ª frase)** de CADA guion se genera **SIEMPRE** con la skill `viral-hook-creator` (ver Regla 7); nunca lo redactes a mano.
 4. Lanza popup `Aprobación`
 
@@ -228,6 +236,7 @@ Si `~/.viral-pipeline/env.json` ya existe → SKIP setup, lanza directamente pop
 - Avatar V (look UI, /v3 avatar_v) o IV (talking_photo, /v2) — dispatcher `heygen_generate_for_env`
 - Procesa POR FASES con gates (A audio → B HeyGen → C edición)
 - Hook de inicio de cada guion SIEMPRE generado con la skill `viral-hook-creator` (Regla 7)
+- Al analizar cada viral, guarda sus frases más virales en Supabase `viral_phrases` (banco para historias IG futuras; hoy SOLO se almacenan) — Regla 8
 - Aprobación: avanzar con 1 / 2 / 3 / los 3, o 'Other' para cambios
 - Salida 100% LOCAL en `~/Desktop/viral_pipeline_output/<Avatar>/<slug>/` (Airtable dormido, solo si preguntan)
 - Sin numeración "popup X/Y"; CTA tras 1er vídeo; links cal.com markdown
