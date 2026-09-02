@@ -52,7 +52,7 @@ en `supabase/ceo_tasks.sql`.
 
 - **Repos git**: cada departamento mantiene el suyo propio; CEO_Sergete tiene el
   suyo aparte. Nada se movió ni se rompió.
-- **Renombrado**: «Descargador de Videos» → **TheDescarga**. La carpeta local ya
-  está renombrada. En GitHub el repo sigue siendo `DescargadorVideos` (redirige
-  solo); si quieres, renómbralo a `TheDescarga` desde Settings del repo y luego
-  `git remote set-url origin https://github.com/xergiagui/TheDescarga.git`.
+- **Renombrado**: «Descargador de Videos» → **TheDescarga**, tanto la carpeta
+  local como el repo de GitHub (`github.com/xergiagui/TheDescarga`).
+- **Repos**: los cuatro están en GitHub bajo `xergiagui` (CEO_Sergete, TheDescarga,
+  TheEditor, TheLanding).

@@ -8,7 +8,7 @@
       "nombre": "TheDescarga",
       "ruta": "C:\\Users\\ico858\\Desktop\\PruebasIA\\TheDescarga",
       "ruta_relativa": "../TheDescarga",
-      "repo": "https://github.com/xergiagui/DescargadorVideos.git",
+      "repo": "https://github.com/xergiagui/TheDescarga.git",
       "subagente": "descarga",
       "que_hace": "Descarga vídeos de YouTube/Instagram/TikTok/etc. con yt-dlp local (sin instalar nada). Salida en TheDescarga/descargas/.",
       "disparadores": ["descarga", "descárgame", "baja este vídeo", "yt-dlp", "guardar reel", "bajar audio", "mp3 de"],
