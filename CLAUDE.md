@@ -21,6 +21,7 @@ fuente de verdad: rutas, repos, disparadores y cómo se ejecuta cada uno.
 | **Descarga** | `../TheDescarga` | `descarga` | Bajar vídeos/audio (YouTube, IG, TikTok…) con yt-dlp local |
 | **Editor** | `../TheEditor` | `editor` | Pipeline viral: link → avatar IA → b-roll + subs + música → vídeo final |
 | **Landing** | `../TheLanding` | `landing` | Web de afiliación (Next.js + Supabase + Vercel) |
+| **Historia** | `../TheHistoria` | `historia` | Historias de IG (9:16): frase de `viral_phrases` + fondo de b-roll |
 
 ---
 
@@ -59,6 +60,11 @@ fuente de verdad: rutas, repos, disparadores y cómo se ejecuta cada uno.
   - **Tareas scriptables/batch** (transcribir, cortar clips, correr una fase con
     todos los parámetros dados, sin popups): delega en el subagente `editor`, que
     ejecuta con el `.venv` de TheEditor.
+- **Historia — proceso independiente:** TheHistoria genera historias de IG a
+  partir de las frases que TheEditor guarda en `viral_phrases`. **NO se encadena**
+  con descarga/edición: se lanza **solo cuando el usuario pide historias**. Delega
+  en el subagente `historia` (usa el `.venv` de TheEditor y `superposiciones/`
+  como banco de fondos; no instala nada).
 
 ---
 

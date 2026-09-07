@@ -46,12 +46,29 @@
       "entrypoint": "npm run dev  ·  npm run build  ·  git push (deploy auto en Vercel)",
       "supabase": "https://akuykrrqmivrcjzcsksj.supabase.co (reutilizado de mis-finanzas)",
       "autonomo": true
+    },
+    {
+      "id": "historia",
+      "nombre": "TheHistoria",
+      "ruta": "C:\\Users\\ico858\\Desktop\\PruebasIA\\TheHistoria",
+      "ruta_relativa": "../TheHistoria",
+      "repo": "https://github.com/xergiagui/TheHistoria.git",
+      "subagente": "historia",
+      "que_hace": "Genera historias de Instagram (MP4 vertical 9:16) a partir de las frases virales que TheEditor guarda en Supabase (viral_phrases, used_in_story=false): pone cada frase sobre un fondo y exporta. Marca la frase como usada al terminar.",
+      "disparadores": ["historia", "historias", "stories", "story de instagram", "genera historias", "monta historias", "frase con fondo"],
+      "entrypoint": "..\\TheEditor\\.venv\\Scripts\\python.exe historias.py [--n N|--categoria X|--min-virality N|--phrase \"...\"|--duracion S|--no-marcar]",
+      "fuente_frases": "Supabase viral_phrases (la puebla TheEditor). Esquema en TheLanding/supabase/viral_phrases.sql.",
+      "banco_fondos": "El MISMO b-roll que TheEditor: ../TheEditor/superposiciones/ catalogado en broll_assets. Match semantico via RPC match_broll o azar. No duplica assets.",
+      "salida": "TheHistoria\\salidas\\<timestamp>\\NN_slug.mp4 + manifest.json",
+      "entorno": "Reutiliza el .venv de TheEditor (httpx, Pillow, imageio-ffmpeg, fastembed) — no instala nada.",
+      "nota": "PROCESO INDEPENDIENTE y a demanda: NO se encadena con descarga/edicion. Solo se lanza cuando el usuario pide historias explicitamente.",
+      "autonomo": true
     }
   ],
   "supabase_compartido": {
     "url": "https://akuykrrqmivrcjzcsksj.supabase.co",
     "origen": "proyecto reutilizado de 'mis-finanzas' (mismo que TheLanding y el catálogo b-roll de TheEditor)",
-    "tablas_relevantes": ["leads", "events", "messages", "broll_assets", "ceo_tasks"],
+    "tablas_relevantes": ["leads", "events", "messages", "broll_assets", "viral_phrases", "ceo_tasks"],
     "rpc": ["match_broll"],
     "creds": "en .env (SUPABASE_URL + SUPABASE_ANON_KEY), no se sube a git"
   }

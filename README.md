@@ -15,7 +15,8 @@ PruebasIA/
 │   └── supabase/            ceo_tasks.sql (historial opcional)
 ├── TheDescarga/        departamento: descarga de vídeo/audio (yt-dlp)
 ├── TheEditor/          departamento: pipeline viral (avatar IA + edición)
-└── TheLanding/         departamento: web de afiliación (Next.js + Supabase)
+├── TheLanding/         departamento: web de afiliación (Next.js + Supabase)
+└── TheHistoria/        departamento: historias de IG (frase + fondo → 9:16)
 ```
 
 ## Departamentos
@@ -25,9 +26,14 @@ PruebasIA/
 | «descárgame este reel» + URL | **TheDescarga** | Baja el vídeo/audio a `TheDescarga/descargas/` |
 | «monta adaptaciones de este reel» | **TheEditor** | Link → avatar IA (HeyGen) → b-roll + subs + música |
 | «cambia esto de la landing» | **TheLanding** | Edita/despliega la web (Vercel) |
+| «genera historias» / «monta stories» | **TheHistoria** | Frases de `viral_phrases` + fondo de b-roll → MP4 9:16 |
 
 También puedes encadenar: *«descarga este reel y móntame 3 adaptaciones»* →
 CEO corre `descarga` y pasa el MP4 a `editor`.
+
+**TheHistoria es independiente:** descargar/editar no crea historias. Se lanza
+solo cuando lo pides. Coge las frases que TheEditor deja en `viral_phrases` y les
+pone un fondo del mismo banco de b-roll (`TheEditor/superposiciones/`).
 
 ## Añadir una funcionalidad nueva
 
@@ -54,5 +60,5 @@ en `supabase/ceo_tasks.sql`.
   suyo aparte. Nada se movió ni se rompió.
 - **Renombrado**: «Descargador de Videos» → **TheDescarga**, tanto la carpeta
   local como el repo de GitHub (`github.com/xergiagui/TheDescarga`).
-- **Repos**: los cuatro están en GitHub bajo `xergiagui` (CEO_Sergete, TheDescarga,
-  TheEditor, TheLanding).
+- **Repos**: bajo `xergiagui` en GitHub (CEO_Sergete, TheDescarga, TheEditor,
+  TheLanding). TheHistoria tiene su repo git local; súbelo cuando quieras.
