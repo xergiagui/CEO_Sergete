@@ -31,13 +31,17 @@ fi
 
 # 3. Instalar deps Python (idempotente — pip detecta lo ya instalado)
 echo "[bootstrap] instalando deps Python..."
+# NOTA: opencv-python-headless SE PINEA a 4.x. La rama 5.x quitó
+# cv2.CascadeClassifier y no incluye los haarcascades -> rompe el
+# seguimiento de cara del recorte 9:16 (clips.py). 4.x los trae.
 "$PIP" install --quiet \
     httpx \
     faster-whisper \
     Pillow \
     imageio-ffmpeg \
     yt-dlp \
-    fastembed
+    fastembed \
+    "opencv-python-headless>=4.9,<5"
 
 # 4. Verificar que el ffmpeg bundled tiene libass
 echo "[bootstrap] verificando ffmpeg+libass..."

@@ -51,6 +51,93 @@ def resolver_nombre(arg: str) -> str:
     return p.stem if p.suffix else arg
 
 
+def resolver_env_supabase() -> dict:
+    """Env con credenciales de Supabase para el banco de frases virales.
+
+    Prioridad: 1) ~/.viral-pipeline/env.json (pc.ENV_PATH, el mismo que ya usa
+    el pipeline y trae SUPABASE_URL/ANON_KEY + PEXELS). 2) fallback al .env de
+    CEO_Sergete (carpeta hermana). Best-effort: devuelve {} si no hay nada.
+    """
+    env = {}
+    try:
+        if pc.ENV_PATH.exists():
+            env = json.loads(pc.ENV_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        env = {}
+    if not (env.get("SUPABASE_URL") and env.get("SUPABASE_ANON_KEY")):
+        ceo_env = RAIZ.parent / "CEO_Sergete" / ".env"
+        try:
+            if ceo_env.exists():
+                for line in ceo_env.read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    k, v = line.split("=", 1)
+                    k = k.strip()
+                    v = v.strip().strip('"').strip("'")
+                    if k in ("SUPABASE_URL", "SUPABASE_ANON_KEY") and not env.get(k):
+                        env[k] = v
+        except Exception:
+            pass
+    return env
+
+
+def guardar_frases_virales(nombre: str, cortes_path: Path,
+                           source_url: str = None, env: dict = None) -> dict:
+    """Lee cortes.json y guarda las frases virales en Supabase (best-effort).
+
+    Por cada corte usa `frase_viral` (texto verbatim); si falta, cae al `titulo`
+    y, en ultimo caso, al `hook_query`. Pasa tambien angle/virality/category/
+    rationale/tags si el corte los trae. avatar_name = slug del video (nombre).
+    Nunca lanza: si no hay env/Supabase o falla la red, avisa y continua. El
+    dedup por phrase_hash en store_viral_phrases evita duplicados al re-ejecutar.
+    """
+    if env is None:
+        env = resolver_env_supabase()
+    if not (env.get("SUPABASE_URL") and env.get("SUPABASE_ANON_KEY")):
+        print("   [frases] sin credenciales Supabase -> no se guardan (best-effort).", flush=True)
+        return {"ok": False, "reason": "sin Supabase"}
+    if not cortes_path.exists():
+        print(f"   [frases] no hay {cortes_path.name}; nada que guardar.", flush=True)
+        return {"ok": False, "reason": "sin cortes.json"}
+    try:
+        cortes = json.loads(cortes_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        print(f"   [frases] no pude leer cortes.json ({e}); se omite.", flush=True)
+        return {"ok": False, "reason": str(e)}
+
+    phrases = []
+    for c in (cortes or []):
+        texto = (c.get("frase_viral") or c.get("titulo") or c.get("hook_query") or "").strip()
+        if not texto:
+            continue
+        phrases.append({
+            "phrase": texto,
+            "category": c.get("category"),
+            "angle": c.get("angle"),
+            "virality": c.get("virality"),
+            "rationale": c.get("rationale"),
+            "tags": c.get("tags") or [],
+        })
+    if not phrases:
+        print("   [frases] ningun corte trae frase_viral/titulo; nada que guardar.", flush=True)
+        return {"ok": False, "reason": "sin frases"}
+
+    try:
+        res = pc.store_viral_phrases(env, phrases, source_url=source_url,
+                                     lang="es", avatar=nombre)
+    except Exception as e:  # blindaje extra: jamas rompe el pipeline
+        print(f"   [frases] guardado fallo (ignorado): {e}", flush=True)
+        return {"ok": False, "reason": str(e)}
+
+    if res.get("ok"):
+        print(f"   [frases] {res['stored']} frases virales guardadas en Supabase "
+              f"(avatar={nombre}).", flush=True)
+    else:
+        print(f"   [frases] no guardado (best-effort): {res.get('reason')}", flush=True)
+    return res
+
+
 def cargar_hooks(cortes_path: Path) -> dict:
     """Mapa nombre_clip -> hook_query desde cortes.json (si existe)."""
     hooks = {}
@@ -115,6 +202,13 @@ def main():
 
     shutil.rmtree(WORKROOT, ignore_errors=True)
     print(f"\nListo. Finales en: {out}", flush=True)
+
+    # --- Banco de frases virales (Supabase, best-effort) ---------------------
+    # Al terminar la edicion guardamos las frases virales de este video en la
+    # tabla viral_phrases para reutilizarlas mas adelante (historias, hooks...).
+    inp = RAIZ / "input" / f"{nombre}.mp4"
+    source_url = str(inp) if inp.exists() else str(args.video)
+    guardar_frases_virales(nombre, cortes_path, source_url=source_url)
 
 
 if __name__ == "__main__":

@@ -1,8 +1,8 @@
 [
-  {"nombre": "01_adiccion_emprendedores", "inicio": 42.0,  "fin": 66.7,  "titulo": "La extrana adiccion de los emprendedores", "hook_query": "excited entrepreneur starting new project idea"},
-  {"nombre": "02_empresa_como_bebe",       "inicio": 88.7,  "fin": 116.5, "titulo": "Una empresa es como un bebe",             "hook_query": "newborn baby crying held in hands"},
-  {"nombre": "03_matrimonio_vs_negocio",   "inicio": 158.6, "fin": 180.8, "titulo": "Enamorate de tu negocio",                 "hook_query": "couple holding hands wedding rings love"},
-  {"nombre": "04_no_coquetear",            "inicio": 299.4, "fin": 318.5, "titulo": "No coquetees con ideas nuevas",           "hook_query": "many open doors choice temptation"},
-  {"nombre": "05_cocacola_new_coke",       "inicio": 645.7, "fin": 675.4, "titulo": "La marca: el caso New Coke",              "hook_query": "vintage coca cola glass bottle red"},
-  {"nombre": "06_migracion_caos",          "inicio": 787.4, "fin": 818.1, "titulo": "La migracion que fue un caos",            "hook_query": "stressed man overwhelmed laptop office"}
+  {"nombre": "01_adiccion_emprendedores", "inicio": 42.0,  "fin": 66.7,  "titulo": "La extrana adiccion de los emprendedores", "hook_query": "excited entrepreneur starting new project idea", "frase_viral": "Los emprendedores somos adictos a empezar cosas nuevas", "angle": "confesion/identidad", "virality": 78, "category": "mentalidad", "rationale": "Frase-espejo con la que el target se identifica al instante"},
+  {"nombre": "02_empresa_como_bebe",       "inicio": 88.7,  "fin": 116.5, "titulo": "Una empresa es como un bebe",             "hook_query": "newborn baby crying held in hands", "frase_viral": "Una empresa es como un bebe: al principio solo da trabajo y no duerme"},
+  {"nombre": "03_matrimonio_vs_negocio",   "inicio": 158.6, "fin": 180.8, "titulo": "Enamorate de tu negocio",                 "hook_query": "couple holding hands wedding rings love", "frase_viral": "Enamorate de tu negocio como te enamorarias de tu pareja"},
+  {"nombre": "04_no_coquetear",            "inicio": 299.4, "fin": 318.5, "titulo": "No coquetees con ideas nuevas",           "hook_query": "many open doors choice temptation", "frase_viral": "Dejar de coquetear con cada idea nueva es lo que te hace ganar"},
+  {"nombre": "05_cocacola_new_coke",       "inicio": 645.7, "fin": 675.4, "titulo": "La marca: el caso New Coke",              "hook_query": "vintage coca cola glass bottle red", "frase_viral": "Coca-Cola cambio su formula y casi se hunde: el caso New Coke"},
+  {"nombre": "06_migracion_caos",          "inicio": 787.4, "fin": 818.1, "titulo": "La migracion que fue un caos",            "hook_query": "stressed man overwhelmed laptop office", "frase_viral": "La migracion tecnica que penso que seria un dia y fueron meses de caos"}
 ]

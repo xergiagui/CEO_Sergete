@@ -535,6 +535,21 @@ def _mask_profanidad(word: str) -> str:
     return word
 
 
+# Fin de oración para RE-CAPITALIZAR subtítulos: la palabra termina en . ! ? …
+# (admitiendo comillas/cierres de paréntesis tras el signo: p.ej.  fin.")
+_SUBS_SENT_END_RE = re.compile(r"[.!?…][\"')\]»”’]*$")
+
+
+def _cap_first_alpha(word: str) -> str:
+    """Pone en MAYÚSCULA la primera letra alfabética, respetando signos de
+    apertura iniciales (¿ ¡ « " ( …). Devuelve la palabra intacta si no tiene
+    letras. Cubre acentos/ñ vía str.upper (Unicode)."""
+    for i, ch in enumerate(word):
+        if ch.isalpha():
+            return word[:i] + ch.upper() + word[i + 1:]
+    return word
+
+
 def _download_image(url: str, out_path: Path, headers: dict) -> bool:
     """Descarga una imagen; True si es un archivo de imagen razonable (>8KB)."""
     try:
@@ -975,8 +990,12 @@ def store_viral_phrases(env: dict, phrases, source_url: str = None,
     endpoint = f"{url}/rest/v1/viral_phrases?on_conflict=phrase_hash"
     headers = dict(_supabase_headers(env))
     headers["Prefer"] = "resolution=merge-duplicates,return=minimal"
+    # Enviamos bytes UTF-8 EXPLÍCITOS (ensure_ascii=False + charset=utf-8) para
+    # que ñ/á/é/í/ó/ú se guarden bien SIEMPRE, sin depender del cliente HTTP.
+    headers["Content-Type"] = "application/json; charset=utf-8"
+    payload = json.dumps(rows, ensure_ascii=False).encode("utf-8")
     try:
-        r = httpx.post(endpoint, headers=headers, json=rows, timeout=30)
+        r = httpx.post(endpoint, headers=headers, content=payload, timeout=30)
         if r.status_code >= 400:
             return {"ok": False, "stored": 0, "skipped": len(rows),
                     "reason": f"HTTP {r.status_code}: {r.text[:300]}"}
@@ -1247,6 +1266,43 @@ def _get_duration(file_path: Path, ff: str) -> float:
     return int(h) * 3600 + int(mi) * 60 + float(s)
 
 
+# Fusión de números partidos por whisper. faster-whisper suele trocear un
+# número con separador de miles/decimales en tokens distintos y SIN espacio de
+# continuación (p.ej. "10.000" -> [" 10", ".000"]). Sin reunirlos, el número se
+# rompe entre líneas/grupos del karaoke o queda con un espacio espurio ("10 .000").
+# Estos regex detectan que dos tokens consecutivos forman UN número continuo:
+#   - a termina en dígito y b empieza por separador+dígito  ("10" + ".000")
+#   - a termina en dígito+separador y b empieza por dígito   ("10." + "000")
+_NUM_TAIL = re.compile(r"\d$")            # a acaba en dígito
+_NUM_HEAD_SEP = re.compile(r"^[.,]\d")    # b: .000 / ,5  (continuación de miles/decimal)
+_NUM_TAIL_SEP = re.compile(r"\d[.,]$")    # a acaba en dígito+separador  ("10.")
+_NUM_HEAD = re.compile(r"^\d")            # b empieza por dígito
+
+
+def _merge_number_tokens(words):
+    """Une tokens consecutivos que forman UN número con separadores internos.
+
+    Sistémico: vale para "10.000", "1.500", "100.000", "3,5"… Nunca fusiona un
+    punto de fin de frase real ("...año. Y...") porque exige dígitos a ambos
+    lados del separador. Devuelve una nueva lista (no muta la de entrada);
+    conserva start del 1º y end del último token fusionado."""
+    out = []
+    for w in words:
+        cur = dict(w)
+        if out:
+            a = (out[-1].get("word") or "").strip()
+            b = (cur.get("word") or "").strip()
+            join = (_NUM_TAIL.search(a) and _NUM_HEAD_SEP.match(b)) or \
+                   (_NUM_TAIL_SEP.search(a) and _NUM_HEAD.match(b))
+            if join:
+                prev = out[-1]
+                prev["word"] = (prev.get("word") or "") + b  # sin espacio: es continuación
+                prev["end"] = cur.get("end", prev.get("end"))
+                continue
+        out.append(cur)
+    return out
+
+
 def _generate_ass_karaoke(words, ass_path: Path):
     """Subtítulos legibles y limpios (sin animación):
       - 1 sola línea, máximo 3 palabras, en minúsculas.
@@ -1261,8 +1317,17 @@ def _generate_ass_karaoke(words, ass_path: Path):
         return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
 
     ws = [w for w in words if (w.get("word") or "").strip()]
+    # Reunir números partidos por whisper ("10" + ".000" -> "10.000") ANTES de
+    # agrupar: así el número queda en una sola unidad, nunca a caballo entre dos
+    # líneas/grupos ni con un espacio espurio en medio.
+    ws = _merge_number_tokens(ws)
     chunks = []
     i = 0
+    # Estilo en minúsculas PERO respetando ortografía: la 1ª letra del texto y
+    # la 1ª letra tras un punto (y por coherencia tras ? ! …) van en MAYÚSCULA.
+    # `cap_next` persiste ENTRE chunks (el fin de oración puede caer al final de
+    # un grupo y la mayúscula toca a la 1ª palabra del grupo siguiente).
+    cap_next = True
     while i < len(ws):
         grp = ws[i:i + 3]  # máximo 3 palabras
         # cortar el grupo si hay un silencio grande entre palabras
@@ -1272,8 +1337,17 @@ def _generate_ass_karaoke(words, ass_path: Path):
                 cut = j
                 break
         grp = grp[:cut]
-        text = " ".join((w["word"] or "").strip() for w in grp).lower()
-        text = re.sub(r"\s+", " ", text).strip()
+        parts = []
+        for w in grp:
+            raw = (w["word"] or "").strip()
+            disp = raw.lower()
+            if cap_next:
+                disp = _cap_first_alpha(disp)
+            parts.append(disp)
+            # ¿esta palabra cierra oración? -> la siguiente empieza en mayúscula
+            if raw:
+                cap_next = bool(_SUBS_SENT_END_RE.search(raw))
+        text = re.sub(r"\s+", " ", " ".join(parts)).strip()
         end = grp[-1]["end"]
         if end <= grp[0]["start"]:
             end = grp[0]["start"] + 0.3
