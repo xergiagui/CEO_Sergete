@@ -1,0 +1,11 @@
+# Secretos
+.env
+
+# Entorno propio (si algún día se crea uno)
+.venv/
+__pycache__/
+*.pyc
+
+# Salidas generadas (historias renderizadas)
+salidas/
+!salidas/.gitkeep
