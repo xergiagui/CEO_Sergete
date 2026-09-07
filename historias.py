@@ -60,6 +60,14 @@ def _tanda_dir() -> Path:
 
 
 def main(argv=None) -> int:
+    # En consolas Windows (cp1252) los caracteres como '✓' o acentos rompen el
+    # print. Forzamos UTF-8 en stdout/stderr de forma best-effort.
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
+
     args = _parse_args(argv)
     env = load_env()
 
