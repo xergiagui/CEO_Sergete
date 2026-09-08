@@ -30,6 +30,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent
@@ -127,18 +128,34 @@ def escribir_txt(destino: Path, segmentos: list):
 
 def transcribir(origen: Path, idioma: str = "es",
                 umbral_seg: float = UMBRAL_TROCEO_MIN * 60,
-                chunk_seg: float = CHUNK_MIN * 60):
+                chunk_seg: float = CHUNK_MIN * 60,
+                work_dir: Path | None = None):
     print(f"\n=> Paso 1 — Transcribiendo: {origen.name}")
     base = SALIDA / origen.stem
     base.mkdir(parents=True, exist_ok=True)
 
     # whisper-cli usa fopen ANSI: las tildes de la ruta ('Transcripción',
-    # 'Adicción') lo rompen. Trabajamos en un area ASCII bajo whisper/_work y
-    # pasamos rutas RELATIVAS ASCII con cwd=RAIZ; luego movemos a `base`.
-    work = RAIZ / "whisper" / "_work"
-    if work.exists():
-        shutil.rmtree(work, ignore_errors=True)
-    work.mkdir(parents=True, exist_ok=True)
+    # 'Adicción') lo rompen. Trabajamos en un area ASCII bajo whisper/ y pasamos
+    # rutas RELATIVAS ASCII con cwd=RAIZ; luego movemos a `base`.
+    #
+    # CONCURRENCIA: el work dir debe ser ÚNICO por ejecución. Antes se usaba un
+    # 'whisper/_work' COMPARTIDO y se hacía rmtree al arrancar; con varias
+    # transcripciones en paralelo se pisaban los intermedios (una podía salir
+    # vacía reportando OK). Ahora cada proceso crea su propio dir aislado
+    # (tempfile.mkdtemp bajo whisper/, nombre ASCII garantizado y único) y solo
+    # limpia ESE al terminar; nunca un rmtree del dir global. Se puede forzar
+    # con --work-dir / WHISPER_WORK_DIR (debe estar bajo la raíz y ser ASCII).
+    base_work = RAIZ / "whisper"
+    base_work.mkdir(parents=True, exist_ok=True)
+    if work_dir is not None:
+        work = Path(work_dir)
+        work.mkdir(parents=True, exist_ok=True)
+        _work_es_propio = False  # dir suministrado: no lo borramos al final
+    else:
+        work = Path(tempfile.mkdtemp(prefix="_work_", dir=str(base_work)))
+        _work_es_propio = True
+    # ruta RELATIVA ASCII (respecto a RAIZ) que se pasa a whisper-cli
+    work_rel = Path(os.path.relpath(work, RAIZ)).as_posix()
     wav = work / "audio.wav"
 
     print("   [1/2] convirtiendo a WAV 16 kHz mono...")
@@ -149,7 +166,7 @@ def transcribir(origen: Path, idioma: str = "es",
     if dur <= umbral_seg:
         # ---- Vídeo corto: comportamiento de siempre (una sola pasada + DTW) ----
         print("   [2/2] whisper.cpp large-v3 + DTW (-dtw large.v3 -nfa)...")
-        whisper_cli("whisper/_work/audio.wav", "whisper/_work/out",
+        whisper_cli(f"{work_rel}/audio.wav", f"{work_rel}/out",
                     idioma, dtw=True, formatos=("txt", "srt", "json"))
         # mover resultados a la carpeta final (con tildes) renombrando al stem
         for ext in (".txt", ".srt", ".json"):
@@ -173,7 +190,7 @@ def transcribir(origen: Path, idioma: str = "es",
             run([FFMPEG, "-y", "-ss", f"{off_seg:.3f}", "-i", str(wav),
                  "-t", f"{chunk_seg:.3f}", "-c", "copy", str(chunk_wav)])
             print(f"      - fragmento {i+1}/{n} (offset {off_seg/60:.1f} min)...")
-            whisper_cli("whisper/_work/chunk.wav", "whisper/_work/cout",
+            whisper_cli(f"{work_rel}/chunk.wav", f"{work_rel}/cout",
                         idioma, dtw=False, formatos=("json",))
             data = json.loads((work / "cout.json").read_text(encoding="utf-8"))
             if template is None:
@@ -197,7 +214,10 @@ def transcribir(origen: Path, idioma: str = "es",
         escribir_srt(base / f"{origen.stem}.srt", segmentos)
         escribir_txt(base / f"{origen.stem}.txt", segmentos)
 
-    shutil.rmtree(work, ignore_errors=True)  # limpiar intermedios (WAV incluido)
+    # limpiar SOLO nuestro propio work dir aislado (WAV incluido). Si el dir lo
+    # suministró el usuario (--work-dir), no lo borramos: es responsabilidad suya.
+    if _work_es_propio:
+        shutil.rmtree(work, ignore_errors=True)
     print(f"   OK -> {base}/  ({origen.stem}.txt + .srt + .json)")
 
 
@@ -209,6 +229,10 @@ def main():
                         help=f"Duracion (min) a partir de la cual se trocea (def: {UMBRAL_TROCEO_MIN})")
     parser.add_argument("--chunk-min", type=float, default=CHUNK_MIN,
                         help=f"Duracion (min) de cada fragmento al trocear (def: {CHUNK_MIN})")
+    parser.add_argument("--work-dir", default=os.environ.get("WHISPER_WORK_DIR"),
+                        help="Directorio intermedio a usar (ASCII, bajo la raiz). "
+                             "Por defecto se crea uno UNICO por ejecucion (seguro "
+                             "para transcripciones en paralelo).")
     args = parser.parse_args()
 
     if not WHISPER_CLI.exists():
@@ -227,11 +251,12 @@ def main():
 
     umbral_seg = args.umbral_min * 60
     chunk_seg = args.chunk_min * 60
+    work_dir = Path(args.work_dir) if args.work_dir else None
     for ruta in objetivos:
         if not ruta.exists():
             print(f"[!] No existe: {ruta}")
             continue
-        transcribir(ruta, args.idioma, umbral_seg, chunk_seg)
+        transcribir(ruta, args.idioma, umbral_seg, chunk_seg, work_dir)
 
     print(f"\nListo. Transcripciones en: {SALIDA}")
 
