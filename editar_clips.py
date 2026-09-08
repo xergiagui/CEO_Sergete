@@ -151,6 +151,23 @@ def cargar_hooks(cortes_path: Path) -> dict:
     return hooks
 
 
+def cargar_cortes_meta(cortes_path: Path) -> dict:
+    """Mapa nombre_clip -> corte (dict completo) desde cortes.json.
+
+    Sirve para derivar por clip la `tipologia_musica` (mood explícito) y el
+    texto del clip (`frase_viral`/`titulo`) con el que inferir el mood cuando no
+    hay anotación. Devuelve {} si no hay cortes.json."""
+    meta = {}
+    if cortes_path.exists():
+        try:
+            for c in json.loads(cortes_path.read_text(encoding="utf-8")):
+                if c.get("nombre"):
+                    meta[c["nombre"]] = c
+        except Exception:
+            pass
+    return meta
+
+
 def main():
     ap = argparse.ArgumentParser(description="Edicion final (Fase C) de los clips de un video.")
     ap.add_argument("video", help="Nombre en input/ o ruta al video.")
@@ -162,6 +179,7 @@ def main():
     out = RAIZ / "transcripciones" / nombre / "finales"
     cortes_path = Path(args.cortes) if args.cortes else (RAIZ / "transcripciones" / nombre / "cortes.json")
     hooks = cargar_hooks(cortes_path)
+    cortes_meta = cargar_cortes_meta(cortes_path)
 
     if not clips_dir.exists():
         raise SystemExit(f"[!] No hay clips en {clips_dir}. Ejecuta antes clips.py.")
@@ -183,7 +201,13 @@ def main():
     for clip in clips:
         name = clip.stem
         hook = hooks.get(name) or name.split("_", 1)[-1].replace("_", " ")
-        print(f"=== {name}   gancho='{hook}'", flush=True)
+        corte = cortes_meta.get(name, {})
+        # Tipología de música explícita (mood) y texto del clip para inferirla.
+        music_typology = corte.get("tipologia_musica")
+        clip_text = (corte.get("frase_viral") or corte.get("titulo")
+                     or hook or "").strip() or None
+        print(f"=== {name}   gancho='{hook}'"
+              + (f"   mood='{music_typology}'" if music_typology else ""), flush=True)
         work = WORKROOT / name
         work.mkdir(parents=True, exist_ok=True)
         ascii_in = work / "in.mp4"
@@ -193,6 +217,7 @@ def main():
             pc.burn_subs_and_music(
                 ascii_in, MUSIC, out_tmp,
                 lang="es", env=env, overlays_dir=OVERLAYS, hook_query=hook,
+                music_typology=music_typology, clip_text=clip_text,
             )
             shutil.move(str(out_tmp), str(out / f"{name}.mp4"))
             print(f"   OK -> finales/{name}.mp4", flush=True)

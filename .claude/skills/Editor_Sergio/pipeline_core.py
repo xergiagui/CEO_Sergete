@@ -903,6 +903,186 @@ def broll_match_filename(phrase: str, env: dict, exclude=(),
 
 
 # ============================================================
+# 8d. SELECCIÓN DE MÚSICA EN DOS PASOS (tipología por contenido + audio)
+#
+# `musicas/` está organizada en subcarpetas por tipología (mood). La elección
+# es en dos pasos:
+#   1) TIPOLOGÍA según el contenido del clip, con prioridad:
+#      a) anotación `tipologia_musica` en cortes.json (match flexible de nombre)
+#      b) inferencia por embeddings: se compara el texto del clip con un
+#         descriptor rico de cada mood y se elige el de mayor similitud coseno
+#      c) fallback a comodines curados/genéricos y, en último caso, random total
+#   2) AUDIO por defecto: random dentro de la carpeta elegida.
+# Reutiliza el modelo de embeddings del b-roll (fastembed, sin dependencias
+# nuevas). Todo best-effort: nunca debe romper el render.
+# ============================================================
+
+# Descriptores ricos en español de cada MOOD (varios sinónimos por mood) para
+# que el embedding case bien con el texto del clip. NEUTRA y DE LAS MEJORES NO
+# son moods: son cajones comodín/curados → se excluyen de la inferencia.
+_MUSIC_MOOD_DESCRIPTORS = {
+    "alegre": ("música alegre feliz divertida positiva optimista jovial luminosa "
+               "vibrante juguetona buen humor celebración fiesta sonrisa diversión "
+               "energía positiva ligereza desenfadada simpática"),
+    "energetica": ("música enérgica intensa potente con ritmo rápido y dinámico "
+                   "acción adrenalina fuerza movimiento empuje pulso marcado beat "
+                   "electrónica bailable entrenamiento deporte velocidad vigor"),
+    "motivacion": ("música motivadora de superación esfuerzo disciplina constancia "
+                   "perseverancia sacrificio trabajo duro lucha resiliencia levantarse "
+                   "tras el fracaso lograr metas éxito crecer mejorar disciplina fuerza "
+                   "de voluntad inspiración para no rendirse"),
+    "nostalgia": ("música nostálgica melancólica sentimental emotiva de recuerdos y "
+                  "añoranza del pasado tristeza suave memoria infancia tiempo perdido "
+                  "reflexiva íntima agridulce evocadora"),
+    "epica": ("música épica grandiosa cinematográfica heroica de triunfo gloria "
+              "batalla apoteosis orquestal poderosa dramática monumental trascendental "
+              "solemne impactante coros grandilocuente"),
+    "inspiracion suaves": ("música inspiradora suave tranquila calmada relajante "
+                           "delicada esperanzadora emotiva serena paz reflexión piano "
+                           "cuerdas ambiental sutil ligera minimalista contemplativa"),
+}
+
+# Comodines (no-moods): orden de fallback cuando no hay tipología clara.
+_MUSIC_FALLBACK_TYPS = ["de las mejores", "neutra"]
+
+_music_mood_vec_cache = None
+
+
+def _norm_typ(name: str) -> str:
+    """Normaliza un nombre de tipología para match flexible.
+
+    Quita el prefijo 'N. ', acentos y pasa a minúsculas/espacios colapsados.
+    Así 'epica' == '15. ÉPICA' y 'motivacion' == '9. MOTIVACIÓN'.
+    """
+    import unicodedata
+    t = unicodedata.normalize("NFKD", (name or "")).encode("ascii", "ignore").decode("ascii")
+    t = re.sub(r"^\s*\d+\s*[.\-)]?\s*", "", t.lower())  # prefijo "9. " / "9 - "
+    return re.sub(r"\s+", " ", t).strip()
+
+
+def _music_typologies(music_dir: Path) -> dict:
+    """Mapa {nombre_normalizado -> Path} de cada subcarpeta de `musicas/`."""
+    out = {}
+    d = Path(music_dir)
+    if not d.is_dir():
+        return out
+    for sub in d.iterdir():
+        if sub.is_dir():
+            out[_norm_typ(sub.name)] = sub
+    return out
+
+
+def _list_music_files(folder) -> list:
+    """MP3 dentro de una carpeta de tipología (sin recursión extra)."""
+    if not folder:
+        return []
+    f = Path(folder)
+    if not f.is_dir():
+        return []
+    return sorted(list(f.glob("*.mp3")) + list(f.glob("*.MP3")))
+
+
+def _cosine(a, b) -> float:
+    import math
+    s = sum(x * y for x, y in zip(a, b))
+    na = math.sqrt(sum(x * x for x in a))
+    nb = math.sqrt(sum(y * y for y in b))
+    return s / (na * nb) if na and nb else 0.0
+
+
+def _mood_descriptor_vecs():
+    """Embeddings (cacheados) de los descriptores de cada mood. {} si falla."""
+    global _music_mood_vec_cache
+    if _music_mood_vec_cache is None:
+        _music_mood_vec_cache = {}
+        for norm, desc in _MUSIC_MOOD_DESCRIPTORS.items():
+            try:
+                _music_mood_vec_cache[norm] = embed_text(desc)
+            except Exception:
+                pass
+    return _music_mood_vec_cache
+
+
+def _infer_music_mood(text: str, available: dict):
+    """(norm_typ, similitud) del mood más afín al texto, o (None, 0.0).
+
+    Solo considera moods que EXISTEN como carpeta en disco (`available`).
+    Excluye NEUTRA/DE LAS MEJORES por no ser moods. Best-effort: si no hay
+    fastembed o algo falla, devuelve (None, 0.0)."""
+    if not (text or "").strip():
+        return None, 0.0
+    try:
+        qv = embed_text(text)
+    except Exception:
+        return None, 0.0
+    dvecs = _mood_descriptor_vecs()
+    best, best_sim = None, -1.0
+    for norm, dv in dvecs.items():
+        if norm not in available:  # el mood debe tener carpeta en disco
+            continue
+        sim = _cosine(qv, dv)
+        if sim > best_sim:
+            best_sim, best = sim, norm
+    if best is None:
+        return None, 0.0
+    return best, best_sim
+
+
+def select_music(music_dir: Path, typology: str = None, clip_text: str = None,
+                 env: dict = None):
+    """Elige (music_path, log) en DOS pasos: tipología por contenido + audio.
+
+    Prioridad de tipología:
+      1) `typology` (anotación cortes.json) — match flexible por nombre.
+      2) inferencia por embeddings sobre `clip_text` (moods; excluye comodines).
+      3) fallback: comodines DE LAS MEJORES / NEUTRA y, en último caso, random
+         entre TODAS las tipologías (y la raíz por compatibilidad).
+    Dentro de la tipología elegida: audio por defecto (random). Si la carpeta
+    está vacía, se pasa a la siguiente opción. Devuelve (None, motivo) si no hay
+    ningún mp3 en absoluto. Nunca lanza por la selección en sí."""
+    import random
+    typs = _music_typologies(music_dir)
+
+    chosen, reason = None, None
+    # 1) anotación explícita
+    if typology and str(typology).strip():
+        key = _norm_typ(typology)
+        if key in typs:
+            chosen, reason = key, f"anotación cortes.json '{typology}' -> {typs[key].name}"
+        else:
+            print(f"  [música] tipología anotada '{typology}' no existe en musicas/; se ignora")
+    # 2) inferencia por embeddings
+    if chosen is None and clip_text:
+        inf, sim = _infer_music_mood(clip_text, typs)
+        if inf:
+            chosen, reason = inf, f"inferida por embeddings sim={sim:.3f} -> {typs[inf].name}"
+
+    # orden de intentos: elegida -> comodines -> random total
+    order = []
+    if chosen:
+        order.append((chosen, reason))
+    for fb in _MUSIC_FALLBACK_TYPS:
+        if fb in typs:
+            order.append((fb, f"fallback comodín '{typs[fb].name}'"))
+
+    for norm, why in order:
+        files = _list_music_files(typs.get(norm))
+        if files:
+            music = random.choice(files)
+            return music, f"{why}; audio={music.name}"
+
+    # último recurso: random entre TODAS las tipologías + raíz (compat. plano)
+    allf = []
+    for f in typs.values():
+        allf += _list_music_files(f)
+    allf += _list_music_files(music_dir)
+    if allf:
+        music = random.choice(allf)
+        return music, f"fallback random total; audio={music.name}"
+    return None, f"sin ningún mp3 en {music_dir}"
+
+
+# ============================================================
 # 8b. BANCO DE FRASES VIRALES (Supabase `viral_phrases`)
 #
 # Al analizar un viral (tras descargar + transcribir), el agente selecciona
@@ -1012,7 +1192,9 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
                         lang: str = "es", env: dict = None,
                         broll_keywords: list[str] = None,
                         overlays_dir: Path = None,
-                        hook_query: str = None) -> Path:
+                        hook_query: str = None,
+                        music_typology: str = None,
+                        clip_text: str = None) -> Path:
     """Render final: gancho + B-roll + música + de-click + subs ASS karaoke.
 
     Gancho inicial: si `hook_query` no es None, descarga un MINI-VIDEO de Pexels
@@ -1031,10 +1213,14 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
     import random
     ff = get_ffmpeg_exe()
 
-    music_files = list(music_dir.glob("*.mp3")) + list(music_dir.glob("*.MP3"))
-    if not music_files:
-        raise RuntimeError(f"No hay MP3 en {music_dir}")
-    music = random.choice(music_files)
+    # Selección de música en DOS PASOS: tipología (por contenido del clip) +
+    # audio por defecto dentro de esa tipología. `music_dir` sigue siendo la
+    # RAÍZ musicas/ (para _parse_music_offset y _find_broll_sfx en parent/sfx).
+    music, music_log = select_music(music_dir, typology=music_typology,
+                                    clip_text=clip_text, env=env)
+    if not music:
+        raise RuntimeError(f"No hay MP3 en {music_dir} ({music_log})")
+    print(f"  [música] {music_log}")
 
     # PASO 0: word-timestamps del avatar. El audio es idéntico en toda la
     # composición (hook y b-roll son overlays de vídeo: no tocan audio ni
