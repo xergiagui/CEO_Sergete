@@ -12,8 +12,9 @@ Por cada clip de transcripciones/<video>/clips/ aplica:
   (musicas/) + de-click + subtitulos palabra a palabra (una sola vez, enmascarando
   palabrotas).
 
-Trabaja en una carpeta ASCII (whisper/_edit) para evitar problemas de rutas con
-tildes en el filtro de subtitulos de ffmpeg. Salida en transcripciones/<video>/finales/.
+Trabaja en una carpeta ASCII ÚNICA por proceso (whisper/_edit_XXXX via mkdtemp)
+para evitar problemas de rutas con tildes en el filtro de subtitulos de ffmpeg y
+para no pisar ediciones en paralelo. Salida en transcripciones/<video>/finales/.
 
 Uso:
     python editar_clips.py "Mi Adicción"
@@ -22,8 +23,10 @@ Uso:
 """
 import argparse
 import json
+import os
 import shutil
 import sys
+import tempfile
 import traceback
 from pathlib import Path
 
@@ -42,7 +45,10 @@ import pipeline_core as pc  # noqa: E402
 
 MUSIC = RAIZ / "musicas"
 OVERLAYS = RAIZ / "superposiciones"
-WORKROOT = RAIZ / "whisper" / "_edit"
+# Raíz ASCII bajo la que se crea el work dir ÚNICO por ejecución (ver main()).
+# whisper-cli/ffmpeg abren rutas ANSI, así que el intermedio va bajo whisper/
+# con nombre ASCII garantizado.
+WORKBASE = RAIZ / "whisper"
 
 
 def resolver_nombre(arg: str) -> str:
@@ -172,6 +178,8 @@ def main():
     ap = argparse.ArgumentParser(description="Edicion final (Fase C) de los clips de un video.")
     ap.add_argument("video", help="Nombre en input/ o ruta al video.")
     ap.add_argument("--cortes", help="Ruta al cortes.json (por defecto transcripciones/<video>/cortes.json).")
+    ap.add_argument("--work-dir", help="Work dir ASCII para intermedios (por defecto uno único por proceso bajo whisper/). "
+                                       "Si se suministra, NO se borra al terminar.")
     args = ap.parse_args()
 
     nombre = resolver_nombre(args.video)
@@ -193,8 +201,23 @@ def main():
         env = {}
     env.update({"MUSIC_DIR": str(MUSIC), "OVERLAYS_DIR": str(OVERLAYS)})
     out.mkdir(parents=True, exist_ok=True)
-    if WORKROOT.exists():
-        shutil.rmtree(WORKROOT, ignore_errors=True)
+
+    # CONCURRENCIA: el work dir debe ser ÚNICO por ejecución. Antes se usaba un
+    # 'whisper/_edit' COMPARTIDO y se hacía rmtree al arrancar; con dos ediciones
+    # en paralelo la segunda borraba los intermedios de la primera (carrera: una
+    # edición se caía o se pisaba a media). Ahora cada proceso crea su propio dir
+    # aislado (tempfile.mkdtemp bajo whisper/, nombre ASCII garantizado y único)
+    # y solo limpia ESE al terminar; nunca un rmtree del dir global. Se puede
+    # forzar con --work-dir / EDIT_WORK_DIR (debe ser ASCII y estar bajo la raíz).
+    WORKBASE.mkdir(parents=True, exist_ok=True)
+    supplied = args.work_dir or os.environ.get("EDIT_WORK_DIR")
+    if supplied:
+        workroot = Path(supplied)
+        workroot.mkdir(parents=True, exist_ok=True)
+        _work_es_propio = False  # dir suministrado: no lo borramos al final
+    else:
+        workroot = Path(tempfile.mkdtemp(prefix="_edit_", dir=str(WORKBASE)))
+        _work_es_propio = True
 
     clips = sorted(clips_dir.glob("*.mp4"))
     print(f"{len(clips)} clips a editar\n", flush=True)
@@ -208,7 +231,7 @@ def main():
                      or hook or "").strip() or None
         print(f"=== {name}   gancho='{hook}'"
               + (f"   mood='{music_typology}'" if music_typology else ""), flush=True)
-        work = WORKROOT / name
+        work = workroot / name
         work.mkdir(parents=True, exist_ok=True)
         ascii_in = work / "in.mp4"
         shutil.copy(str(clip), str(ascii_in))
@@ -225,7 +248,8 @@ def main():
             traceback.print_exc()
             print(f"   [!] FALLO en {name}: {e}", flush=True)
 
-    shutil.rmtree(WORKROOT, ignore_errors=True)
+    if _work_es_propio:
+        shutil.rmtree(workroot, ignore_errors=True)
     print(f"\nListo. Finales en: {out}", flush=True)
 
     # --- Banco de frases virales (Supabase, best-effort) ---------------------
