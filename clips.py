@@ -39,7 +39,7 @@ veces ni acabar con subtitulos duplicados en pantalla.
 
 Pipeline por clip:
   1) ffmpeg  -> recorte + crop vertical 1080x1920
-  2) auto-editor (umbral 8%, margen 0.1s) -> quita silencios -> clip final
+  2) auto-editor (umbral 6%, margen 0.15s) -> quita silencios -> clip final
 """
 import argparse
 import json
@@ -426,7 +426,7 @@ def _render_segmentado(video: Path, inicio, dur, segs, destino, src_h):
 
 def quitar_silencios(origen, destino):
     run([PY, "-m", "auto_editor", str(origen),
-         "--edit", "audio:threshold=8%", "--margin", "0.1s",
+         "--edit", "audio:threshold=6%", "--margin", "0.15s",
          "-o", str(destino), "--no-open"])
 
 
