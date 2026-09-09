@@ -49,6 +49,9 @@ def _parse_args(argv=None):
     p.add_argument("--orientation", default=None, choices=["vertical", "horizontal"],
                    help="fondo con esa orientación (si el catálogo lo tiene)")
     p.add_argument("--no-marcar", action="store_true", help="no marcar used_in_story")
+    p.add_argument("--max-len", type=int, default=None,
+                   help="OPCIONAL: descarta frases más largas que N caracteres. "
+                        "Por defecto NO filtra: las frases largas se ajustan solas.")
     return p.parse_args(argv)
 
 
@@ -95,9 +98,16 @@ def main(argv=None) -> int:
     manifest = []
 
     print(f"[i] Generando {len(items)} historia(s) en {out_dir}")
+    omitidas_largas = 0
     for idx, it in enumerate(items, 1):
         phrase = (it.get("phrase") or "").strip()
         if not phrase:
+            continue
+        # Filtro OPCIONAL por longitud (por defecto desactivado: el render ajusta
+        # el tamaño de fuente para que cualquier frase larga quepa y sea legible).
+        if args.max_len is not None and len(phrase) > args.max_len:
+            omitidas_largas += 1
+            print(f"  [{idx}] omitida por --max-len ({len(phrase)} > {args.max_len})")
             continue
         fondo, metodo = elegir_fondo(phrase, env, usados=usados_fondo,
                                      want_orientation=args.orientation)
@@ -126,11 +136,14 @@ def main(argv=None) -> int:
             "metodo_fondo": metodo,
             "salida": out_mp4.name,
             "marcada_usada": marcada,
+            "virality": it.get("virality"),
+            "longitud": len(phrase),
         })
 
     (out_dir / "manifest.json").write_text(
         json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(f"[✓] {len(manifest)} historia(s) generada(s). Manifiesto: {out_dir / 'manifest.json'}")
+    print(f"[✓] {len(manifest)} historia(s) generada(s). Manifiesto: {out_dir / 'manifest.json'}"
+          + (f"  ({omitidas_largas} omitidas por --max-len)" if omitidas_largas else ""))
     return 0
 
 

@@ -20,6 +20,7 @@ from typing import Optional
 from PIL import Image, ImageDraw, ImageFont
 
 import config
+from lib.texto import capitalizar_frase
 
 
 def _ffmpeg_exe() -> str:
@@ -43,17 +44,29 @@ def _wrap(draw, text: str, font, max_w: int) -> list[str]:
     return lines
 
 
+# Rango de tamaños de fuente para el auto-ajuste. El máximo es el ideal para
+# one-liners; el mínimo garantiza que un bloque largo de transcripción (1500+
+# caracteres) SIEMPRE quepa y siga siendo legible en 9:16. Nunca se descarta una
+# frase por longitud: se reduce la fuente hasta que entra en el área segura.
+_FONT_MAX = 96
+_FONT_MIN = 24
+_LINE_SPACING = 1.28   # factor alto-de-línea → alto-de-bloque (debe casar con el gap del pintado)
+
+
 def _fit_font(draw, text: str, max_w: int, max_h: int,
               font_path: Path) -> tuple[ImageFont.FreeTypeFont, list[str]]:
-    """Elige el mayor tamaño de fuente que hace caber el texto en la caja."""
-    for size in range(96, 39, -4):
+    """Elige el MAYOR tamaño de fuente con el que el texto (envuelto en líneas)
+    cabe en la caja (max_w × max_h). Baja el tamaño dinámicamente para frases
+    largas; si ni el mínimo cupiera, devuelve el mínimo (mejor legible que nada).
+    """
+    for size in range(_FONT_MAX, _FONT_MIN - 1, -2):
         font = ImageFont.truetype(str(font_path), size)
         lines = _wrap(draw, text, font, max_w)
         line_h = font.getbbox("Ag")[3] - font.getbbox("Ag")[1]
-        total_h = int(len(lines) * line_h * 1.28)
+        total_h = int(len(lines) * line_h * _LINE_SPACING)
         if total_h <= max_h:
             return font, lines
-    font = ImageFont.truetype(str(font_path), 40)
+    font = ImageFont.truetype(str(font_path), _FONT_MIN)
     return font, _wrap(draw, text, font, max_w)
 
 
@@ -67,14 +80,20 @@ def _build_text_png(phrase: str, out_png: Path) -> None:
     scrim_alpha = int(max(0.0, min(1.0, config.FONDO_OSCURECER)) * 255)
     draw.rectangle([0, 0, W, H], fill=(0, 0, 0, scrim_alpha))
 
+    # Regla de Sergio: minúsculas salvo inicio de oración. Se aplica AQUÍ, justo
+    # donde se pinta el texto, para que valga en todo el flujo (BBDD o --phrase).
+    texto = capitalizar_frase(phrase.strip())
+
     font_path = config.FONTS_DIR / "Montserrat-Bold.ttf"
     margin_x = 90
     max_w = W - 2 * margin_x
-    max_h = int(H * 0.62)
-    font, lines = _fit_font(draw, phrase.strip(), max_w, max_h, font_path)
+    # Área segura vertical: amplia para que los bloques largos de transcripción
+    # quepan tras el auto-ajuste de fuente, sin invadir bordes de la story.
+    max_h = int(H * 0.78)
+    font, lines = _fit_font(draw, texto, max_w, max_h, font_path)
 
     line_h = font.getbbox("Ag")[3] - font.getbbox("Ag")[1]
-    gap = int(line_h * 0.28)
+    gap = int(line_h * (_LINE_SPACING - 1.0))
     block_h = len(lines) * line_h + (len(lines) - 1) * gap
     y = (H - block_h) // 2
 
