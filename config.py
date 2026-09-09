@@ -26,6 +26,11 @@ EDITOR_ROOT = PRUEBAS_IA / "TheEditor"
 # consultable por afinidad semántica con la RPC `match_broll`.
 FONDOS_DIR = EDITOR_ROOT / "superposiciones"
 
+# Banco de FONDOS para las HISTORIAS ESPECIALES (vía aparte): vídeos propios de
+# TheHistoria, SIN Supabase ni semántica. Se eligen por rotación/azar sin repetir
+# dentro de la tanda. No se cataloga en broll_assets.
+FONDOS_ESPECIALES_DIR = PROJECT_ROOT / "BRells especiales"
+
 # Python del entorno con las dependencias ya instaladas (fastembed, httpx,
 # Pillow, imageio-ffmpeg). Reutilizamos el .venv de TheEditor para NO instalar
 # nada nuevo. Si algún día TheHistoria tiene su propio .venv, cambia esto.
@@ -37,6 +42,11 @@ STORY_H = 1920
 STORY_FPS = 30
 STORY_DURATION = 6.0          # segundos por historia (una frase)
 FONDO_OSCURECER = 0.45        # scrim oscuro 0..1 sobre el fondo (legibilidad)
+
+# Fracción de la ALTURA reservada ABAJO en las historias especiales para dejar
+# sitio al botón/enlace de Instagram. El texto se centra en la zona superior
+# [margen .. H*(1-RESERVA_INFERIOR_ESPECIAL)], no en la pantalla completa.
+RESERVA_INFERIOR_ESPECIAL = 0.25
 
 # --- Modelo de embeddings (EL MISMO con el que se indexó broll_assets) ---
 EMBED_MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"

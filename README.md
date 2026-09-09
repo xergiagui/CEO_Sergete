@@ -66,6 +66,48 @@ Ejemplos:
 H.264) y un `manifest.json` (frase, fondo usado, método, si se marcó). La carpeta
 `salidas/` está en `.gitignore`.
 
+## Historias especiales (vía aparte)
+
+Además del flujo normal (frases de Supabase), hay una **vía aparte** para
+promos/anuncios donde **tú das el texto** y el fondo sale de un **banco propio**:
+
+- **Texto**: lo pasas por `--texto` (soporta acentos/UTF-8). **No** toca Supabase
+  ni `viral_phrases`.
+- **Fondos**: vídeos de **`BRells especiales/`** (NO `superposiciones/`). Se
+  eligen por **rotación/azar sin repetir** dentro de la tanda. Sin semántica.
+- **Espacio para el botón de IG**: el texto **no** se centra en toda la pantalla,
+  sino en la **zona superior**, dejando libre una **franja inferior** (por defecto
+  el **25 %**, `--reserva-inferior`) para el botón/enlace de la historia.
+- **Variaciones**: `--variaciones N` genera N historias del mismo tema, cada una
+  con un **fondo distinto**. Puedes pasar **varios `--texto`** (uno por variación);
+  si hay menos textos que variaciones, los textos **se ciclan** y varía el fondo.
+  Con **1 solo texto y N>1**, todas comparten texto y solo cambia el fondo.
+
+```powershell
+cd C:\Users\ico858\Desktop\PruebasIA\TheHistoria
+
+# 3 variaciones (mismo texto, 3 fondos distintos)
+..\TheEditor\.venv\Scripts\python.exe historias_especiales.py `
+  --texto "descuento exclusivo del 30% solo este fin de semana" --variaciones 3
+
+# Varios textos (uno por variación) + duración y reserva inferior a medida
+..\TheEditor\.venv\Scripts\python.exe historias_especiales.py `
+  --texto "oferta flash" --texto "ultimas horas" --variaciones 4 `
+  --duracion 5 --reserva-inferior 0.30
+```
+
+### Opciones (especiales)
+
+| Flag | Qué hace |
+|---|---|
+| `--texto "..."` | texto de la historia. **REPETIBLE** (uno por variación). Al menos uno. |
+| `--variaciones N` | nº de historias del mismo tema, cada una con otro fondo (def. 3) |
+| `--duracion S` | segundos por historia (def. 6) |
+| `--reserva-inferior F` | fracción 0..0.6 reservada abajo para el botón de IG (def. 0.25) |
+
+Salida en `salidas/especiales_<AAAAMMDD_HHMMSS>/` con `NN_slug.mp4` (1080×1920,
+H.264) + `manifest.json` (texto, fondo, variación, reserva inferior, duración).
+
 ## Credenciales
 
 Supabase (anon key) desde `./.env` o, si no existe, `../CEO_Sergete/.env`.
@@ -75,14 +117,17 @@ Copia `.env.example` a `.env` solo si quieres claves propias.
 
 ```
 TheHistoria/
-  historias.py          # CLI/orquestador
-  config.py             # rutas y constantes del lienzo
+  historias.py            # CLI/orquestador (frases de Supabase)
+  historias_especiales.py # CLI vía aparte (texto propio + BRells especiales/)
+  config.py               # rutas y constantes del lienzo
   lib/
-    env.py              # carga de credenciales
-    supabase_phrases.py # leer frases sin usar / marcar usadas
-    fondos.py           # elegir fondo (match_broll semántico o azar)
-    embeddings.py       # modelo de embeddings (el mismo que indexó el catálogo)
-    render.py           # componer fondo + texto -> MP4 9:16 (Pillow + ffmpeg)
-  fonts/                # Montserrat (texto de la historia)
-  salidas/              # MP4 generados (gitignored)
+    env.py                # carga de credenciales
+    supabase_phrases.py   # leer frases sin usar / marcar usadas
+    fondos.py             # elegir fondo normal (match_broll semántico o azar)
+    fondos_especiales.py  # fondos de BRells especiales/ (rotación/azar, sin repetir)
+    embeddings.py         # modelo de embeddings (el mismo que indexó el catálogo)
+    render.py             # componer fondo + texto -> MP4 9:16 (Pillow + ffmpeg)
+  fonts/                  # Montserrat (texto de la historia)
+  BRells especiales/      # banco de fondos propio para historias especiales
+  salidas/                # MP4 generados (gitignored)
 ```

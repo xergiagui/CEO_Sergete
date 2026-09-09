@@ -9,3 +9,6 @@ __pycache__/
 # Salidas generadas (historias renderizadas)
 salidas/
 !salidas/.gitkeep
+
+# Banco de B-rolls para historias especiales (assets locales pesados, no a git)
+BRells especiales/

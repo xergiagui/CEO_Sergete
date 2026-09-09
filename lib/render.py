@@ -70,8 +70,16 @@ def _fit_font(draw, text: str, max_w: int, max_h: int,
     return font, _wrap(draw, text, font, max_w)
 
 
-def _build_text_png(phrase: str, out_png: Path) -> None:
-    """Capa 1080x1920 RGBA: scrim + frase centrada con sombra."""
+def _build_text_png(phrase: str, out_png: Path,
+                    bottom_reserved_frac: float = 0.0) -> None:
+    """Capa 1080x1920 RGBA: scrim + frase centrada con sombra.
+
+    `bottom_reserved_frac` (0..1): fracción de la altura reservada ABAJO (p. ej.
+    para el botón de Instagram en las historias especiales). Con 0.0 el texto se
+    centra en TODA la pantalla (comportamiento original). Con >0.0 el bloque de
+    texto se compone y se centra dentro de la ZONA SUPERIOR
+    [margen_sup .. H*(1-bottom_reserved_frac)]; el scrim sigue a pantalla completa.
+    """
     W, H = config.STORY_W, config.STORY_H
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
@@ -87,15 +95,28 @@ def _build_text_png(phrase: str, out_png: Path) -> None:
     font_path = config.FONTS_DIR / "Montserrat-Bold.ttf"
     margin_x = 90
     max_w = W - 2 * margin_x
-    # Área segura vertical: amplia para que los bloques largos de transcripción
-    # quepan tras el auto-ajuste de fuente, sin invadir bordes de la story.
-    max_h = int(H * 0.78)
+
+    # Zona segura vertical donde se compone y se centra el bloque de texto.
+    frac = max(0.0, min(0.6, float(bottom_reserved_frac)))
+    if frac > 0.0:
+        # Deja libre la franja inferior (botón de IG). El texto vive en
+        # [zona_top .. zona_bottom] y se centra DENTRO de esa zona.
+        margin_top = int(H * 0.10)
+        zona_bottom = int(H * (1.0 - frac))
+        zona_top = margin_top
+        max_h = max(1, zona_bottom - zona_top)
+    else:
+        # Comportamiento original: área amplia, centrado en pantalla completa.
+        max_h = int(H * 0.78)
+        zona_top = 0
+        zona_bottom = H
+
     font, lines = _fit_font(draw, texto, max_w, max_h, font_path)
 
     line_h = font.getbbox("Ag")[3] - font.getbbox("Ag")[1]
     gap = int(line_h * (_LINE_SPACING - 1.0))
     block_h = len(lines) * line_h + (len(lines) - 1) * gap
-    y = (H - block_h) // 2
+    y = zona_top + (zona_bottom - zona_top - block_h) // 2
 
     for line in lines:
         tw = draw.textlength(line, font=font)
@@ -111,14 +132,19 @@ def _build_text_png(phrase: str, out_png: Path) -> None:
 def render_historia(
     fondo: Path, phrase: str, out_mp4: Path,
     duration: Optional[float] = None,
+    bottom_reserved_frac: float = 0.0,
 ) -> Path:
-    """Compone el MP4 9:16 (fondo cover + frase). Devuelve la ruta de salida."""
+    """Compone el MP4 9:16 (fondo cover + frase). Devuelve la ruta de salida.
+
+    `bottom_reserved_frac` (0..1): reserva una franja inferior sin texto (botón
+    de IG). 0.0 = texto centrado en pantalla completa (comportamiento original).
+    """
     duration = duration or config.STORY_DURATION
     out_mp4.parent.mkdir(parents=True, exist_ok=True)
 
     with tempfile.TemporaryDirectory() as tmp:
         png = Path(tmp) / "texto.png"
-        _build_text_png(phrase, png)
+        _build_text_png(phrase, png, bottom_reserved_frac=bottom_reserved_frac)
 
         W, H, fps = config.STORY_W, config.STORY_H, config.STORY_FPS
         vf_bg = (
