@@ -1,5 +1,8 @@
 import type { SVGProps } from "react";
 
+// Iconos decorativos: acompañan siempre a texto, así que los ocultamos a los
+// lectores de pantalla (aria-hidden) y los sacamos del foco de teclado.
+// Los botones que solo llevan icono aportan su propio aria-label.
 const base = {
   fill: "none",
   stroke: "currentColor",
@@ -7,6 +10,8 @@ const base = {
   strokeLinecap: "round" as const,
   strokeLinejoin: "round" as const,
   viewBox: "0 0 24 24",
+  "aria-hidden": true,
+  focusable: false,
 };
 
 export const ArrowRight = (p: SVGProps<SVGSVGElement>) => (

@@ -6,6 +6,7 @@ import ContactForm from "@/components/ContactForm";
 export const metadata: Metadata = {
   title: "Contacto",
   description: "¿Tienes una duda? Escríbenos y te respondemos.",
+  alternates: { canonical: "/contacto" },
 };
 
 export default function Contacto() {

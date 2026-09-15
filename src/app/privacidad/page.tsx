@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: "Privacidad",
   description:
     "Cómo tratamos tus datos en esta página: qué recogemos, para qué y tus derechos.",
+  alternates: { canonical: "/privacidad" },
   robots: { index: false, follow: true },
 };
 
