@@ -133,7 +133,7 @@ src/
     robots.ts, sitemap.ts, opengraph-image.tsx   # SEO
   components/           # secciones y UI de la landing
   lib/
-    products.ts         # los 4 productos y sus enlaces de afiliado
+    products.ts         # los 5 productos y sus enlaces de afiliado
     analytics.ts        # medición en el navegador
     supabase/server.ts  # conexión segura a Supabase
 public/llms.txt         # guía para crawlers de IA
@@ -142,5 +142,5 @@ supabase/schema.sql     # base de datos
 
 ## Cambiar textos o productos
 
-Edita [`src/lib/products.ts`](src/lib/products.ts): ahí están los 4 productos,
+Edita [`src/lib/products.ts`](src/lib/products.ts): ahí están los 5 productos,
 sus ganchos, precios y **enlaces de afiliado**. Cambia lo que quieras y guarda.

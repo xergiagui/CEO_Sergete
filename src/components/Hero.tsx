@@ -25,7 +25,7 @@ export default function Hero() {
 
         <Reveal delay={150}>
           <p className="mx-auto mt-6 max-w-xl text-lg text-[var(--text-muted)]">
-            He reunido los <strong className="text-[var(--text)]">4 recursos</strong>{" "}
+            He reunido los <strong className="text-[var(--text)]">5 recursos</strong>{" "}
             con los que cualquiera puede empezar hoy: desde tu primer euro como
             afiliado hasta cerrar ventas de miles. Elige el tuyo en 30 segundos.
           </p>
@@ -34,7 +34,7 @@ export default function Hero() {
         <Reveal delay={220}>
           <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <a href="#productos" className="btn-primary w-full sm:w-auto">
-              Ver los 4 recursos
+              Ver los 5 recursos
               <ArrowRight width={18} height={18} />
             </a>
             <a href="#faq" className="btn-ghost w-full sm:w-auto">

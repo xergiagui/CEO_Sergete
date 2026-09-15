@@ -18,9 +18,9 @@ const fraunces = Fraunces({
 });
 
 const TITLE =
-  "Aprende a vender y ganar dinero online · 4 recursos de Luis Monge Malo";
+  "Aprende a vender y ganar dinero online · 5 recursos de Luis Monge Malo";
 const DESCRIPTION =
-  "Los 4 recursos de Luis Monge Malo para vender más y ganar dinero online: la Escuela de Afiliados, el mejor negocio destripado, el curso de objeciones y la mentoría. Elige el tuyo en 30 segundos.";
+  "Los 5 recursos de Luis Monge Malo para vender más y ganar dinero online: el Grupo Alfa, la Escuela de Afiliados, el mejor negocio destripado, el curso de objeciones y la mentoría. Elige el tuyo en 30 segundos.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

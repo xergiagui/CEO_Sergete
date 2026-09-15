@@ -28,6 +28,7 @@
   --azure: #2563eb;
   --emerald: #059669;
   --rose: #e11d48;
+  --violet: #7c3aed;      /* acento premium — Grupo Alfa (buque insignia) */
 
   /* Acento principal de marca (dinero) */
   --accent: var(--gold);
@@ -52,6 +53,7 @@
   --color-azure: var(--azure);
   --color-emerald: var(--emerald);
   --color-rose: var(--rose);
+  --color-violet: var(--violet);
   --font-sans: var(--font-geist-sans);
   --font-display: var(--font-fraunces);
 }

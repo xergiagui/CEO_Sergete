@@ -5,7 +5,132 @@ import type { Product } from "@/lib/products";
 import { track } from "@/lib/analytics";
 import LeadModal from "@/components/LeadModal";
 import Reveal from "@/components/Reveal";
-import { ArrowRight, Check } from "@/components/icons";
+import { ArrowRight, Check, Bolt } from "@/components/icons";
+
+// Registra que una tarjeta se ha visto (product_view), una sola vez.
+function useProductView(id: string) {
+  const ref = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          track("product_view", id);
+          io.disconnect();
+        }
+      },
+      { threshold: 0.4 }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [id]);
+  return ref;
+}
+
+// Tarjeta destacada (buque insignia) — ocupa el ancho completo, encima del
+// grid. Layout horizontal en desktop, apilado en móvil. Mismo sistema de
+// diseño (.card, .pill, .btn-primary, font-display) y misma lógica de tracking.
+function FeaturedProductCard({
+  product,
+  onWant,
+}: {
+  product: Product;
+  onWant: (p: Product) => void;
+}) {
+  const ref = useProductView(product.id);
+
+  return (
+    <article
+      ref={ref}
+      className="card overflow-hidden p-7 sm:p-9 lg:p-10"
+      style={{
+        ["--accent" as string]: product.accent,
+        borderColor: `color-mix(in oklab, ${product.accent} 45%, var(--border-strong))`,
+        background: `
+          radial-gradient(120% 140% at 100% 0%, color-mix(in oklab, ${product.accent} 12%, transparent), transparent 60%),
+          linear-gradient(180deg, var(--surface) 0%, var(--bg-2) 140%)`,
+      }}
+    >
+      {/* Barra de acento superior más marcada */}
+      <div
+        className="absolute inset-x-0 top-0 h-[3px]"
+        style={{
+          background: `linear-gradient(90deg, transparent, ${product.accent}, transparent)`,
+        }}
+      />
+
+      <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:gap-10">
+        {/* Izquierda: texto + bullets */}
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-3">
+            <span
+              className="pill"
+              style={{
+                color: product.accentInk,
+                borderColor: `color-mix(in oklab, ${product.accent} 45%, var(--border-strong))`,
+                background: `color-mix(in oklab, ${product.accent} 10%, transparent)`,
+              }}
+            >
+              <Bolt width={13} height={13} style={{ color: product.accent }} />
+              {product.kind}
+            </span>
+            {product.badge && (
+              <span
+                className="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide"
+                style={{ color: "#fff", background: product.accent }}
+              >
+                {product.badge}
+              </span>
+            )}
+          </div>
+
+          <h3 className="mt-5 font-display text-[2rem] leading-[1.1] tracking-tight sm:text-[2.5rem]">
+            {product.hook}
+          </h3>
+          <p className="mt-3 max-w-2xl text-[16px] text-[var(--text-muted)]">
+            {product.subhook}
+          </p>
+
+          <ul className="mt-6 grid gap-2.5 sm:grid-cols-2">
+            {product.bullets.map((b) => (
+              <li key={b} className="flex items-start gap-2.5 text-[14.5px]">
+                <span
+                  className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
+                  style={{ background: `color-mix(in oklab, ${product.accent} 20%, transparent)` }}
+                >
+                  <Check width={13} height={13} style={{ color: product.accent }} />
+                </span>
+                <span className="text-[var(--text)]/90">{b}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Derecha: precio + CTA grande */}
+        <div className="flex shrink-0 flex-col gap-4 lg:w-64 lg:items-stretch lg:border-l lg:border-[var(--border)] lg:pl-10">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-[var(--text-faint)]">
+              {product.name}
+            </p>
+            <p className="mt-1 text-2xl font-semibold leading-tight">
+              {product.price}
+            </p>
+          </div>
+          <button
+            onClick={() => onWant(product)}
+            className="btn-primary w-full !py-4 text-base"
+            style={{ ["--accent" as string]: product.accent, color: "#fff" }}
+            aria-label={`Lo quiero: ${product.name}`}
+          >
+            Lo quiero
+            <ArrowRight width={18} height={18} />
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}
 
 function ProductCard({
   product,
@@ -14,24 +139,7 @@ function ProductCard({
   product: Product;
   onWant: (p: Product) => void;
 }) {
-  const ref = useRef<HTMLElement | null>(null);
-
-  // Registra que la tarjeta se ha visto (product_view), una vez.
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) {
-          track("product_view", product.id);
-          io.disconnect();
-        }
-      },
-      { threshold: 0.5 }
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [product.id]);
+  const ref = useProductView(product.id);
 
   return (
     <article
@@ -121,12 +229,15 @@ export default function ProductsSection({ products }: { products: Product[] }) {
     setSelected(p);
   };
 
+  const featured = products.find((p) => p.id === "grupo-alfa");
+  const rest = products.filter((p) => p.id !== "grupo-alfa");
+
   return (
     <section id="productos" className="relative mx-auto w-full max-w-6xl px-5 py-20 sm:py-28">
       <Reveal className="mx-auto max-w-2xl text-center">
         <span className="pill">Elige tu recurso</span>
         <h2 className="mt-5 font-display text-3xl sm:text-4xl md:text-5xl leading-[1.05] tracking-tight">
-          4 formas de empezar a{" "}
+          5 formas de empezar a{" "}
           <span className="hl">ganar dinero</span> vendiendo
         </h2>
         <p className="mt-4 text-[var(--text-muted)]">
@@ -135,8 +246,15 @@ export default function ProductsSection({ products }: { products: Product[] }) {
         </p>
       </Reveal>
 
-      <div className="mt-14 grid gap-5 md:grid-cols-2">
-        {products.map((p, i) => (
+      {/* Buque insignia: tarjeta destacada a lo ancho, encima de la parrilla */}
+      {featured && (
+        <Reveal className="mt-14">
+          <FeaturedProductCard product={featured} onWant={want} />
+        </Reveal>
+      )}
+
+      <div className="mt-5 grid gap-5 md:grid-cols-2">
+        {rest.map((p, i) => (
           <Reveal key={p.id} delay={i * 70}>
             <ProductCard product={p} onWant={want} />
           </Reveal>

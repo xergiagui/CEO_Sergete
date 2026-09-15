@@ -1,6 +1,6 @@
 # TheLanding · Selección · Monje Malo
 
-Landing page de afiliación de alto rendimiento: presenta 4 productos de Luis
+Landing page de afiliación de alto rendimiento: presenta 5 productos de Luis
 Monje Malo como **gancho**, capta el email del visitante en una base de datos de
 Supabase y lo redirige a los enlaces de afiliado. Incluye panel de estadísticas,
 SEO avanzado y optimización para crawlers de IA.
@@ -54,5 +54,5 @@ npm run lint    # linter
 
 ## Editar contenido
 
-Los 4 productos, ganchos, precios y **enlaces de afiliado** están en
+Los 5 productos, ganchos, precios y **enlaces de afiliado** están en
 [`src/lib/products.ts`](src/lib/products.ts).

@@ -38,6 +38,29 @@ export type Product = {
 
 export const PRODUCTS: Product[] = [
   {
+    id: "grupo-alfa",
+    name: "Grupo Alfa",
+    fullName: "Grupo Alfa de Luis Monge Malo",
+    kind: "Comunidad Élite",
+    hook: "Domina las 3 habilidades de la libertad financiera",
+    subhook:
+      "La comunidad de competidores que aprenden a generar, invertir y proteger su dinero juntos.",
+    bullets: [
+      "Lecciones semanales en audio sobre dinero y negocios",
+      "Comunidad en Discord con miles de miembros activos",
+      "Mentoría directa de Luis: responde preguntas cada día",
+    ],
+    price: "99 € primer mes · luego 49 €/mes",
+    priceValue: 99,
+    badge: "El más importante",
+    href: "https://mongemalo.com/grupo-alfa/?via=sergio-aguilar",
+    accent: "#7C3AED",
+    accentInk: "#6D28D9",
+    accentVar: "--violet",
+    bestFor:
+      "Quieres rodearte de gente ambiciosa y acelerar de verdad con mentoría diaria.",
+  },
+  {
     id: "mentoria",
     name: "Mentoría",
     fullName: "Mentoría de Luis Monge Malo",
