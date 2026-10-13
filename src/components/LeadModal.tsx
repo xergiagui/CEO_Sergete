@@ -176,6 +176,19 @@ export default function LeadModal({
               <Lock width={13} height={13} />
               Sin spam. Solo información útil. Puedes darte de baja cuando quieras.
             </p>
+            <p className="mt-1.5 text-center text-xs text-[var(--text-faint)]">
+              Al continuar aceptas la{" "}
+              <a
+                href="/privacidad"
+                target="_blank"
+                rel="noopener"
+                className="underline underline-offset-2 transition-colors hover:text-[var(--text)]"
+              >
+                política de privacidad
+                <span className="sr-only"> (se abre en una pestaña nueva)</span>
+              </a>
+              .
+            </p>
           </>
         )}
       </div>

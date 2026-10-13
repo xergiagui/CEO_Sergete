@@ -16,11 +16,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "yearly",
       priority: 0.4,
     },
-    {
-      url: `${SITE_URL}/privacidad`,
-      lastModified,
-      changeFrequency: "yearly",
-      priority: 0.3,
-    },
+    // Solo rutas indexables. /privacidad es noindex: no va aquí.
   ];
 }

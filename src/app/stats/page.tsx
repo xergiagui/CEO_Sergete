@@ -103,6 +103,7 @@ export default function StatsPage() {
         return;
       }
       setData(json as Stats);
+      setPass(password);
       setAuthed(true);
       sessionStorage.setItem(PASS_KEY, password);
     } catch {
@@ -113,11 +114,13 @@ export default function StatsPage() {
   }, []);
 
   useEffect(() => {
+    // Autologin con la contraseña guardada en la sesión. Se difiere a un
+    // callback para no hacer setState síncrono dentro del efecto; load()
+    // rellena `pass` al validar.
     const saved = sessionStorage.getItem(PASS_KEY);
-    if (saved) {
-      setPass(saved);
-      load(saved);
-    }
+    if (!saved) return;
+    const id = setTimeout(() => load(saved), 0);
+    return () => clearTimeout(id);
   }, [load]);
 
   if (!authed) {

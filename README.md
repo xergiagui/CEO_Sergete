@@ -1,19 +1,21 @@
-# TheLanding · Selección · Monje Malo
+# TheLanding · Selección · Monge Malo
 
-Landing page de afiliación de alto rendimiento: presenta 5 productos de Luis
-Monje Malo como **gancho**, capta el email del visitante en una base de datos de
+Landing page de afiliación (perfil independiente, no la cuenta oficial): presenta
+5 productos de Luis Monge Malo como **gancho**, capta el email del visitante en
 Supabase y lo redirige a los enlaces de afiliado. Incluye panel de estadísticas,
-SEO avanzado y optimización para crawlers de IA.
+SEO técnico y optimización para crawlers de IA.
 
-> **¿Primera vez?** Empieza por **[SETUP.md](SETUP.md)** — te guía en 15 minutos
-> para conectar Supabase y publicar en Vercel.
+En producción: <https://the-landing-ten.vercel.app>. Reglas de trabajo y
+despliegue: **[CLAUDE.md](CLAUDE.md)**. Variables de entorno y base de datos:
+**[SETUP.md](SETUP.md)**.
 
 ---
 
 ## Qué hace
 
-- **Landing muy visual** (base oscura premium, tipografía editorial, animaciones cuidadas).
+- **Landing muy visual** (tema claro: fondo blanco, acento dorado `#f59e0b`, tipografía editorial Fraunces + Geist, animaciones cuidadas).
 - **Captación de email** con modal → guarda `email + producto + fecha/hora` en Supabase → redirige al enlace de afiliado.
+- **Contacto** (`/contacto`) → tabla `messages` en Supabase + aviso por email con Resend (opcional).
 - **Analítica propia** (visitas, clics, emails, embudo, fuentes, dispositivos) en un panel privado `/stats`.
 - **SEO técnico**: metadatos, Open Graph dinámico, `sitemap.xml`, `robots.txt`, datos estructurados JSON-LD (Product + FAQ + ItemList).
 - **IA crawlers**: `llms.txt`, permisos explícitos para GPTBot/ClaudeBot/PerplexityBot… y HTML renderizado en servidor.
@@ -23,7 +25,7 @@ SEO avanzado y optimización para crawlers de IA.
 - **Next.js 16** (App Router) + **TypeScript** + **Tailwind CSS v4**
 - **Supabase** (PostgreSQL) para leads y eventos
 - **Recharts** para el panel de estadísticas
-- Desplegable gratis en **Vercel**
+- Desplegada en **Vercel** (deploy automático al hacer push a `main`)
 
 ## Skills de diseño instaladas (guía OriginaLabs)
 
@@ -46,7 +48,7 @@ Este proyecto trae instaladas las herramientas del stack "diseño de agencia":
 ## Comandos
 
 ```bash
-npm run dev     # desarrollo en http://localhost:3000
+npm run dev     # desarrollo en http://localhost:3000 (solo a mano; un agente no lo lanza)
 npm run build   # build de producción
 npm run start   # servir el build
 npm run lint    # linter
@@ -55,4 +57,5 @@ npm run lint    # linter
 ## Editar contenido
 
 Los 5 productos, ganchos, precios y **enlaces de afiliado** están en
-[`src/lib/products.ts`](src/lib/products.ts).
+[`src/lib/products.ts`](src/lib/products.ts). Si los cambias, actualiza también
+[`public/llms.txt`](public/llms.txt).

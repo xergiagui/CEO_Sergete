@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
 import { ArrowRight } from "@/components/icons";
@@ -28,13 +29,13 @@ export default function NotFound() {
           inicio y elige tu recurso en 30 segundos.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <a href="/" className="btn-primary">
+          <Link href="/" className="btn-primary">
             Volver al inicio
             <ArrowRight width={18} height={18} />
-          </a>
-          <a href="/#productos" className="btn-ghost">
+          </Link>
+          <Link href="/#productos" className="btn-ghost">
             Ver los recursos
-          </a>
+          </Link>
         </div>
       </main>
       <Footer />

@@ -135,6 +135,17 @@ export default function ContactForm() {
           </>
         )}
       </button>
+
+      <p className="mt-4 text-xs text-[var(--text-faint)]">
+        Al continuar aceptas la{" "}
+        <a
+          href="/privacidad"
+          className="underline underline-offset-2 transition-colors hover:text-[var(--text)]"
+        >
+          política de privacidad
+        </a>
+        .
+      </p>
     </form>
   );
 }

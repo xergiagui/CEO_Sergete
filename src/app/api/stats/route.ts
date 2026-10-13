@@ -1,9 +1,21 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { PRODUCTS } from "@/lib/products";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/**
+ * Compara la contraseña en tiempo constante. Se comparan los SHA-256 de ambas
+ * (siempre 32 bytes), así timingSafeEqual no lanza con longitudes distintas y
+ * la duración no revela la longitud de la contraseña esperada.
+ */
+function passwordMatches(given: string, expected: string): boolean {
+  const a = createHash("sha256").update(given, "utf8").digest();
+  const b = createHash("sha256").update(expected, "utf8").digest();
+  return timingSafeEqual(a, b);
+}
 
 type Agg = {
   totals: {
@@ -30,7 +42,7 @@ export async function GET(req: NextRequest) {
       { status: 500 }
     );
   }
-  if (!pass || pass !== expected) {
+  if (!pass || !passwordMatches(pass, expected)) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 

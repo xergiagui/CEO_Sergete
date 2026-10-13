@@ -1,98 +1,86 @@
-# 🚀 Puesta en marcha de TheLanding
+# Puesta en marcha de TheLanding
 
-Guía paso a paso. Tiempo estimado: **15 minutos**.
-
----
-
-## 1) Crea tu base de datos en Supabase
-
-1. Entra en <https://supabase.com> → **New project** (es gratis).
-2. Ponle nombre (p. ej. `thelanding`) y elige una contraseña de base de datos.
-3. Cuando esté listo, ve a **SQL Editor → New query**.
-4. Abre [`supabase/schema.sql`](supabase/schema.sql), copia **todo**, pégalo y **Run**.
-   - Crea las tablas `leads` (emails) y `events` (analítica) con seguridad (RLS) activada.
-5. Abre [`supabase/policies.sql`](supabase/policies.sql), copia **todo**, pégalo y **Run**.
-   - Da permiso a la clave `anon` para **insertar** (no leer) y crea la función de
-     estadísticas agregadas. Imprescindible para que guarde datos y funcione `/stats`.
-6. Ve a **Project Settings → API** y copia estos dos valores:
-   - **Project URL** → será tu `SUPABASE_URL`
-   - **anon public** (en *Project API keys*) → tu `SUPABASE_ANON_KEY`
-
-> Usamos la clave **anon** (no la `service_role`) a propósito: así TheLanding solo
-> puede escribir en `leads`/`events` y leer recuentos, sin acceso a nada más de tu
-> base de datos. Ideal si la reutilizas de otro proyecto.
-
-7. (Formulario de contacto) Abre [`supabase/contact.sql`](supabase/contact.sql),
-   copia, pega y **Run**. Crea la tabla `messages` para guardar los mensajes.
-
-### Recibir los mensajes de contacto por email (opcional pero recomendado)
-
-El formulario de `/contacto` guarda cada mensaje en Supabase (tabla `messages`) y,
-si configuras **Resend**, además te lo envía por email:
-
-1. Crea una cuenta gratis en <https://resend.com> con tu email (`xergiagui@gmail.com`).
-2. **API Keys → Create** y copia la clave.
-3. En `.env.local` (y en Vercel) pon:
-   - `RESEND_API_KEY=` la clave de Resend
-   - `CONTACT_EMAIL=` tu email (dónde quieres recibir los mensajes; **no se muestra
-     nunca en la web**)
-
-> Sin Resend, los mensajes igualmente se guardan en Supabase (**Table editor →
-> messages**); solo no llega el aviso por email.
+Guía para dejar el proyecto funcionando en local y entender cómo está conectado.
+Reglas de trabajo y despliegue: [`CLAUDE.md`](CLAUDE.md).
 
 ---
 
-## 2) Configura las variables de entorno
+## 1) Base de datos: Supabase compartido (no crees uno nuevo)
 
-1. Copia el archivo de ejemplo:
+TheLanding **reutiliza** un proyecto de Supabase que ya existe
+(`https://akuykrrqmivrcjzcsksj.supabase.co`, originalmente de *mis-finanzas*).
+Lo comparten TheLanding (`leads`, `events`, `messages`) y TheEditor/TheHistoria
+(`broll_assets`, `viral_phrases`). **Tiene leads reales.**
 
-   ```bash
-   cp .env.local.example .env.local
-   ```
+Las tablas ya están creadas. Los SQL de [`supabase/`](supabase/) quedan como
+referencia y solo se ejecutan si falta algo (Supabase → **SQL Editor**):
 
-2. Edita `.env.local` y rellena:
+| Archivo | Qué hace |
+|---|---|
+| `schema.sql` | Tablas `leads` y `events` con RLS activada |
+| `policies.sql` | Permisos de la clave `anon` (insertar, no leer) + función `thelanding_stats` para `/stats` |
+| `contact.sql` | Tabla `messages` del formulario de contacto |
+| `consultas.sql` | Consultas de solo lectura para revisar leads y datos |
+| `limpiar.sql` | Borra filas de prueba. **Nunca se ejecuta sin el OK explícito de Sergio** |
+| `broll_assets.sql`, `viral_phrases.sql` | Tablas de TheEditor/TheHistoria (no las usa la web) |
 
-   ```env
-   NEXT_PUBLIC_SITE_URL=http://localhost:3000
-   SUPABASE_URL=https://TU-PROYECTO.supabase.co
-   SUPABASE_ANON_KEY=eyJhbGci...   # la clave anon public
-   STATS_PASSWORD=una-contraseña-que-tú-elijas
-   ```
-
-> `.env.local` **nunca** se sube a Git. La clave anon solo se usa en el servidor.
+> Se usa la clave **anon** (no la `service_role`) y solo en el servidor: con RLS,
+> TheLanding solo puede escribir en sus tablas y leer recuentos agregados.
 
 ---
 
-## 3) Arranca en local
+## 2) Variables de entorno (7)
+
+Copia el ejemplo y rellénalo con los valores reales (pídelos; no están en Git):
+
+```bash
+cp .env.local.example .env.local
+```
+
+| Variable | Para qué |
+|---|---|
+| `NEXT_PUBLIC_SITE_URL` | URL pública sin barra final. En local `http://localhost:3000`; en Vercel, la de producción |
+| `SUPABASE_URL` | URL del Supabase compartido |
+| `SUPABASE_ANON_KEY` | Clave anon (solo servidor) |
+| `STATS_PASSWORD` | Contraseña del panel `/stats` |
+| `CONTACT_EMAIL` | Dónde llegan los mensajes de `/contacto` (nunca se muestra en la web) |
+| `RESEND_API_KEY` | Envío de esos mensajes por email con Resend (opcional) |
+| `CONTACT_FROM` | Remitente del email (por defecto `TheLanding <onboarding@resend.dev>`) |
+
+> `.env.local` **nunca** se sube a Git. Sin `RESEND_API_KEY`, los mensajes de
+> contacto se guardan igualmente en Supabase (tabla `messages`), pero no llega el
+> aviso por email.
+
+En Vercel (**Settings → Environment Variables**) están las mismas 7 variables,
+con `NEXT_PUBLIC_SITE_URL` apuntando a producción.
+
+---
+
+## 3) Local
 
 ```bash
 npm install       # solo la primera vez
-npm run dev
+npm run dev       # http://localhost:3000 (a mano; un agente no lo lanza)
 ```
 
 - Landing: <http://localhost:3000>
-- Panel de estadísticas: <http://localhost:3000/stats> (te pedirá tu `STATS_PASSWORD`)
+- Panel de estadísticas: <http://localhost:3000/stats> (pide `STATS_PASSWORD`)
 
-Deja tu email en la web y comprueba en Supabase (**Table editor → leads**) que se ha guardado.
-
----
-
-## 4) Publica en internet (Vercel, gratis)
-
-1. Sube el proyecto a un repositorio de GitHub.
-2. Entra en <https://vercel.com> → **Add New → Project** → importa el repo.
-3. En **Environment Variables**, añade las **mismas 4 variables** del `.env.local`,
-   pero pon `NEXT_PUBLIC_SITE_URL` con tu dominio final (p. ej. `https://tudominio.com`).
-4. **Deploy**. En 1–2 minutos tendrás la URL pública para pegar en tus RRSS.
-
-> Cuando tengas dominio propio, añádelo en Vercel → **Domains** y actualiza
-> `NEXT_PUBLIC_SITE_URL`.
+Para verificar sin servidor de desarrollo: `npm run build` y `npm run lint`.
 
 ---
 
-## 5) Cómo funcionan las estadísticas
+## 4) Producción (Vercel)
 
-Todo se guarda en la tabla `events` (+ `leads`). El panel `/stats` te muestra:
+El repo ya está conectado a Vercel: **cada `git push` a `main` despliega**
+(<https://the-landing-ten.vercel.app>). El flujo completo (build, lint, commit,
+OK de Sergio, push, comprobación y vuelta atrás) está en [`CLAUDE.md`](CLAUDE.md).
+
+---
+
+## 5) Estadísticas
+
+Todo se guarda en `events` (+ `leads`). El panel `/stats` muestra:
 
 | Métrica | Qué es |
 |---|---|
@@ -105,16 +93,12 @@ Todo se guarda en la tabla `events` (+ `leads`). El panel `/stats` te muestra:
 | **Dispositivos** | móvil, escritorio, tablet |
 | **Serie 30 días** | evolución diaria |
 
-### Truco: mide cada red social por separado
-
-Añade parámetros UTM al enlace que pones en cada perfil:
+Para medir cada red por separado, añade UTM al enlace de cada perfil:
 
 ```
-https://tudominio.com/?utm_source=instagram
-https://tudominio.com/?utm_source=tiktok&utm_campaign=reel-ventas
+https://the-landing-ten.vercel.app/?utm_source=instagram
+https://the-landing-ten.vercel.app/?utm_source=tiktok&utm_campaign=reel-ventas
 ```
-
-Así el panel te dirá qué red te trae más ventas.
 
 ---
 
@@ -123,24 +107,32 @@ Así el panel te dirá qué red te trae más ventas.
 ```
 src/
   app/
-    page.tsx            # la landing
-    stats/page.tsx      # panel privado de estadísticas
-    privacidad/page.tsx # política de privacidad
+    page.tsx              # la landing (+ JSON-LD: Organization, WebSite, ItemList de Product, FAQPage)
+    layout.tsx            # metadatos globales y fuentes
+    contacto/page.tsx     # formulario de contacto
+    privacidad/page.tsx   # política de privacidad (noindex)
+    stats/page.tsx        # panel privado de estadísticas
+    not-found.tsx         # 404 de marca
     api/
-      lead/route.ts     # guarda el email + devuelve enlace de afiliado
-      event/route.ts    # guarda eventos de analítica
-      stats/route.ts    # agrega las estadísticas (protegido por contraseña)
+      lead/route.ts       # guarda el email + devuelve enlace de afiliado
+      event/route.ts      # guarda eventos de analítica
+      contact/route.ts    # guarda el mensaje + aviso por Resend
+      stats/route.ts      # estadísticas agregadas (protegido por contraseña)
     robots.ts, sitemap.ts, opengraph-image.tsx   # SEO
-  components/           # secciones y UI de la landing
+    icon.svg, apple-icon.tsx                     # favicon de marca
+  components/             # secciones y UI (Hero, ProductsSection, LeadModal, ContactForm, Faq…)
   lib/
-    products.ts         # los 5 productos y sus enlaces de afiliado
-    analytics.ts        # medición en el navegador
-    supabase/server.ts  # conexión segura a Supabase
-public/llms.txt         # guía para crawlers de IA
-supabase/schema.sql     # base de datos
+    products.ts           # los 5 productos y sus enlaces de afiliado
+    site.ts               # SITE_URL
+    analytics.ts          # medición en el navegador
+    request-meta.ts       # dispositivo/país para la analítica
+    supabase/server.ts    # conexión a Supabase (solo servidor)
+public/llms.txt           # guía para crawlers de IA (sincronizada con products.ts)
+supabase/                 # SQL de referencia (ver tabla de arriba)
 ```
 
 ## Cambiar textos o productos
 
-Edita [`src/lib/products.ts`](src/lib/products.ts): ahí están los 5 productos,
-sus ganchos, precios y **enlaces de afiliado**. Cambia lo que quieras y guarda.
+Edita [`src/lib/products.ts`](src/lib/products.ts): productos, ganchos, precios y
+**enlaces de afiliado**. Si cambias algo, actualiza también
+[`public/llms.txt`](public/llms.txt).
