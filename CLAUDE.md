@@ -8,8 +8,10 @@ local. Lo dirige CEO_Sergete con el subagente `descarga`. Uso detallado en
 - **Autónomo, sin instalar nada:** usa siempre `tools\yt-dlp.exe` (con
   `tools\ffmpeg.exe`/`ffprobe.exe` al lado). Nada de yt-dlp, ffmpeg ni Python
   globales.
-- Salida siempre en `descargas\`, con el título como nombre:
-  `-o "descargas/%(title)s.%(ext)s"`.
+- **Por proyecto:** salida en `descargas\<proyecto>\` (p. ej. `descargas\mongemalo\`),
+  con el título como nombre: `-o "descargas/<proyecto>/%(title)s.%(ext)s"`. Lo que
+  no sea de ningún proyecto va a `descargas\_general\`. Si el CEO no dice el
+  proyecto y no es evidente, pregúntaselo; nunca mezcles proyectos.
 - Por defecto, **solo el vídeo de la URL** (`--no-playlist`). Si la URL es una
   lista, pregunta antes de bajarla entera.
 - Vídeo: `-f "bv*+ba/b" --merge-output-format mp4`. Audio: `-x --audio-format mp3 --audio-quality 0`.
@@ -19,5 +21,5 @@ local. Lo dirige CEO_Sergete con el subagente `descarga`. Uso detallado en
 
 ## Handoff con TheEditor
 Lo que se baja aquí se trata después en TheEditor. Devuelve la **ruta exacta** del
-MP4 en `descargas\`: el subagente `editor` lo copia a su buzón `TheEditor\input\`.
-No lo copies tú.
+archivo en `descargas\<proyecto>\`: el subagente `editor` lo lleva a su buzón
+`TheEditor\proyectos\<proyecto>\input\`. No lo copies tú.

@@ -1,15 +1,19 @@
 @echo off
 REM ============================================================
 REM  TheDescarga  -  yt-dlp autonomo (sin instalar nada)
-REM  Uso:  descargar.bat "URL"           -> mejor calidad, MP4
-REM        descargar.bat "URL" audio     -> solo audio MP3
-REM        descargar.bat "URL" 720p      -> calidad concreta MP4
+REM  Uso:  descargar.bat "URL" [modo] [proyecto]
+REM        modo:     best (por defecto, MP4) | audio (MP3) | 1080p | 720p | 480p | 360p
+REM        proyecto: id del proyecto (p. ej. mongemalo) -> descargas\<proyecto>\
+REM                  sin proyecto -> descargas\_general\
+REM  Ej.:  descargar.bat "URL" best mongemalo     descargar.bat "URL" audio
 REM  Los binarios (yt-dlp + ffmpeg) viven en la carpeta tools\.
 REM ============================================================
 setlocal enabledelayedexpansion
 set "SCRIPTDIR=%~dp0"
 set "YTDLP=%SCRIPTDIR%tools\yt-dlp.exe"
-set "OUT=%SCRIPTDIR%descargas"
+set "PROY=%~3"
+if "%PROY%"=="" set "PROY=_general"
+set "OUT=%SCRIPTDIR%descargas\%PROY%"
 if not exist "%OUT%" mkdir "%OUT%"
 
 if not exist "%YTDLP%" (
@@ -18,7 +22,7 @@ if not exist "%YTDLP%" (
 )
 
 if "%~1"=="" (
-  echo Uso: descargar.bat "URL" [audio^|1080p^|720p^|480p^|360p]
+  echo Uso: descargar.bat "URL" [best^|audio^|1080p^|720p^|480p^|360p] [proyecto]
   exit /b 1
 )
 
@@ -27,6 +31,7 @@ set "MODE=%~2"
 
 if /I "%MODE%"=="audio" goto audio
 if "%MODE%"=="" goto best
+if /I "%MODE%"=="best" goto best
 goto quality
 
 :audio
