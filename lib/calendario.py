@@ -218,25 +218,23 @@ def _estado(estados: list[str]) -> str:
     return "No encontrado" if "No encontrado" in e else e[0]
 
 
-def _origen_clip(stem: str, indice: dict) -> str:
-    cands = indice.get(stem) or []
-    if cands:
-        cortes = sorted(cands, key=lambda c: c[0].stat().st_mtime, reverse=True)[0][0]
-        return "video:" + normalizar(cortes.parent.name)
-    return "clip:" + normalizar(stem)
+def _origen_clip(stem: str, buscador) -> str:
+    carpeta = buscador.origen(stem) if buscador is not None else None
+    return "video:" + normalizar(carpeta) if carpeta else "clip:" + normalizar(stem)
 
 
-def _origen(p: Pieza, indice: dict) -> str | None:
+def _origen(p: Pieza, buscador) -> str | None:
     """Vídeo (o fuente) del que sale la pieza. Solo se consulta para no poner seguidas dos
-    piezas del mismo origen; no se guarda en el registro."""
+    piezas del mismo origen; no se guarda en el registro. `buscador` = BuscadorMetadatos
+    del proyecto (solo mira sus carpetas de contexto)."""
     if p.formato == "reel":
-        return _origen_clip(Path(p.clip).stem, indice)
+        return _origen_clip(Path(p.clip).stem, buscador)
     f = car.fuente(Path(p.ruta)) if p.ruta else {}
     tipo, ruta = str(f.get("tipo") or "").lower(), str(f.get("ruta") or "")
     if tipo == "clip" and ruta:
-        return _origen_clip(Path(ruta).stem, indice)
+        return _origen_clip(Path(ruta).stem, buscador)
     if tipo == "video" and ruta:
-        # el MP4 del vídeo largo o su carpeta de transcripción (TheEditor/transcripciones, _Historico)
+        # el MP4 del vídeo largo o su carpeta de transcripción (TheEditor/proyectos/<id>/transcripciones, _Historico/<id>)
         r = Path(ruta)
         return "video:" + normalizar(r.stem if r.suffix.lower() in config.EXT_VIDEO else r.name)
     if ruta:
@@ -244,7 +242,8 @@ def _origen(p: Pieza, indice: dict) -> str | None:
     return None
 
 
-def piezas_de_registro(proyecto, reg, indice_metadatos: dict | None = None) -> list[Pieza]:
+def piezas_de_registro(proyecto, reg, buscador=None) -> list[Pieza]:
+    """Piezas del registro. Con `buscador` (BuscadorMetadatos del proyecto) se calcula su origen."""
     grupos: dict[str, list[dict]] = {}
     filas: dict[str, list[int]] = {}
     for fila, d in reg.filas():
@@ -282,8 +281,8 @@ def piezas_de_registro(proyecto, reg, indice_metadatos: dict | None = None) -> l
         p.manual = bool(p.fecha) and plan.get(key) != (p.fecha.isoformat(), hhmm(p.hora))
         if p.formato == "carrusel":
             p.formula = car.formula(Path(p.ruta)) if p.ruta else None
-        if indice_metadatos is not None:
-            p.origen = _origen(p, indice_metadatos)
+        if buscador is not None:
+            p.origen = _origen(p, buscador)
         out.append(p)
     return out
 

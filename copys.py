@@ -13,6 +13,10 @@ Flujo normal (lo lleva el subagente `copy` de CEO_Sergete):
   6. copys.py calendario hoy        → qué se publica hoy, con el texto listo para pegar
   7. copys.py sincronizar           → Estado/ruta según la carpeta donde esté cada pieza
 
+Proyectos: cada orden trabaja con UN proyecto (`--proyecto <id>`; sin él, el único que
+haya; con varios, error con la lista). Registro, tandas (tandas/<id>/), calendario y .txt
+son siempre los de ese proyecto, y nunca se lee ni escribe en carpetas de otro.
+
 Ejecuta con el entorno propio:  .venv\\Scripts\\python.exe copys.py <orden> ...
 (El script NO se llama copy.py: chocaría con el módulo `copy` de Python.)
 """
@@ -38,13 +42,41 @@ from lib.util import escribir_json, forzar_utf8, leer_json, normalizar
 
 # ---------------------------------------------------------------- helpers
 def _proyecto(pid: str | None) -> proy.Proyecto:
-    if not pid:
-        disponibles = proy.listar()
-        if len(disponibles) != 1:
-            raise proy.ErrorProyecto(
-                f"Indica --proyecto ({', '.join(disponibles) or 'no hay ninguno'}).")
-        pid = disponibles[0]
-    return proy.Proyecto(pid)
+    """--proyecto <id>; sin él, el único proyecto que haya (sin contar _plantilla); con varios, error."""
+    return proy.elegir(pid)
+
+
+def _proyecto_de_tanda(tanda: dict, pid_arg: str | None) -> proy.Proyecto:
+    """El proyecto de una tanda es el suyo (campo `proyecto`); --proyecto, si se da, tiene que coincidir."""
+    pid_tanda = tanda.get("proyecto")
+    if pid_arg and pid_tanda and pid_arg != pid_tanda:
+        raise proy.ErrorProyecto(f"La tanda es del proyecto '{pid_tanda}' y has pedido --proyecto {pid_arg}: "
+                                 "no se mezclan proyectos.")
+    return _proyecto(pid_tanda or pid_arg)
+
+
+def _ajena(p: proy.Proyecto, ruta: Path | str | None, que: str) -> None:
+    """Error si `ruta` es de OTRO proyecto (sus carpetas de piezas, su registro o sus tandas)."""
+    otro = proy.de_otro_proyecto(p.id, ruta)
+    if otro:
+        raise proy.ErrorProyecto(f"{que} {ruta} es del proyecto '{otro}', no de '{p.id}': no se mezclan proyectos.")
+
+
+def _excel(args, p: proy.Proyecto) -> Path:
+    """Registro del proyecto o el de --excel (pruebas), que no puede ser el de otro proyecto."""
+    if getattr(args, "excel", None):
+        excel = Path(args.excel)
+        _ajena(p, excel, "--excel")
+        return excel
+    return p.registro_path
+
+
+def _carpeta(p: proy.Proyecto, alternativa: str | None, propia: Path | None, que: str) -> Path | None:
+    """Carpeta alternativa (pruebas) o la del proyecto; nunca la de otro proyecto."""
+    if alternativa:
+        _ajena(p, alternativa, que)
+        return Path(alternativa)
+    return propia
 
 
 def _pid_de_nombre(p: proy.Proyecto, nombre: str | None) -> str | None:
@@ -95,7 +127,17 @@ def cmd_proyectos(args) -> int:
             p = proy.Proyecto(pid)
             plats = ", ".join(p.nombre_plataforma(x) for x in p.plataformas_activas())
             calend = "calendario activo" if p.calendario_activo else "sin calendario"
-            print(f"- {pid:<16} {p.nombre}  ·  plataformas activas: {plats}  ·  {calend}  ·  registro: {p.registro_path.name}")
+            print(f"- {pid:<16} {p.nombre}  ·  {p.tipo or 'tipo ?'}  ·  IDs {p.prefijo_id}-  ·  plataformas activas: "
+                  f"{plats}  ·  {calend}  ·  registro: {p.registro_path.name}")
+            faltan = [f"{que} ({c})" for que, c in (("pendiente", p.carpeta_pendiente), ("publicado", p.carpeta_publicado))
+                      if c and not c.exists()]
+            if p.calendario_activo and p.carpeta_historias and not p.carpeta_historias.exists():
+                faltan.append(f"historias ({p.carpeta_historias})")
+            if faltan:
+                print(f"    [!] no existen (las crea el CEO): {'; '.join(faltan)}")
+            sin = p.sin_rellenar()
+            if sin:
+                print(f"    por rellenar: {'; '.join(sin)}")
         except proy.ErrorProyecto as e:
             print(f"- {pid:<16} [config incorrecta] {e}")
     return 0
@@ -103,9 +145,13 @@ def cmd_proyectos(args) -> int:
 
 def cmd_pendientes(args) -> int:
     p = _proyecto(args.proyecto)
-    carpeta = Path(args.carpeta) if args.carpeta else p.carpeta_pendiente
-    if not carpeta or not carpeta.exists():
-        print(f"[!] No existe la carpeta de pendientes: {carpeta}")
+    carpeta = _carpeta(p, args.carpeta, p.carpeta_pendiente, "--carpeta")
+    if not carpeta:
+        print(f"[!] {p.id}/proyecto.json no define carpetas.pendiente.")
+        return 1
+    if not carpeta.exists():
+        print(f"[!] No existe la carpeta pendiente de {p.nombre}: {carpeta}\n"
+              f"    La crea el CEO (CEO_Sergete/REVISADOS/{p.id}/…); hasta entonces no hay piezas que buscar.")
         return 1
     plataformas = args.plataformas.split(",") if args.plataformas else p.plataformas_activas()
     for pid in plataformas:
@@ -118,9 +164,12 @@ def cmd_pendientes(args) -> int:
         clips = [c for c in clips if c.name.lower() in quiero or c.stem.lower() in quiero]
         carrs = [d for d in carrs if d.name.lower() in quiero]
 
-    excel = Path(args.excel) if args.excel else p.registro_path
+    excel = _excel(args, p)
+    salida = Path(args.salida) if args.salida else (
+        config.TANDAS_DIR / p.id / f"{p.id}_{dt.datetime.now():%Y%m%d_%H%M%S}.json")
+    _ajena(p, salida, "--salida")
     reg = Registro(excel, p) if excel.exists() else None
-    meta = BuscadorMetadatos()
+    meta = BuscadorMetadatos(p)
 
     def faltan_en(nombre: str, plats: list[str]) -> list[str]:
         return [pid for pid in plats
@@ -151,8 +200,6 @@ def cmd_pendientes(args) -> int:
         piezas.append({"ruta": d, "contexto": ctx, "plataformas": faltan, "formato": "carrusel",
                        "tema": ctx.get("tema") or "", "extra": extra})
 
-    salida = Path(args.salida) if args.salida else (
-        config.TANDAS_DIR / f"{p.id}_{dt.datetime.now():%Y%m%d_%H%M%S}.json")
     tanda = tnd.esqueleto(p, piezas)
     # Pieza ya registrada en otra plataforma → mismo tema y campos propios (lo del Excel manda).
     for bloque in tanda["clips"]:
@@ -181,7 +228,7 @@ def cmd_pendientes(args) -> int:
         if pz["formato"] == "carrusel":
             info = f"carrusel · {ctx.get('formula') or '¿fórmula?'} · {ctx.get('n_imagenes')} slides · «{ctx.get('gancho_slide1', '')}»"
         else:
-            info = ctx.get("frase_viral") or ctx.get("titulo") or ""
+            info = ctx.get("frase_viral") or ctx.get("titulo") or ctx.get("gancho_texto") or ""
         aviso = f"  [aviso: {ctx['aviso']}]" if ctx.get("aviso") else ""
         print(f"  - {Path(pz['ruta']).name}  [{', '.join(pz['plataformas'])}]  {info}{aviso}")
     print(f"\nTANDA: {salida}")
@@ -191,8 +238,9 @@ def cmd_pendientes(args) -> int:
 def cmd_registrar(args) -> int:
     entrada = Path(args.entrada)
     tanda = leer_json(entrada)
-    p = _proyecto(tanda.get("proyecto"))
-    excel = Path(args.excel) if args.excel else p.registro_path
+    p = _proyecto_de_tanda(tanda, args.proyecto)
+    _ajena(p, entrada, "La tanda")
+    excel = _excel(args, p)
     reg = Registro(excel, p)
 
     existentes: dict[str, dict[str, str]] = {}
@@ -202,6 +250,18 @@ def cmd_registrar(args) -> int:
             existentes.setdefault(pid, {})[normalizar(str(d["Copy"]))] = str(d.get("Clip"))
 
     errores, avisos = tnd.validar(p, tanda, existentes, _hashtags_recientes(p, reg))
+    # Nunca se escribe un .txt en las carpetas de otro proyecto.
+    propias = p.carpetas_propias()
+    for c in tanda.get("clips") or []:
+        ruta = c.get("ruta")
+        if not ruta:
+            continue
+        otro = proy.de_otro_proyecto(p.id, ruta)
+        if otro:
+            errores.append(f"[{c.get('clip')}] está en una carpeta del proyecto '{otro}' ({ruta}): "
+                           f"esta tanda es de '{p.id}' y no se mezclan proyectos.")
+        elif not any(proy.dentro_de(ruta, x) for x in propias):
+            avisos.append(f"[{c.get('clip')}] no está en las carpetas de {p.nombre} ({ruta}).")
     if not args.reemplazar:
         for c in tanda.get("clips") or []:
             for pid in c.get("plataformas") or {}:
@@ -280,18 +340,21 @@ def cmd_registrar(args) -> int:
     tanda["registro"] = str(excel)
     escribir_json(entrada, tanda)
     if p.calendario_activo:
-        print("\nSiguiente: copys.py calendario planificar  (fecha y hora de publicación para lo registrado)")
+        print(f"\nSiguiente: copys.py calendario planificar --proyecto {p.id}  (fecha y hora de publicación para lo registrado)")
     return 0
 
 
 def cmd_sincronizar(args) -> int:
     p = _proyecto(args.proyecto)
-    excel = Path(args.excel) if args.excel else p.registro_path
+    excel = _excel(args, p)
+    pend = _carpeta(p, args.pendiente, p.carpeta_pendiente, "--pendiente")
+    publ = _carpeta(p, args.publicado, p.carpeta_publicado, "--publicado")
     if not excel.exists():
         print(f"Aún no hay registro para {p.nombre} ({excel}).")
         return 0
-    pend = Path(args.pendiente) if args.pendiente else p.carpeta_pendiente
-    publ = Path(args.publicado) if args.publicado else p.carpeta_publicado
+    faltan = [str(c) for c in (pend, publ) if c and not c.exists()]
+    if faltan:
+        print(f"  aviso: no existe {' ni '.join(faltan)} (la crea el CEO): lo que estuviera ahí saldrá como No encontrado.")
 
     # Reels (MP4) y carruseles (carpetas con carrusel.json), por nombre; si está en las dos, manda Publicados.
     donde: dict[str, tuple[Path, str]] = {}
@@ -359,9 +422,9 @@ def cmd_sincronizar(args) -> int:
 
 def cmd_ver(args) -> int:
     p = _proyecto(args.proyecto)
-    excel = Path(args.excel) if args.excel else p.registro_path
+    excel = _excel(args, p)
     if not excel.exists():
-        print(f"Aún no hay registro para {p.nombre}.")
+        print(f"Aún no hay registro para {p.nombre} ({excel}).")
         return 0
     reg = Registro(excel, p)
     filas = [d for _, d in reg.filas()]
@@ -391,9 +454,11 @@ def cmd_ver(args) -> int:
 
 def cmd_banco(args) -> int:
     p = _proyecto(args.proyecto)
+    excel = _excel(args, p)
     usados: list[str] = []
-    if p.registro_path.exists():
-        usados = [normalizar(str(d.get("Copy") or "")) for _, d in Registro(p.registro_path, p).filas()]
+    if excel.exists():
+        usados = [normalizar(str(d.get("Copy") or "")) for _, d in Registro(excel, p).filas()]
+    print(f"Banco de copys de {p.nombre} (proyectos/{p.id}/banco_copys.json)")
 
     def veces(copy: str) -> int:
         n = normalizar(copy)
@@ -427,7 +492,7 @@ def cmd_auditar(args) -> int:
     p = None
     if args.entrada:
         tanda = leer_json(Path(args.entrada))
-        p = _proyecto(tanda.get("proyecto"))
+        p = _proyecto_de_tanda(tanda, args.proyecto)
         for c in tanda.get("clips") or []:
             fmt = c.get("formato") or "reel"
             for pid, b in (c.get("plataformas") or {}).items():
@@ -517,7 +582,7 @@ def cmd_hashtags(args) -> int:
         for tam in ("nicho", "medio", "amplio", "sin_tamano"):
             if g[tam]:
                 print(f"  {tam:<10} {' '.join(g[tam])}")
-    excel = Path(args.excel) if args.excel else p.registro_path
+    excel = _excel(args, p)
     if excel.exists():
         n = int(reglas.get("rotacion_ultimos", config.ROTACION_ULTIMOS) or 0)
         ult = _hashtags_recientes(p, Registro(excel, p)).get(pid, [])[-n:] if n else []
@@ -535,11 +600,13 @@ def cmd_calendario(args) -> int:
     if not cfg.activo:
         print(f"[!] El calendario de {p.nombre} está desactivado (proyecto.json → calendario.activo).")
         return 1
-    excel = Path(args.excel) if args.excel else p.registro_path
-    carpeta_hist = Path(args.carpeta_historias) if args.carpeta_historias else p.carpeta_historias
+    excel = _excel(args, p)
+    carpeta_hist = _carpeta(p, args.carpeta_historias, p.carpeta_historias, "--carpeta-historias")
     hoy = cal.hoy_en(cfg.zona)
     if not excel.exists():
-        msg = f"Aún no hay registro para {p.nombre} ({excel}): no hay nada que planificar."
+        msg = f"Aún no hay registro para {p.nombre} ({excel}): no hay piezas en el calendario."
+        if carpeta_hist and not carpeta_hist.exists():
+            msg += f" Tampoco existe la carpeta de historias {carpeta_hist} (la crea el CEO)."
         print(json.dumps({"aviso": msg}, ensure_ascii=True) if getattr(args, "json", False) else msg)
         return 0
     acciones = {"planificar": _cal_planificar, "hoy": _cal_hoy, "ver": _cal_ver}
@@ -550,7 +617,7 @@ def _cal_planificar(args, p, cfg, excel: Path, carpeta_hist: Path | None, hoy: d
     inicio = _fecha_arg(args.desde, "--desde") or hoy + dt.timedelta(days=1)
     semanas = args.semanas or cfg.semanas
     reg = Registro(excel, p)
-    piezas = cal.piezas_de_registro(p, reg, BuscadorMetadatos().indice)
+    piezas = cal.piezas_de_registro(p, reg, BuscadorMetadatos(p))
     ilegibles = [pz for pz in piezas if pz.fecha is None and _celda_llena(reg, pz, "Fecha prevista")]
     for pz in ilegibles:
         pz.estado = "Descartado"  # no se planifica (ni se pisa lo escrito) hasta que se corrija
@@ -733,9 +800,43 @@ def _cal_ver(args, p, cfg, excel: Path, carpeta_hist: Path | None, hoy: dt.date)
 
 
 def cmd_nuevo_proyecto(args) -> int:
-    destino = proy.crear(args.id, args.nombre, args.prefijo)
-    print(f"[OK] Proyecto creado en {destino}")
-    print("Rellena: proyecto.json (tono, carpetas, plataformas, calendario), ofertas.json, hashtags.json, banco_copys.json.")
+    """Crea proyectos/<id>/ desde la plantilla (solo en TheCopy) y dice qué falta rellenar.
+
+    Las carpetas del CEO (REVISADOS/<id>, HISTORIAS/<id>) NO se crean aquí: si faltan, se avisa.
+    """
+    proy.valida_id(args.id)
+    if args.prefijo and args.prefijo.upper() in proy.prefijos_usados():
+        raise proy.ErrorProyecto(f"El prefijo {args.prefijo.upper()} ya lo usa el proyecto "
+                                 f"'{proy.prefijos_usados()[args.prefijo.upper()]}': elige otro con --prefijo.")
+    destino, ceo = proy.crear(args.id, args.nombre, args.prefijo, args.tipo)
+    p = proy.Proyecto(args.id)
+    print(f"[OK] Proyecto '{p.id}' creado en {destino}")
+    print(f"  nombre: {p.nombre} · tipo: {p.tipo or '(sin tipo)'} · IDs: {p.prefijo_id}-0001… · "
+          f"registro: {p.registro_path.name}")
+    if ceo:
+        print(f"  (nombre/tipo/prefijo/descripción tomados del índice del CEO: {config.INDICE_PROYECTOS.name})")
+        plats_ceo = [x for x in (ceo.get("plataformas") or []) if x not in p.plataformas_activas()]
+        if plats_ceo:
+            print(f"  aviso: el índice del CEO dice plataformas {', '.join(ceo['plataformas'])}; aquí solo están "
+                  f"activas {', '.join(p.plataformas_activas())}. Actívalas cuando Sergio confirme fijos y CTA.")
+    else:
+        print(f"  aviso: '{p.id}' no está en el índice del CEO ({config.INDICE_PROYECTOS}); lo da de alta el CEO.")
+    otro = proy.prefijos_usados(excepto=p.id).get(p.prefijo_id)
+    if otro:
+        print(f"  aviso: el prefijo {p.prefijo_id} ya lo usa '{otro}': cámbialo en proyecto.json → prefijo_id.")
+
+    print("\nCarpetas (las del CEO las crea el CEO):")
+    for que, c in (("pendiente", p.carpeta_pendiente), ("publicado", p.carpeta_publicado),
+                   ("historias", p.carpeta_historias)):
+        print(f"  {que:<10} {c}  " + ("[ok]" if c and c.exists() else "[NO EXISTE: avisa al CEO]"))
+    for c, transicion in p.carpetas_contexto():
+        if not transicion:
+            print(f"  {'contexto':<10} {c}  " + ("[ok]" if c.exists() else "[aún no existe: la crean TheEditor/el CEO]"))
+
+    print("\nFalta rellenar (pregunta a Sergio lo que no sepas; no lo inventes):")
+    for x in p.sin_rellenar():
+        print(f"  - {x}")
+    print(f"\nArchivos: {destino}\\proyecto.json · ofertas.json · hashtags.json · banco_copys.json")
     return 0
 
 
@@ -758,6 +859,7 @@ def main() -> int:
 
     s = sub.add_parser("registrar", help="Valida una tanda rellena y la registra (Excel + .txt).")
     s.add_argument("--entrada", required=True)
+    s.add_argument("--proyecto", help="Opcional: si se da, tiene que ser el de la tanda.")
     s.add_argument("--excel", help="Registro alternativo (pruebas).")
     s.add_argument("--simular", action="store_true", help="Solo valida y muestra; no escribe nada.")
     s.add_argument("--reemplazar", action="store_true", help="Sobrescribe el copy de piezas ya registradas.")
@@ -777,12 +879,13 @@ def main() -> int:
     s = sub.add_parser("banco", help="Copys del banco del proyecto y cuántas veces se han usado.")
     s.add_argument("--proyecto")
     s.add_argument("--oferta")
+    s.add_argument("--excel", help="Registro alternativo (pruebas).")
 
     s = sub.add_parser("auditar", help="Audita copys (gancho, cebos, estilo). Solo informe, no reescribe.")
     s.add_argument("--entrada", help="Tanda JSON (usa el contexto de la pieza para las frases literales).")
     s.add_argument("--texto", help="Un texto suelto.")
     s.add_argument("--banco", action="store_true", help="Audita banco_copys.json del proyecto.")
-    s.add_argument("--proyecto")
+    s.add_argument("--proyecto", help="Para --texto/--banco; con --entrada, si se da, tiene que ser el de la tanda.")
     s.add_argument("--plataforma", help="Reglas de esta plataforma para --texto/--banco (def. la 1.ª activa).")
     s.add_argument("--solo-estilo", action="store_true",
                    help="Solo estilo y emojis (+ cebos y cierres vacíos): sin gancho, CTA, hashtags ni longitud.")
@@ -818,10 +921,11 @@ def main() -> int:
     comunes(c)
     c.add_argument("--semana", help="Solo esta semana (AAAA-Www, p. ej. 2026-W42).")
 
-    s = sub.add_parser("nuevo-proyecto", help="Da de alta un proyecto desde la plantilla.")
-    s.add_argument("id")
-    s.add_argument("--nombre", required=True)
-    s.add_argument("--prefijo", help="Prefijo de los IDs (ej. MM).")
+    s = sub.add_parser("nuevo-proyecto", help="Da de alta un proyecto desde la plantilla y dice qué falta rellenar.")
+    s.add_argument("id", help="Minúsculas y sin espacios (el mismo id que en CEO_Sergete/proyectos.json).")
+    s.add_argument("--nombre", help="Nombre visible (def. el del índice del CEO).")
+    s.add_argument("--prefijo", help="Prefijo de los IDs, p. ej. MM (def. el del índice del CEO o 3 letras del nombre).")
+    s.add_argument("--tipo", choices=list(config.TIPOS), help="largos | clipping (def. el del índice del CEO).")
 
     args = ap.parse_args()
     ordenes = {"proyectos": cmd_proyectos, "pendientes": cmd_pendientes, "registrar": cmd_registrar,

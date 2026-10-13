@@ -3,13 +3,17 @@
   "nombre": "PLANTILLA",
   "descripcion": "Qué es el proyecto y qué se busca con sus clips (captar leads, vender X, marca personal...).",
   "prefijo_id": "XX",
+  "tipo": "",
+  "_tipo": "largos (vídeos largos cortados en clips por TheEditor) | clipping (vídeos ya cortados que entrega el proyecto). El mismo que en CEO_Sergete/proyectos.json.",
   "idioma": "es-ES",
   "como_reconocerlo": [
     "Pistas para que el CEO sepa que un clip es de este proyecto (persona que sale, canal de origen, temática)."
   ],
   "carpetas": {
-    "pendiente": "CEO_Sergete/REVISADOS/1. pte Publicar",
-    "publicado": "CEO_Sergete/REVISADOS/2. Publicados"
+    "_ayuda": "Relativas a PruebasIA/; <id> = id del proyecto. pendiente/publicado e historias las crea el CEO. contexto = dónde buscar cortes.json + .srt (largos) o textos/<clip>.txt (clipping) de cada clip.",
+    "pendiente": "CEO_Sergete/REVISADOS/<id>/1. pte Publicar",
+    "publicado": "CEO_Sergete/REVISADOS/<id>/2. Publicados",
+    "contexto": ["TheEditor/proyectos/<id>/transcripciones", "_Historico/<id>"]
   },
   "registro": "registro_PLANTILLA.xlsx",
 
@@ -53,7 +57,7 @@
       "evitar_seguidas": ["origen", "oferta"]
     },
     "historias": {
-      "carpeta": "CEO_Sergete/HISTORIAS/1. Pte publicar",
+      "carpeta": "CEO_Sergete/HISTORIAS/<id>/1. Pte publicar",
       "por_dia_min": 2,
       "por_dia_max": 4
     }

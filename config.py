@@ -8,29 +8,58 @@ junto a cada MP4 o dentro de la carpeta del carrusel). Con el calendario, ademá
 le pone fecha y hora de publicación a lo aprobado.
 
 El código es GENÉRICO: no sabe nada de ningún proyecto concreto. Todo lo
-específico (tono, ofertas, CTA, hashtags, plataformas, carpetas) vive en
-`proyectos/<id>/`. Un proyecto nuevo = copiar `proyectos/_plantilla/`.
+específico (tono, ofertas, CTA, hashtags, plataformas, carpetas, calendario) vive
+en `proyectos/<id>/`. Un proyecto nuevo = `copys.py nuevo-proyecto <id>` (copia
+`proyectos/_plantilla/`). Las rutas de proyecto.json son relativas a PruebasIA/ y
+admiten la plantilla `<id>` (se sustituye por el id del proyecto).
 """
 from __future__ import annotations
 from pathlib import Path
 
-# --- Rutas del propio proyecto ---
+# --- Rutas del propio departamento ---
 PROJECT_ROOT = Path(__file__).resolve().parent
 PROYECTOS_DIR = PROJECT_ROOT / "proyectos"
-PLANTILLA_DIR = PROYECTOS_DIR / "_plantilla"
-TANDAS_DIR = PROJECT_ROOT / "tandas"
+PLANTILLA = "_plantilla"                      # no es un proyecto: no cuenta al elegir el proyecto
+PLANTILLA_DIR = PROYECTOS_DIR / PLANTILLA
+TANDAS_DIR = PROJECT_ROOT / "tandas"          # una subcarpeta por proyecto: tandas/<id>/
 
-# --- Proyectos hermanos (PruebasIA/) ---
+# --- Hermanos (PruebasIA/) ---
 PRUEBAS_IA = PROJECT_ROOT.parent
-EDITOR_ROOT = PRUEBAS_IA / "TheEditor"
+CEO_ROOT = PRUEBAS_IA / "CEO_Sergete"
+# Índice común de proyectos del CEO (solo se LEE: nombre, tipo, prefijo… al crear uno).
+INDICE_PROYECTOS = CEO_ROOT / "proyectos.json"
 
-# Dónde buscar los metadatos de cada clip (cortes.json + .srt de la
-# transcripción). El nombre del clip final (finales/<nombre>.mp4) es el
-# `nombre` de su entrada en cortes.json. Se mira primero lo que está en curso y
-# luego lo archivado (al dar OK, las transcripciones pasan a _Historico).
-FUENTES_METADATOS = [
-    EDITOR_ROOT / "transcripciones",
-    PRUEBAS_IA / "_Historico",
+# Id de proyecto: minúsculas, sin espacios (letras, números, _ y -).
+RE_ID_PROYECTO = r"[a-z0-9_][a-z0-9_-]*"
+
+# Tipos de proyecto (los mismos en todos los departamentos):
+#   largos   → vídeos largos cortados en clips por TheEditor: contexto = cortes.json + .srt
+#   clipping → vídeos YA cortados que entrega el proyecto: contexto = textos/<clip>.txt (+ ganchos.json)
+TIPOS = {
+    "largos": "vídeos largos cortados en clips (contexto: cortes.json + .srt)",
+    "clipping": "vídeos ya cortados que entrega el proyecto (contexto: textos/<clip>.txt)",
+}
+
+# Carpetas por defecto de un proyecto (relativas a PruebasIA/, `<id>` = id del proyecto).
+# Cada proyecto las fija en su proyecto.json (carpetas.* y calendario.historias.carpeta);
+# esto solo se usa si allí falta alguna. Las carpetas del CEO las crea el CEO, no TheCopy.
+CARPETAS_POR_DEFECTO = {
+    "pendiente": "CEO_Sergete/REVISADOS/<id>/1. pte Publicar",
+    "publicado": "CEO_Sergete/REVISADOS/<id>/2. Publicados",
+    "historias": "CEO_Sergete/HISTORIAS/<id>/1. Pte publicar",
+}
+
+# Dónde buscar el CONTEXTO de cada clip (proyecto.json → carpetas.contexto). Cada carpeta
+# tiene una subcarpeta por vídeo con su cortes.json + .srt (largos) o textos/<clip>.txt
+# (clipping). Primero lo que está en curso en TheEditor y luego lo archivado al dar OK.
+CONTEXTO_POR_DEFECTO = [
+    "TheEditor/proyectos/<id>/transcripciones",
+    "_Historico/<id>",
+]
+# Ruta ANTIGUA de TheEditor (sin proyecto), solo durante la transición: se mira únicamente
+# si el clip no aparece en las carpetas del proyecto, y el contexto sale con un aviso.
+CONTEXTO_TRANSICION = [
+    "TheEditor/transcripciones",
 ]
 
 # Fragmento de transcripción que se pasa como contexto (caracteres máx.).

@@ -2,12 +2,16 @@
 Carga de un PROYECTO (cliente/marca) desde `proyectos/<id>/`.
 
 Cada proyecto es autocontenido:
-  proyecto.json     reglas: tono, CTA, carpetas, plataformas, campos propios
+  proyecto.json     reglas: tipo, tono, CTA, carpetas, plataformas, campos propios, calendario
   ofertas.json      productos/ofertas a los que puede apuntar un copy
   hashtags.json     fijos por plataforma + banco temático (por tamaño: nicho/medio/amplio)
   banco_copys.json  copys de referencia (tono) y de reserva
   fuentes/          documentos originales de los que salió todo lo anterior
   registro_<id>.xlsx  el registro clip ↔ copy ↔ hashtags (lo crea el script)
+  calendario/       el plan semanal (lo crea `calendario planificar`)
+
+Las rutas de proyecto.json son relativas a PruebasIA/ (o absolutas) y admiten `<id>`.
+`_plantilla` no es un proyecto: no se lista ni se puede abrir.
 """
 from __future__ import annotations
 
@@ -30,16 +34,38 @@ class ErrorProyecto(Exception):
     pass
 
 
-def _ruta(p: str) -> Path:
-    """Rutas de proyecto.json: absolutas o relativas a PruebasIA/."""
-    path = Path(p)
+def ruta(p: str, pid: str) -> Path:
+    """Ruta de proyecto.json: `<id>` → id del proyecto; absoluta o relativa a PruebasIA/."""
+    path = Path(str(p).replace("<id>", pid))
     return path if path.is_absolute() else (config.PRUEBAS_IA / path)
+
+
+def dentro_de(ruta_hija: Path | str, carpeta: Path | str) -> bool:
+    """True si `ruta_hija` es `carpeta` o está dentro (sin distinguir mayúsculas, como Windows)."""
+    try:
+        h, c = Path(ruta_hija).resolve(), Path(carpeta).resolve()
+    except OSError:
+        return False
+    hs, cs = str(h).lower(), str(c).lower().rstrip("\\/")
+    return hs == cs or hs.startswith(cs + "\\") or hs.startswith(cs + "/")
+
+
+def _lleva_id(carpeta: Path, pid: str) -> bool:
+    """True si el id del proyecto es una de las carpetas de la ruta (…/REVISADOS/<id>/…)."""
+    return pid.lower() in (x.lower() for x in Path(carpeta).parts)
+
+
+def valida_id(pid: str) -> None:
+    if not re.fullmatch(config.RE_ID_PROYECTO, pid or ""):
+        raise ErrorProyecto(f"Id de proyecto '{pid}' no válido: minúsculas y sin espacios (ej. 'mi_marca').")
+    if pid == config.PLANTILLA:
+        raise ErrorProyecto(f"'{config.PLANTILLA}' es la plantilla, no un proyecto.")
 
 
 class Proyecto:
     def __init__(self, pid: str):
         self.dir = config.PROYECTOS_DIR / pid
-        if pid.startswith("_") or not (self.dir / "proyecto.json").exists():
+        if pid == config.PLANTILLA or not (self.dir / "proyecto.json").exists():
             raise ErrorProyecto(
                 f"No existe el proyecto '{pid}'. Disponibles: {', '.join(listar()) or '(ninguno)'}")
         faltan = [a for a in ARCHIVOS if not (self.dir / a).exists()]
@@ -51,15 +77,21 @@ class Proyecto:
         self.hashtags = leer_json(self.dir / "hashtags.json")
         self.banco = leer_json(self.dir / "banco_copys.json")
 
-        self.id = self.conf.get("id") or pid
+        # El id es el de la carpeta: un proyecto.json copiado de otro no puede mezclar registros.
+        if self.conf.get("id") not in (None, "", pid):
+            raise ErrorProyecto(f"proyectos/{pid}/proyecto.json dice \"id\": \"{self.conf.get('id')}\": "
+                                f"tiene que ser \"{pid}\" (el nombre de su carpeta).")
+        self.id = pid
         self.nombre = self.conf.get("nombre") or pid
-        self.prefijo_id = self.conf.get("prefijo_id") or pid[:2].upper()
+        self.prefijo_id = self.conf.get("prefijo_id") or pid.strip("_")[:2].upper()
         self._tamanos, self._conflictos_tamano = self._indexar_tamanos()
         self._comprobar()
 
     # ---------- validación de la configuración ----------
     def _comprobar(self) -> None:
         errores = []
+        if self.tipo and self.tipo not in config.TIPOS:
+            errores.append(f"tipo '{self.tipo}' desconocido (usa {', '.join(config.TIPOS)}).")
         plats = self.conf.get("plataformas") or {}
         if not plats:
             errores.append("proyecto.json no define 'plataformas'.")
@@ -78,6 +110,13 @@ class Proyecto:
                     errores.append(f"plataformas.{pid}.formatos: formato desconocido '{fmt}' "
                                    f"(usa {', '.join(config.FORMATOS)}).")
         errores += self._comprobar_calendario()
+        for propia in self.carpetas_propias():
+            for ajena, otro in carpetas_ajenas(self.id, internas=False).items():
+                if dentro_de(propia, ajena) or dentro_de(ajena, propia):
+                    if _lleva_id(propia, self.id) and not _lleva_id(ajena, otro):
+                        continue  # la carpeta es de este proyecto: el mal configurado es el otro
+                    errores.append(f"la carpeta {propia} coincide con una del proyecto '{otro}' ({ajena}): "
+                                   "cada proyecto usa las suyas (pon <id> en la ruta).")
         # banco temático: formato antiguo (tema → lista) o nuevo (tema → {nicho/medio/amplio: lista})
         for tema, val in (self.hashtags.get("tematicos") or {}).items():
             if tema.startswith("_"):
@@ -213,16 +252,41 @@ class Proyecto:
             return {v: v for v in campo["valores"]}
         return None
 
-    # ---------- carpetas / registro ----------
+    # ---------- tipo / carpetas / registro ----------
+    @property
+    def tipo(self) -> str | None:
+        """'largos' | 'clipping' (config.TIPOS) o None si proyecto.json no lo dice."""
+        return self.conf.get("tipo") or None
+
+    def _carpeta(self, clave: str) -> Path | None:
+        carpetas = self.conf.get("carpetas") or {}
+        p = carpetas[clave] if clave in carpetas else config.CARPETAS_POR_DEFECTO.get(clave)
+        return ruta(p, self.id) if p else None
+
     @property
     def carpeta_pendiente(self) -> Path | None:
-        p = (self.conf.get("carpetas") or {}).get("pendiente")
-        return _ruta(p) if p else None
+        return self._carpeta("pendiente")
 
     @property
     def carpeta_publicado(self) -> Path | None:
-        p = (self.conf.get("carpetas") or {}).get("publicado")
-        return _ruta(p) if p else None
+        return self._carpeta("publicado")
+
+    def carpetas_contexto(self) -> list[tuple[Path, bool]]:
+        """[(carpeta, es_transicion)] donde buscar cortes.json/.srt o textos/ de los clips.
+
+        Las del proyecto (proyecto.json → carpetas.contexto) y, al final, la ruta antigua de
+        TheEditor sin proyecto (es_transicion=True: solo se usa si el clip no sale en las otras).
+        """
+        propias = (self.conf.get("carpetas") or {}).get("contexto")
+        if propias is None:
+            propias = config.CONTEXTO_POR_DEFECTO
+        out = [(ruta(p, self.id), False) for p in propias]
+        out += [(ruta(p, self.id), True) for p in config.CONTEXTO_TRANSICION]
+        return out
+
+    def carpetas_propias(self) -> list[Path]:
+        """Carpetas de piezas del proyecto (pendiente, publicado, historias)."""
+        return [c for c in (self.carpeta_pendiente, self.carpeta_publicado, self.carpeta_historias) if c]
 
     @property
     def registro_path(self) -> Path:
@@ -239,8 +303,44 @@ class Proyecto:
 
     @property
     def carpeta_historias(self) -> Path | None:
-        p = (self.calendario.get("historias") or {}).get("carpeta")
-        return _ruta(p) if p else None
+        hist = self.calendario.get("historias") or {}
+        p = hist["carpeta"] if "carpeta" in hist else config.CARPETAS_POR_DEFECTO["historias"]
+        return ruta(p, self.id) if p else None
+
+    # ---------- lo que sigue igual que en la plantilla (sin rellenar) ----------
+    def sin_rellenar(self) -> list[str]:
+        """Qué conserva aún los valores de la plantilla (para avisar tras `nuevo-proyecto`)."""
+        try:
+            pl = {a: leer_json(config.PLANTILLA_DIR / a) for a in ARCHIVOS}
+        except Exception:
+            return []
+        pc, falta = pl["proyecto.json"], []
+        for clave, que in (("descripcion", "descripcion (qué es el proyecto)"),
+                           ("como_reconocerlo", "como_reconocerlo (pistas para saber que un clip es suyo)"),
+                           ("tono", "tono"), ("reglas_copy", "reglas_copy (siguen las genéricas: revísalas)")):
+            if self.conf.get(clave) == pc.get(clave):
+                falta.append(que)
+        if not self.tipo:
+            falta.append(f"tipo ({' / '.join(config.TIPOS)})")
+        if self.ofertas.get("ofertas") == pl["ofertas.json"].get("ofertas"):
+            falta.append("ofertas.json (ofertas y cuándo usar cada una; vacío si no vende nada)")
+        if self.ofertas.get("generico") == pl["ofertas.json"].get("generico"):
+            falta.append("ofertas.json → generico.cta (CTA genérico)")
+        h, ph = self.hashtags, pl["hashtags.json"]
+        if h.get("fijos") == ph.get("fijos"):
+            falta.append("hashtags.json → fijos por plataforma")
+        if h.get("tematicos") == ph.get("tematicos"):
+            falta.append("hashtags.json → banco temático por tamaño (nicho/medio/amplio)")
+        plats, pplats = self.conf.get("plataformas") or {}, pc.get("plataformas") or {}
+        for pid in self.plataformas_activas():
+            if plats.get(pid) == pplats.get(pid):
+                falta.append(f"plataformas.{pid}: CTA (cta_patrones, cta_ejemplo), emojis, nº de hashtags y guía "
+                             "(siguen los de la plantilla)")
+        if not self.calendario_activo:
+            falta.append("calendario (desactivado: días, franjas y nº de posts cuando Sergio los dé)")
+        if self.banco == pl["banco_copys.json"]:
+            falta.append("banco_copys.json (opcional: copys de referencia de tono)")
+        return falta
 
     def _comprobar_calendario(self) -> list[str]:
         cal = self.calendario
@@ -278,25 +378,128 @@ class Proyecto:
 
 
 def listar() -> list[str]:
+    """Ids de los proyectos (carpetas con proyecto.json), sin contar la plantilla."""
     if not config.PROYECTOS_DIR.exists():
         return []
     return sorted(d.name for d in config.PROYECTOS_DIR.iterdir()
-                  if d.is_dir() and not d.name.startswith("_") and (d / "proyecto.json").exists())
+                  if d.is_dir() and d.name != config.PLANTILLA and (d / "proyecto.json").exists())
 
 
-def crear(pid: str, nombre: str, prefijo: str | None = None) -> Path:
-    """Da de alta un proyecto nuevo copiando la plantilla."""
-    if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", pid):
-        raise ErrorProyecto("El id del proyecto debe ir en minúsculas, sin espacios (ej. 'mi_marca').")
+def elegir(pid: str | None) -> "Proyecto":
+    """Regla común de todos los departamentos: `--proyecto <id>`; sin él, el único que haya.
+
+    Con varios proyectos y sin `--proyecto`, error con la lista (nunca se elige uno al azar).
+    """
+    if pid:
+        return Proyecto(pid)
+    disponibles = listar()
+    if not disponibles:
+        raise ErrorProyecto("No hay ningún proyecto. Crea uno con: copys.py nuevo-proyecto <id>")
+    if len(disponibles) > 1:
+        raise ErrorProyecto(f"Hay {len(disponibles)} proyectos ({', '.join(disponibles)}): "
+                            "indica cuál con --proyecto <id>.")
+    return Proyecto(disponibles[0])
+
+
+def carpetas_ajenas(pid: str, internas: bool = True) -> dict[Path, str]:
+    """{carpeta: id} de las carpetas de los OTROS proyectos (para no mezclar nunca): las de
+    piezas (pendiente, publicado, historias) y, con `internas`, su carpeta de TheCopy
+    (registro, calendario) y sus tandas. Se lee proyecto.json en crudo: un proyecto a medio
+    configurar también cuenta.
+    """
+    out: dict[Path, str] = {}
+    for otro in listar():
+        if otro == pid:
+            continue
+        try:
+            conf = leer_json(config.PROYECTOS_DIR / otro / "proyecto.json")
+        except Exception:
+            continue
+        carpetas = conf.get("carpetas") or {}
+        hist = (conf.get("calendario") or {}).get("historias") or {}
+        for clave in ("pendiente", "publicado"):
+            p = carpetas[clave] if clave in carpetas else config.CARPETAS_POR_DEFECTO[clave]
+            if p:
+                out[ruta(p, otro)] = otro
+        p = hist["carpeta"] if "carpeta" in hist else config.CARPETAS_POR_DEFECTO["historias"]
+        if p:
+            out[ruta(p, otro)] = otro
+        if internas:
+            out[config.PROYECTOS_DIR / otro] = otro  # su registro y su calendario
+            out[config.TANDAS_DIR / otro] = otro
+    return out
+
+
+def de_otro_proyecto(pid: str, ruta_x: Path | str | None) -> str | None:
+    """Id del otro proyecto al que pertenece `ruta_x` (o None si no es de ninguno)."""
+    if not ruta_x:
+        return None
+    for carpeta, otro in carpetas_ajenas(pid).items():
+        if dentro_de(ruta_x, carpeta):
+            return otro
+    return None
+
+
+def indice_ceo() -> dict[str, dict]:
+    """{id: entrada} del índice común de proyectos del CEO (solo lectura; {} si no está)."""
+    try:
+        data = leer_json(config.INDICE_PROYECTOS)
+    except Exception:
+        return {}
+    return {str(p.get("id")): p for p in (data.get("proyectos") or []) if isinstance(p, dict) and p.get("id")}
+
+
+def crear(pid: str, nombre: str | None = None, prefijo: str | None = None,
+          tipo: str | None = None) -> tuple[Path, dict]:
+    """Da de alta un proyecto nuevo copiando la plantilla (solo dentro de TheCopy).
+
+    Lo que no se pase se toma del índice del CEO (proyectos.json) si el id está allí.
+    Devuelve (carpeta, entrada del índice o {}).
+    """
+    valida_id(pid)
     destino = config.PROYECTOS_DIR / pid
     if destino.exists():
-        raise ErrorProyecto(f"Ya existe el proyecto '{pid}'.")
-    shutil.copytree(config.PLANTILLA_DIR, destino)
+        raise ErrorProyecto(f"Ya existe el proyecto '{pid}' ({destino}).")
+    ceo = indice_ceo().get(pid) or {}
+    nombre = nombre or ceo.get("nombre")
+    if not nombre:
+        raise ErrorProyecto(f"'{pid}' no está en el índice del CEO ({config.INDICE_PROYECTOS.name}): "
+                            "indica --nombre \"Nombre\".")
+    tipo = tipo or ceo.get("tipo")
+    if tipo and tipo not in config.TIPOS:
+        raise ErrorProyecto(f"tipo '{tipo}' desconocido (usa {', '.join(config.TIPOS)}).")
+    prefijo = (prefijo or ceo.get("prefijo_id") or re.sub(r"[^A-Z]", "", nombre.upper())[:3]
+               or pid.strip("_")[:2]).upper()
+
+    shutil.copytree(config.PLANTILLA_DIR, destino, ignore=shutil.ignore_patterns("calendario", "registro_*.xlsx"))
     conf_path = destino / "proyecto.json"
     conf = leer_json(conf_path)
-    conf["id"] = pid
-    conf["nombre"] = nombre
-    conf["prefijo_id"] = (prefijo or re.sub(r"[^A-Z]", "", nombre.upper())[:3] or pid[:2]).upper()
-    conf["registro"] = f"registro_{pid}.xlsx"
-    escribir_json(conf_path, conf)
-    return destino
+    nuevo = {"id": pid, "nombre": nombre}
+    for k, v in conf.items():  # mismo orden de claves que la plantilla
+        if k not in nuevo:
+            nuevo[k] = v
+    nuevo["prefijo_id"] = prefijo
+    nuevo["registro"] = f"registro_{pid}.xlsx"
+    if tipo:
+        nuevo["tipo"] = tipo
+    if ceo.get("descripcion"):
+        nuevo["descripcion"] = ceo["descripcion"]
+    if ceo.get("cuenta_ig"):
+        nuevo["cuenta_ig"] = ceo["cuenta_ig"]
+    escribir_json(conf_path, nuevo)
+    return destino, ceo
+
+
+def prefijos_usados(excepto: str | None = None) -> dict[str, str]:
+    """{prefijo_id: id} de los proyectos existentes (para no repetir prefijo)."""
+    out = {}
+    for pid in listar():
+        if pid == excepto:
+            continue
+        try:
+            pref = leer_json(config.PROYECTOS_DIR / pid / "proyecto.json").get("prefijo_id")
+        except Exception:
+            continue
+        if pref:
+            out[str(pref).upper()] = pid
+    return out

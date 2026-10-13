@@ -67,7 +67,7 @@ def esqueleto(proyecto, piezas: list[dict]) -> dict:
             "Rellena tema, extra y, por plataforma, copy (+titulo si aparece) y hashtags TEMÁTICOS "
             "(solo los temáticos: los fijos los añade el script; nº y tamaños en proyecto.json → "
             "plataformas.<p>.hashtags, banco por tamaño en hashtags.json, últimos usados con "
-            f"copys.py hashtags). Reglas del copy en proyectos/{proyecto.id}/proyecto.json y guía de "
+            f"copys.py hashtags --proyecto {proyecto.id}). Reglas del copy en proyectos/{proyecto.id}/proyecto.json y guía de "
             "cada plataforma/formato en 'guias'. "
             + "".join(f"extra.{c['id']}: {' / '.join(c['valores'])}"
                       + (f" ({c['ayuda']})" if c.get("ayuda") else "") + ". " for c in campos)
@@ -77,7 +77,7 @@ def esqueleto(proyecto, piezas: list[dict]) -> dict:
             + "Antes de registrar: copys.py auditar --entrada <este archivo> y corrige los avisos de "
             "estilo reescribiendo (solo se dejan si la frase es literal del clip o de las slides). "
             "Luego: copys.py registrar --entrada <este archivo> --simular, sin --simular y "
-            "copys.py calendario planificar."),
+            f"copys.py calendario planificar --proyecto {proyecto.id}."),
         "guias": guias,
         "clips": [
             {

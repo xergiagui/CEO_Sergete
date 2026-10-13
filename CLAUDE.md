@@ -1,78 +1,67 @@
 # TheCopy — Departamento de copys, hashtags y calendario
 
 Escribe el copy y los hashtags de cada pieza aprobada (**Reel** = MP4 o
-**carrusel** = carpeta de slides de TheHistoria), registra la relación
-**pieza ↔ copy ↔ hashtags** (Excel por proyecto + `.txt` listo para pegar) y le
-pone **fecha y hora de publicación** con el calendario. Lo dirige CEO_Sergete
-con el subagente `copy`. Funcionamiento y órdenes en [`README.md`](README.md).
+**carrusel** = carpeta de slides de TheHistoria), registra **pieza ↔ copy ↔
+hashtags** (Excel por proyecto + `.txt` listo para pegar) y le pone **fecha y hora
+de publicación**. Lo dirige CEO_Sergete con el subagente `copy`. Órdenes y detalle
+en [`README.md`](README.md).
 
 ## Entorno
-- Entorno propio: `.venv\Scripts\python.exe` (solo `openpyxl`). Nunca `python3`
-  (en este equipo es el acceso directo de la Microsoft Store).
+- `.venv\Scripts\python.exe` (solo `openpyxl`). Nunca `python3` (acceso directo de la Store).
 - El script es **`copys.py`**, no `copy.py` (chocaría con el módulo `copy`).
 
+## Proyectos (varios e independientes)
+- **Proyecto** = cuenta o cliente; id en minúsculas y sin espacios. Índice común (solo
+  lectura): `CEO_Sergete/proyectos.json`. **Todo lo específico vive en `proyectos/<id>/`**
+  (`proyecto.json`, `ofertas.json`, `hashtags.json`, `banco_copys.json`): es la fuente de
+  verdad, léelo antes de escribir y, si algo choca con este archivo, manda el proyecto.
+  Común a todos: `referencias/auditoria_copy.md` y `referencias/calendario.md`.
+- **Cada orden, un proyecto:** `--proyecto <id>`; sin él se usa el único que haya (sin
+  contar `_plantilla`); con varios, error con la lista. **Nunca mezclar:** registro,
+  tandas (`tandas/<id>/`), calendario y `.txt` son siempre del proyecto, y el script se
+  niega a leer o escribir en carpetas, registros o tandas de otro.
+- **Carpetas** (en `proyecto.json`, relativas a PruebasIA y con `<id>`):
+  `CEO_Sergete/REVISADOS/<id>/1. pte Publicar` y `…/2. Publicados`,
+  `CEO_Sergete/HISTORIAS/<id>/1. Pte publicar`; contexto de los clips en
+  `TheEditor/proyectos/<id>/transcripciones/` y `_Historico/<id>/` (la ruta antigua
+  `TheEditor/transcripciones/` solo se mira en la transición). Las carpetas del CEO
+  **las crea el CEO**: si faltan, se avisa.
+- **Tipos:** `largos` (contexto = `cortes.json` + `.srt`) y `clipping` (vídeos ya cortados:
+  contexto = `textos/<clip>.txt` + `ganchos.json`).
+- **Proyecto nuevo:** `copys.py nuevo-proyecto <id>` (nombre, tipo y prefijo salen del
+  índice del CEO si está allí). Dice qué falta: tono, ofertas, hashtags, CTA, plataformas
+  y calendario. **Lo que falte se pregunta a Sergio; no se inventa.**
+
 ## Reglas (decisiones de Sergio)
-- **Cuándo:** al dar OK a unas piezas (cuando pasan a
-  `CEO_Sergete/REVISADOS/1. pte Publicar`) y a demanda. Nunca al renderizar.
-- **Fuente de verdad por proyecto:** `proyectos/<id>/` (`proyecto.json`,
-  `ofertas.json`, `hashtags.json`, `banco_copys.json`). Léelos antes de escribir;
-  si algo choca con ellos, mandan ellos. Común a todos: `referencias/auditoria_copy.md`
-  y `referencias/calendario.md`.
-- **Solo pieza ↔ copy ↔ hashtags en el registro.** No se añaden columnas ni búsquedas
-  del vídeo largo de origen. El calendario solo lo **consulta** (cortes.json del clip o
-  `fuente` de carrusel.json) para no poner seguidas dos piezas del mismo vídeo.
-- **Carruseles** (contrato con TheHistoria): carpeta con `01.jpg … NN.jpg` + `carrusel.json`
-  (+ `_vista.jpg`, que se ignora). `pendientes` los detecta en la carpeta pendiente; el
-  nombre de la pieza es el de la carpeta. **Solo Instagram** admite carrusel
-  (`plataformas.<p>.formatos`). El caption **repite el gancho de la slide 1 en los primeros
-  125 caracteres**, va corto y mantiene el **CTA a la bio** (manda siempre); si el objetivo
-  es guardados, puede invitar a guardarlo. Mismas reglas de hashtags y auditoría que un Reel.
-  Los textos de las slides pueden traer `**marcado**`: se quita al usarlos. El `.txt` va
-  **dentro de la carpeta** (`<carpeta>.txt`) y el enlace del Excel apunta a la carpeta.
-  Mismo contador de IDs que los Reels.
-- **Objetivo y pilar, obligatorios en cada pieza** (`campos_extra`): objetivo =
-  guardados / compartidos / comentarios / seguidores; pilar = educativo / historia /
-  interaccion / promocion. En los carruseles vienen de `carrusel.json`; en los Reels los
-  elige el subagente. `promocion` solo si la pieza va **sobre todo** de vender un producto
-  (nombrar la oferta en el caption no la convierte en promoción).
-- **MongeMalo · hashtags (Instagram):** solo `#grupoalfa` es **fijo** (lo pone el
-  script); `#ventas`, `#dinero` y `#exitopersonal` pasan al banco rotativo. **3–5 en
-  total contando el fijo** → se escriben 2–4 temáticos: **2–3 de nicho** (`#grupoalfa`
-  ya cuenta como uno), **1–2 medios** y **como mucho 1 amplio**, del banco por tamaño de
-  `hashtags.json` y acordes al tema. **Rotar** por tema: no repetir el conjunto de
-  temáticos de otra pieza de la tanda ni de los 5 últimos registrados (`copys.py
-  hashtags`). Los tamaños son **estimados**: Sergio los verifica en el buscador de IG.
-  TikTok/YouTube conservan sus fijos de siempre (inactivas). CTA siempre a la bio.
-- **Auditoría antes de registrar** (`copys.py auditar --entrada <tanda>`; checklist en
-  `referencias/auditoria_copy.md`, adaptado de `sergebulaev/instagram-skills`, MIT):
-  gancho (1.ª frase/línea) ≤ 125 caracteres en Instagram, sin cebos de interacción ni
-  cierres vacíos (errores: bloquean) y sin paralelismos negativos, revelaciones,
-  anuncios de sinceridad, vocabulario de IA ni emojis (avisos de estilo). **Los avisos
-  de estilo se corrigen reescribiendo antes de registrar; solo se dejan si la frase es
-  literal del clip (o de las slides del carrusel).** `registrar` pasa la misma auditoría.
-- **Auditoría de solo estilo para TheHistoria:** `copys.py auditar --solo-estilo --json
-  --texto "<texto>"` audita el texto de las slides: solo estilo y emojis, más cebos y
-  cierres vacíos (sin gancho de 125, CTA, hashtags ni longitud). Saca una lista JSON de
-  `{nivel, regla, fragmento, mensaje}` (ASCII puro) y sale con 0 si no hay errores.
-  **No cambies ese contrato** sin avisar al CEO: TheHistoria depende de él.
-- **Calendario (activo en MongeMalo):** **después de registrar se ejecuta
-  `copys.py calendario planificar`**, que pone fecha y hora a lo registrado, pendiente y
-  sin fecha (desde mañana), reparte las historias de `HISTORIAS/1. Pte publicar` (2–4 al
-  día, sin moverlas) y deja `proyectos/<id>/calendario/<AAAA>-W<ss>.md`. Es **estable**:
-  no recoloca lo que ya tiene fecha; las fechas que Sergio ponga a mano **no se mueven
-  nunca** (ni con `--replanificar-atrasados`). Su última línea (`FALTAN …`, o `--json`)
-  dice cuántos Reels y carruseles faltan por semana: pásasela al CEO.
-  «¿Qué publico hoy?» → `copys.py calendario hoy`. Resumen y atrasados →
-  `copys.py calendario ver`. Los valores (5 posts/semana, franjas 13:30/20:30, mínimos)
-  son **provisionales** hasta que Sergio los ajuste con las estadísticas de la cuenta.
-- **Plataformas:** hoy solo Instagram activa. TikTok y YouTube (Shorts) están
-  preparadas con `"activa": false`, solo para Reels, y fijos/CTA provisionales: **no las
-  actives sin que Sergio lo pida y confirme** sus fijos y su CTA.
-- **Independiente por proyecto:** vendrán más proyectos además de MongeMalo
-  (`copys.py nuevo-proyecto <id>`; el calendario de la plantilla viene desactivado). Lo
-  que falte de un proyecto nuevo, se pregunta.
-- Copys a medida de cada pieza, distintos entre sí, sin hashtags dentro del copy
-  y sin cifras inventadas. Para cambiar un copy, solo el de la pieza pedida.
+- **Cuándo:** al dar OK a unas piezas (cuando pasan a la carpeta *pendiente* del
+  proyecto) y a demanda. Nunca al renderizar.
+- **Solo pieza ↔ copy ↔ hashtags en el registro**, sin columnas del vídeo largo. El
+  calendario solo consulta el origen (`cortes.json` del clip o `fuente` de
+  `carrusel.json`) para no poner seguidas dos piezas del mismo vídeo.
+- **Copys** a medida de cada pieza (el gancho sale de lo que se dice en el clip), distintos
+  entre sí, sin hashtags dentro y sin cifras inventadas. Para cambiar un copy, solo el de la
+  pieza pedida (`registrar --reemplazar`).
+- **Hashtags:** los fijos los pone el script; se escriben solo los temáticos del banco por
+  tamaño del proyecto, en el nº y tamaños de su `proyecto.json`, y **rotados** (`copys.py
+  hashtags`). Ej.: MongeMalo/Instagram = `#grupoalfa` fijo + 2–4 temáticos.
+- **Campos propios obligatorios** (`campos_extra`: oferta, objetivo, pilar…). En los
+  carruseles vienen de `carrusel.json`. `promocion` solo si la pieza va sobre todo de vender.
+- **Carruseles** (contrato con TheHistoria): carpeta con `01.jpg … NN.jpg` +
+  `carrusel.json`; solo en plataformas que los admitan (`formatos`). El caption repite el
+  gancho de la slide 1 en los primeros 125 caracteres, va corto y mantiene el CTA. El `.txt`
+  va dentro de la carpeta. Mismo contador de IDs que los Reels.
+- **Auditoría antes de registrar** (`copys.py auditar --entrada <tanda>`): los errores
+  bloquean; los avisos de estilo se corrigen **reescribiendo** y solo se dejan si la frase
+  es literal del clip o de las slides. `registrar` pasa la misma auditoría.
+- **Contrato con TheHistoria:** `copys.py auditar --solo-estilo --json --texto "<texto>"
+  [--proyecto <id>]` → lista JSON ASCII `{nivel, regla, fragmento, mensaje}`, sale con 0 si
+  no hay errores; sin proyecto claro audita con 0 emojis. **No lo cambies** sin avisar al CEO.
+- **Calendario** (si `calendario.activo`): después de registrar, `copys.py calendario
+  planificar`. Es estable: no recoloca lo que ya tiene fecha y lo puesto a mano no se mueve
+  nunca. Su última línea (`FALTAN …`) va al CEO. Valores provisionales hasta que Sergio los
+  ajuste con las estadísticas. En la plantilla viene desactivado.
+- **Plataformas:** no actives ninguna (`"activa": true`) sin que Sergio lo pida y confirme
+  sus fijos y su CTA.
 - Las **historias de IG no llevan copy** (el calendario solo las reparte por día).
 - **El Excel tiene que estar cerrado** para escribir; si está abierto, avisa y no
   reintentes en bucle.

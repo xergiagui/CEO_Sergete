@@ -3,14 +3,17 @@
   "nombre": "MongeMalo",
   "descripcion": "Clips (Reels) y carruseles de Luis Monge (MongeMalo) para captar tráfico hacia sus productos con el link de afiliado de Sergio.",
   "prefijo_id": "MM",
+  "tipo": "largos",
   "idioma": "es-ES",
   "como_reconocerlo": [
     "Clips sacados de vídeos de Luis Monge / MongeMalo (ventas, copywriting, emprendimiento, dinero).",
-    "Mientras sea el único proyecto, es el proyecto por defecto."
+    "Cuenta de IG @xergi.ventas."
   ],
   "carpetas": {
-    "pendiente": "CEO_Sergete/REVISADOS/1. pte Publicar",
-    "publicado": "CEO_Sergete/REVISADOS/2. Publicados"
+    "_ayuda": "Relativas a PruebasIA/; <id> = id del proyecto. pendiente/publicado e historias las crea el CEO. contexto = dónde buscar cortes.json + .srt (largos) o textos/<clip>.txt (clipping) de cada clip.",
+    "pendiente": "CEO_Sergete/REVISADOS/<id>/1. pte Publicar",
+    "publicado": "CEO_Sergete/REVISADOS/<id>/2. Publicados",
+    "contexto": ["TheEditor/proyectos/<id>/transcripciones", "_Historico/<id>"]
   },
   "registro": "registro_mongemalo.xlsx",
   "landing_afiliacion": "https://the-landing-ten.vercel.app",
@@ -64,7 +67,7 @@
       "evitar_seguidas": ["origen", "oferta"]
     },
     "historias": {
-      "carpeta": "CEO_Sergete/HISTORIAS/1. Pte publicar",
+      "carpeta": "CEO_Sergete/HISTORIAS/<id>/1. Pte publicar",
       "por_dia_min": 2,
       "por_dia_max": 4,
       "recordatorio": "Comparte en historias el post del día cuando lo publiques.",

@@ -16,56 +16,91 @@ pone **fecha y hora de publicación**.
 - **Calendario:** fecha y hora para todo lo aprobado con una mezcla equilibrada, las
   historias del día y un `.md` por semana. «¿Qué publico hoy?» → `copys.py calendario hoy`.
 
-> Se lanza **al dar OK** a unas piezas (cuando pasan a `REVISADOS/1. pte Publicar`)
+> Se lanza **al dar OK** a unas piezas (cuando pasan a `REVISADOS/<id>/1. pte Publicar`)
 > o **a demanda**. Las historias de IG no llevan copy ni hashtags: el calendario solo
 > las reparte por día.
 
 ## Proyectos independientes
 
-El código es genérico; **todo lo específico vive en `proyectos/<id>/`**:
+Un **proyecto** es una cuenta o cliente de contenido (id en minúsculas y sin espacios,
+p. ej. `mongemalo`). El índice común está en `CEO_Sergete/proyectos.json` (TheCopy solo lo
+lee). El código es genérico; **todo lo específico vive en `proyectos/<id>/`**:
 
 | Archivo | Qué lleva |
 |---|---|
-| `proyecto.json` | tono, reglas del copy, carpetas pendiente/publicado, campos propios (*Oferta*, *Objetivo*, *Pilar*), **plataformas** (activas o preparadas) con sus límites, CTA y `formatos` que admiten (reel / carrusel), y el **calendario** |
+| `proyecto.json` | **tipo** (`largos` / `clipping`), tono, reglas del copy, **carpetas** (pendiente, publicado, contexto), campos propios (*Oferta*, *Objetivo*, *Pilar*), **plataformas** (activas o preparadas) con sus límites, CTA y `formatos` (reel / carrusel), y el **calendario** (con su carpeta de historias) |
 | `ofertas.json` | productos a los que puede apuntar un copy (+ «genérico») y cuándo usar cada uno |
 | `hashtags.json` | **fijos** por plataforma (se añaden solos) + banco **temático por tamaño** (`nicho` < 50k publicaciones, `medio` 50k–500k, `amplio` > 500k; **estimados**) + `tamano_fijos`. El formato antiguo (tema → lista, sin tamaños) sigue valiendo |
 | `banco_copys.json` | copys de referencia de tono y de reserva (auditados con `auditar --banco`) |
-| `fuentes/` | documentos originales (p. ej. `Copys_MongeMalo.pdf`) |
+| `fuentes/` | documentos originales (p. ej. el PDF de copys del cliente) |
+| `registro_<id>.xlsx` | el registro (lo crea `registrar`) |
 | `calendario/` | lo genera `calendario planificar`: un `<AAAA>-W<ss>.md` por semana (no va a git) |
 
 Común a todos los proyectos (adaptado de `sergebulaev/instagram-skills`, MIT):
 [`referencias/auditoria_copy.md`](referencias/auditoria_copy.md) (checklist del copy) y
 [`referencias/calendario.md`](referencias/calendario.md) (cómo planifica el calendario).
 
-**Proyecto nuevo:** `copys.py nuevo-proyecto <id> --nombre "Nombre" [--prefijo XX]`
-copia `proyectos/_plantilla/` (con el calendario desactivado) y luego se rellenan sus JSON.
+**Elegir el proyecto:** todas las órdenes aceptan `--proyecto <id>`. Sin él se usa el único
+proyecto que haya (sin contar `_plantilla`); con varios, error con la lista. `registrar` y
+`auditar --entrada` toman el proyecto de la tanda (si además das `--proyecto`, tiene que
+coincidir).
 
-**Plataformas:** cada proyecto define `instagram`, `tiktok` y `youtube` (Shorts, con
-título). Activar una = `"activa": true` en su `proyecto.json` (y revisar sus fijos en
-`hashtags.json`). A partir de ahí, cada tanda pide copy para todas las activas que admitan
-el formato de la pieza, y a una pieza ya registrada se le puede añadir la plataforma nueva
-con el mismo ID.
+**Nunca se mezclan proyectos:** registro, tandas (`tandas/<id>/`), calendario y `.txt` son
+siempre los del proyecto. El script se niega a usar como `--carpeta`, `--pendiente`,
+`--publicado`, `--carpeta-historias`, `--excel` o `--salida` algo que sea de otro proyecto,
+y `registrar` no escribe un `.txt` en las carpetas de otro. Un `proyecto.json` cuyo `id` no
+sea el de su carpeta, o que reutilice las carpetas de otro proyecto, da error.
 
-### MongeMalo (`proyectos/mongemalo/`)
-- Instagram activa (Reels y carruseles); TikTok y YouTube **preparadas** (sin activar, solo
-  Reels, con sus fijos de siempre).
-- Hashtags en Instagram: **3–5 en total** contando el único fijo `#grupoalfa` (lo pone el
-  script): se escriben **2–4 temáticos** del banco → **2–3 de nicho** (`#grupoalfa` ya cuenta
-  como uno), **1–2 medios** y **como mucho 1 amplio**. `#ventas`, `#dinero` y `#exitopersonal`
-  pasan al banco rotativo. Se **rotan** por tema (aviso si se repite el conjunto de otra pieza
-  de la tanda o de los 5 últimos registrados).
-- Copy: gancho ≤ 125 caracteres, sin emojis, sin paralelismos negativos ni cebos de interacción.
-  Carrusel: el caption repite el gancho de la slide 1 en los primeros 125 caracteres y va corto.
-- CTA siempre a la bio; la oferta se elige por tema (Gestión de Objeciones, Grupo Alfa,
-  Escuela de Afiliados, Mentoría, El Mejor Negocio Destripado, o genérico).
-- Calendario **activo** con valores provisionales: 5 posts/semana (lun, mar, jue, vie, dom),
-  13:30 entre semana y 20:30 el domingo, historias 2–4 al día.
-- IDs `MM-0001`, `MM-0002`… (Reels y carruseles comparten contador).
+**Carpetas** (en `proyecto.json`, relativas a `PruebasIA/`; `<id>` se sustituye por el id):
+
+| Clave | Por defecto | Quién la crea |
+|---|---|---|
+| `carpetas.pendiente` | `CEO_Sergete/REVISADOS/<id>/1. pte Publicar` | el CEO |
+| `carpetas.publicado` | `CEO_Sergete/REVISADOS/<id>/2. Publicados` | el CEO |
+| `calendario.historias.carpeta` | `CEO_Sergete/HISTORIAS/<id>/1. Pte publicar` | el CEO |
+| `carpetas.contexto` | `TheEditor/proyectos/<id>/transcripciones`, `_Historico/<id>` | TheEditor / el CEO al dar OK |
+
+Si una carpeta del CEO no existe, TheCopy **avisa** (no la crea). Durante la transición de
+TheEditor también se mira su ruta antigua `TheEditor/transcripciones/` (sin proyecto), solo
+si el clip no aparece en las del proyecto y con un aviso en el contexto.
+
+**Tipos de proyecto:** `largos` (vídeos largos que TheEditor corta en clips: contexto =
+`cortes.json` + `.srt`) y `clipping` (vídeos ya cortados que entrega el proyecto: contexto =
+`<carpeta>/textos/<clip>.txt` + el gancho de `ganchos.json`). Los dos se buscan siempre; el
+tipo es informativo.
+
+### Proyecto nuevo
+
+```powershell
+.venv\Scripts\python.exe copys.py nuevo-proyecto <id> [--nombre "Nombre"] [--prefijo XX] [--tipo largos|clipping]
+```
+
+1. Copia `proyectos/_plantilla/` a `proyectos/<id>/` con el id, nombre, prefijo de IDs,
+   tipo y nombre del registro. Si el id está en `CEO_Sergete/proyectos.json`, nombre, tipo,
+   prefijo y descripción salen de allí (si no, `--nombre` es obligatorio y avisa de que lo
+   tiene que dar de alta el CEO). No deja repetir el prefijo de otro proyecto.
+2. Comprueba las carpetas (las del CEO no las crea: si faltan, avisa).
+3. Lista **qué falta rellenar** (lo que sigue igual que en la plantilla): descripción y
+   `como_reconocerlo`, **tono** y `reglas_copy`, **ofertas** y CTA genérico (`ofertas.json`),
+   **hashtags** fijos y banco temático (`hashtags.json`), **CTA y reglas de cada plataforma**
+   activa (`cta_patrones`, `cta_ejemplo`, emojis, nº de hashtags, guía) y el **calendario**
+   (desactivado en la plantilla). `copys.py proyectos` lo vuelve a enseñar.
+
+Lo que no se sepa se pregunta a Sergio. **Plataformas:** cada proyecto define `instagram`,
+`tiktok` y `youtube` (Shorts, con título); activar una = `"activa": true` (y revisar sus
+fijos en `hashtags.json`), solo cuando Sergio lo pida. A una pieza ya registrada se le puede
+añadir una plataforma nueva con el mismo ID (`pendientes --plataformas <p>`).
+
+### Ejemplo: MongeMalo (`proyectos/mongemalo/`)
+Tipo `largos`; Instagram activa (Reels y carruseles), TikTok y YouTube preparadas. Hashtags:
+`#grupoalfa` fijo + 2–4 temáticos rotados (3–5 en total). CTA siempre a la bio; la oferta se
+elige por tema. Calendario activo (5 posts/semana, provisional). IDs `MM-0001`… El detalle,
+en sus JSON.
 
 ## Carruseles (contrato con TheHistoria)
 
 ```
-<carpeta_carrusel>\        al dar OK, el CEO la mueve entera a REVISADOS\1. pte Publicar\
+<carpeta_carrusel>\        al dar OK, el CEO la mueve entera a REVISADOS\<id>\1. pte Publicar\
   01.jpg … NN.jpg          1080×1350, en orden
   carrusel.json            tipo, proyecto, slug, tema, formula (IG5_lista | IG6_antes_despues |
                            IG7_mitos | IG8_metodo), objetivo, pilar, fuente {tipo, ruta, credito},
@@ -81,7 +116,7 @@ tanda) y, como contexto, la fórmula, la fuente y el texto de las slides sin el 
 ## Cómo funciona
 
 ```
-copys.py pendientes          → tandas/<proyecto>_<fecha>.json
+copys.py pendientes          → tandas/<id>/<id>_<fecha>.json
                                 (Reels y carruseles sin copy + su contexto)
   (el subagente `copy` rellena: tema, oferta, objetivo, pilar, copy y hashtags temáticos;
    copys.py hashtags enseña el banco por tamaño y los últimos conjuntos usados)
@@ -97,10 +132,12 @@ corrigen reescribiendo **antes de registrar**; solo se dejan si la frase es lite
 (`contexto.frase_viral` / `contexto.transcripcion`) o de las slides del carrusel, y entonces la
 auditoría la marca como «literal del clip» y no avisa.
 
-El **contexto** de cada Reel sale de TheEditor: el clip `finales/<nombre>.mp4` es la
-entrada `nombre` de su `cortes.json` (título, frase viral, ángulo, categoría) y de la
-transcripción `.srt` se extrae lo que se dice en ese tramo. Se busca en
-`TheEditor/transcripciones/` y en `_Historico/`. El de cada carrusel, de su `carrusel.json`.
+El **contexto** de cada Reel sale de TheEditor, solo en las carpetas `contexto` del
+proyecto. En `largos`, el clip `finales/<nombre>.mp4` es la entrada `nombre` de su
+`cortes.json` (título, frase viral, ángulo, categoría) y de la transcripción `.srt` se extrae
+lo que se dice en ese tramo. En `clipping`, la transcripción es `textos/<clip>.txt` y el
+gancho, el de `ganchos.json`; si el mismo nombre de clip está en varias carpetas de clipping,
+no se elige ninguna y se avisa. El de cada carrusel, de su `carrusel.json`.
 
 **Validaciones** antes de escribir nada (si hay un error, no se registra nada):
 
@@ -148,17 +185,17 @@ El script se llama `copys.py` (un `copy.py` chocaría con el módulo `copy` de P
 ```powershell
 cd C:\Users\ico858\Desktop\PruebasIA\TheCopy
 .venv\Scripts\python.exe copys.py proyectos
-.venv\Scripts\python.exe copys.py pendientes [--proyecto mongemalo] [--clip 01_x | --clip carpeta_carrusel] [--plataformas instagram,tiktok]
-.venv\Scripts\python.exe copys.py registrar --entrada tandas\mongemalo_....json [--simular] [--reemplazar]
-.venv\Scripts\python.exe copys.py calendario planificar [--semanas N] [--desde AAAA-MM-DD] [--simular] [--replanificar-atrasados] [--json]
-.venv\Scripts\python.exe copys.py calendario hoy [--fecha AAAA-MM-DD]
-.venv\Scripts\python.exe copys.py calendario ver [--semana AAAA-Www]
-.venv\Scripts\python.exe copys.py sincronizar
-.venv\Scripts\python.exe copys.py ver [MM-0003 | nombre_pieza]
-.venv\Scripts\python.exe copys.py banco [--oferta grupo_alfa]
-.venv\Scripts\python.exe copys.py auditar (--entrada tandas\....json | --texto "..." | --banco) [--plataforma instagram] [--solo-estilo] [--json]
-.venv\Scripts\python.exe copys.py hashtags [--plataforma instagram] [--tema ventas]
-.venv\Scripts\python.exe copys.py nuevo-proyecto <id> --nombre "Nombre"
+.venv\Scripts\python.exe copys.py pendientes [--proyecto <id>] [--clip 01_x | --clip carpeta_carrusel] [--plataformas instagram,tiktok]
+.venv\Scripts\python.exe copys.py registrar --entrada tandas\<id>\<id>_....json [--simular] [--reemplazar]
+.venv\Scripts\python.exe copys.py calendario planificar [--proyecto <id>] [--semanas N] [--desde AAAA-MM-DD] [--simular] [--replanificar-atrasados] [--json]
+.venv\Scripts\python.exe copys.py calendario hoy [--proyecto <id>] [--fecha AAAA-MM-DD]
+.venv\Scripts\python.exe copys.py calendario ver [--proyecto <id>] [--semana AAAA-Www]
+.venv\Scripts\python.exe copys.py sincronizar [--proyecto <id>]
+.venv\Scripts\python.exe copys.py ver [--proyecto <id>] [MM-0003 | nombre_pieza]
+.venv\Scripts\python.exe copys.py banco [--proyecto <id>] [--oferta grupo_alfa]
+.venv\Scripts\python.exe copys.py auditar (--entrada tandas\<id>\....json | --texto "..." | --banco) [--proyecto <id>] [--plataforma instagram] [--solo-estilo] [--json]
+.venv\Scripts\python.exe copys.py hashtags [--proyecto <id>] [--plataforma instagram] [--tema ventas]
+.venv\Scripts\python.exe copys.py nuevo-proyecto <id> [--nombre "Nombre"] [--prefijo XX] [--tipo largos|clipping]
 ```
 
 | Orden | Qué hace |
@@ -173,11 +210,14 @@ cd C:\Users\ico858\Desktop\PruebasIA\TheCopy
 | `banco` | Copys del banco y cuántas veces se han usado (para tirar de reserva sin repetir). |
 | `auditar` | Solo informe (no reescribe): audita los copys de una tanda (`--entrada`, con la excepción de frases literales), un texto suelto (`--texto`) o el banco del proyecto (`--banco`). `--solo-estilo`: solo estilo y emojis, más cebos y cierres vacíos (sin gancho de 125, CTA, hashtags ni longitud); lo usa TheHistoria con las slides. `--json`: lista `[{nivel, regla, fragmento, mensaje}]` por stdout (ASCII). Sale con código 1 si hay errores. |
 | `hashtags` | Reglas de hashtags de la plataforma, banco temático por tamaño y los últimos conjuntos de temáticos usados (para rotar). |
+| `proyectos` | Lista los proyectos: tipo, prefijo, plataformas activas, calendario, carpetas que faltan y lo que queda por rellenar. |
+| `nuevo-proyecto` | Crea `proyectos/<id>/` desde la plantilla y dice qué falta (ver «Proyecto nuevo»). |
 
-Para pruebas: `--excel <ruta>` en `pendientes/registrar/sincronizar/ver/hashtags/calendario`
+Para pruebas: `--excel <ruta>` en `pendientes/registrar/sincronizar/ver/banco/hashtags/calendario`
 usa otro registro (los `.md` del calendario van a `<carpeta del Excel>/calendario/`);
-`calendario … --carpeta-historias <ruta>` y `sincronizar --pendiente/--publicado <ruta>`
-usan otras carpetas.
+`pendientes --carpeta`, `calendario … --carpeta-historias <ruta>` y
+`sincronizar --pendiente/--publicado <ruta>` usan otras carpetas. Ninguna puede ser de otro
+proyecto.
 
 **El Excel tiene que estar cerrado** cuando el script escribe; si está abierto, avisa y
 no escribe nada. Lo que edites a mano (Estado, Fecha prevista, Hora prevista, Notas,

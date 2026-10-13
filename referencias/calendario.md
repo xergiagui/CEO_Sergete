@@ -55,7 +55,7 @@ formatos se guardan y se comparten más).
   **≥ 2 de compartidos**, **promoción ≤ 2**, no más de **2 carruseles de la misma
   fórmula** y no poner seguidas dos piezas del **mismo vídeo de origen** ni de la
   **misma oferta** (la genérica no cuenta). Todo es recomendación: nada bloquea.
-- **Historias: 2–4 al día**, de `CEO_Sergete/HISTORIAS/1. Pte publicar`, más el
+- **Historias: 2–4 al día**, de `CEO_Sergete/HISTORIAS/<id>/1. Pte publicar`, más el
   recordatorio diario de compartir el post del día en historias.
 
 ## Cómo coloca las piezas
