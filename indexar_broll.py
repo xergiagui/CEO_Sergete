@@ -21,6 +21,13 @@ Flujo (3 pasos, como el catálogo común):
        -> _indice.json (embedding de «nombre + descripción» por clip).
 Es idempotente: se puede relanzar al añadir o quitar clips. Un clip sin
 descripción se indexa por su nombre de archivo (con aviso).
+
+Banco COMÚN (superposiciones/ + catálogo `broll_assets` de Supabase):
+    python indexar_broll.py --faltan
+       -> lista los vídeos de superposiciones/ que NO están en `broll_assets`
+          (solo lee; no escribe en Supabase). Sin catálogo, ese b-roll solo puede
+          salir al azar (máx. 1 por clip). Para indexarlos:
+          .claude/skills/Editor_Sergio/broll_index/README.md.
 """
 import argparse
 import json
@@ -89,12 +96,50 @@ def extraer_frames(clips: dict, broll_dir: Path) -> int:
     return hechos
 
 
+def faltan_en_catalogo() -> int:
+    """Vídeos del banco común (superposiciones/) que no están en broll_assets."""
+    import httpx
+    env = pc.cargar_env()
+    url = (env.get("SUPABASE_URL") or "").rstrip("/")
+    if not url or not env.get("SUPABASE_ANON_KEY"):
+        raise SystemExit("[!] Sin credenciales de Supabase (env.json o CEO_Sergete/.env).")
+    catalogo, desde, paso = set(), 0, 1000
+    while True:
+        r = httpx.get(f"{url}/rest/v1/broll_assets", params={"select": "filename"},
+                      headers={**pc._supabase_headers(env), "Range": f"{desde}-{desde + paso - 1}"},
+                      timeout=30)
+        if r.status_code >= 400:
+            raise SystemExit(f"[!] Supabase respondió {r.status_code}: {r.text[:200]}")
+        filas = r.json()
+        catalogo |= {f.get("filename") for f in filas if f.get("filename")}
+        if len(filas) < paso:
+            break
+        desde += paso
+    banco = pc._list_overlay_videos(pc.PROJECT_ROOT / "superposiciones")
+    faltan = [v.name for v in banco if v.name not in catalogo]
+    print(f"Banco común: {len(banco)} vídeos · catálogo broll_assets: {len(catalogo)} · "
+          f"faltan en el catálogo: {len(faltan)}")
+    for n in faltan:
+        print(f"  {n}")
+    return 0
+
+
 def main():
+    for _s in (sys.stdout, sys.stderr):
+        try:
+            _s.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
     ap = argparse.ArgumentParser(description="Índice semántico local del b-roll propio.")
     proyecto.add_argumento(ap)
     ap.add_argument("--frames", action="store_true",
                     help="Paso 1: montajes en _frames/ + plantilla de _descripciones.json (sin indexar).")
+    ap.add_argument("--faltan", action="store_true",
+                    help="Banco común: lista los vídeos de superposiciones/ que no están en broll_assets "
+                         "(solo lectura).")
     args = ap.parse_args()
+    if args.faltan:
+        sys.exit(faltan_en_catalogo())
     p = proyecto.abrir(args.proyecto, "indexar_broll", log=False)
     if p.recursos["broll"] != "propio":
         raise SystemExit(f"[!] El proyecto «{p.id}» usa b-roll «{p.recursos['broll']}»: el índice "

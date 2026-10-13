@@ -6,9 +6,11 @@ Batch — reels 9:16 a partir de clips YA cortados (vía 2).
 Trabaja por PROYECTO (`--proyecto <id>`, ver proyecto.py). Recorre las
 subcarpetas de una raíz (por defecto el buzón del proyecto,
 proyectos/<id>/input/), trata cada subcarpeta como un "vídeo" (slug = nombre de
-la carpeta) y por cada .mp4 hace el FLUJO COMPLETO de reel:
+la carpeta) y por cada clip (.mp4, .mov, .m4v, .mkv) hace el FLUJO COMPLETO:
   1) reencuadre 9:16 vertical (1080x1920) según el MODO (argumento o, si no se
-     da, el de la carpeta en proyecto.json → encuadre)
+     da, el de la carpeta en proyecto.json → encuadre). Si la fuente YA es
+     vertical (alto ≥ 1,7 × ancho, con la rotación aplicada), solo se escala,
+     salvo con un MODO explícito (argumento o carpeta en encuadre.carpetas)
   2) quita silencios (auto-editor con los `silencios` del proyecto)
   3) edición final Fase C: b-roll + música + de-click + subtítulos palabra a
      palabra (pipeline_core.burn_subs_and_music) SOLO con los recursos que
@@ -16,18 +18,25 @@ la carpeta) y por cada .mp4 hace el FLUJO COMPLETO de reel:
      Sin gancho visual; con GANCHO DE TEXTO en la franja superior (~2,5 s) si el
      clip tiene texto en ganchos.json (y el proyecto lleva gancho_texto).
 Salida en proyectos/<id>/transcripciones/<carpeta>/finales/.
+Los clips SUELTOS en input/ (sin subcarpeta) forman el lote `_sueltos` en los
+proyectos de clipping (o pidiendo la CARPETA `_sueltos`).
+Al empezar cuenta los recursos según la política y PARA si falta b-roll o
+música propios, salvo con --sin-broll / --sin-musica.
 
 Gancho de texto (lo escribe el editor/LLM, nunca se genera mecánicamente):
     1) `--solo-transcribir`: hace reencuadre + silencios + transcripción de cada
-       clip, guarda el texto en transcripciones/<carpeta>/textos/<clip>.txt y deja
-       el 9:16 desilenciado + los word-timestamps en transcripciones/<carpeta>/_prep/.
-       No renderiza.
-    2) El editor lee los textos y escribe transcripciones/<carpeta>/ganchos.json:
+       clip, guarda el texto en transcripciones/<carpeta>/textos/<clip>.txt, deja
+       el 9:16 desilenciado + los word-timestamps en transcripciones/<carpeta>/_prep/
+       y escribe transcripciones/<carpeta>/_para_ganchos.md (todos los textos, con
+       la duración de cada clip: LO ÚNICO que lee el editor) y una plantilla
+       ganchos.json con todas las claves vacías. No renderiza.
+    2) El editor rellena transcripciones/<carpeta>/ganchos.json:
        {"<clip>.mp4": "¿Texto que abre el bucle?", ...}
-       (también vale un ganchos.json dentro de la carpeta de origen).
-    3) Sin el flag: renderiza reutilizando _prep/ (ni reencuadra ni transcribe otra
-       vez) y quema el gancho de cada clip. Clip sin texto -> sale SIN gancho y se
-       avisa.
+       (también vale un ganchos.json dentro de la carpeta de origen) y lo
+       comprueba con `--validar-ganchos`.
+    3) Sin el flag: VALIDA ganchos.json (para si hay errores), renderiza
+       reutilizando _prep/ (ni reencuadra ni transcribe otra vez) y quema el
+       gancho de cada clip. Clip sin texto -> sale SIN gancho y se avisa.
 _prep/ se CONSERVA hasta archivar (`proyecto.py aprobar` lo borra): corregir un
 gancho (`--solo`) no repite reencuadre ni Whisper. Cada _prep/<clip>.words.json
 guarda con qué MODO y silencios se hizo; si cambian, ese clip se rehace solo.
@@ -56,7 +65,9 @@ Uso ([RAIZ] es opcional: si el primer argumento no es una ruta, es la CARPETA):
     python procesar_batch_clip.py --proyecto x "Carpeta" follow --solo-transcribir
     python procesar_batch_clip.py --proyecto x "C:/otra/raiz" "Carpeta" right   # otra raíz
     python procesar_batch_clip.py --proyecto x "Carpeta" --solo "clip 3" --sin-frases
-Si solo hay un proyecto, --proyecto se puede omitir.
+    python procesar_batch_clip.py --proyecto x "Carpeta" --validar-ganchos   # solo valida
+Si solo hay un proyecto, --proyecto se puede omitir. Con --quiet (por defecto si
+la salida no es una terminal) la consola recibe una línea por clip y el RESUMEN.
 """
 import argparse
 import sys
@@ -75,9 +86,11 @@ for _s in (sys.stdout, sys.stderr):
 RAIZ = Path(__file__).resolve().parent
 sys.path.insert(0, str(RAIZ / ".claude" / "skills" / "Editor_Sergio"))
 import pipeline_core as pc  # noqa: E402
-from editar_clips import resolver_env_supabase  # noqa: E402
+from editar_clips import linea_clip  # noqa: E402
 import clips as C  # noqa: E402  (reencuadre 9:16 + quitar silencios)
+import herramientas  # noqa: E402
 import proyecto  # noqa: E402
+import validar  # noqa: E402
 
 # Recursos del proyecto en curso (los fija main() a partir de proyecto.json).
 MUSIC = None
@@ -85,6 +98,7 @@ OVERLAYS = None
 WORKROOT = RAIZ / "whisper" / "_edit_batch"
 
 GANCHOS_JSON = "ganchos.json"   # {"<clip>.mp4": "texto del gancho"} por carpeta
+PARA_GANCHOS = "_para_ganchos.md"   # textos de todos los clips (lo que lee el LLM)
 PREP_DIR = "_prep"              # 9:16 desilenciado + words de --solo-transcribir
 
 
@@ -110,6 +124,13 @@ def parse_args():
                     help="Margen de silencio SOLO para esta ejecución (p. ej. 0.3s); no toca proyecto.json.")
     ap.add_argument("--forzar", action="store_true",
                     help="Procesa también lotes ya aprobados (_Historico/) y re-renderiza finales existentes.")
+    ap.add_argument("--validar-ganchos", action="store_true",
+                    help="Solo valida ganchos.json de la CARPETA (claves, líneas, signos, cifras) y sale.")
+    ap.add_argument("--sin-musica", action="store_true",
+                    help="Sin música en esta ejecución (si el proyecto aún no tiene la suya).")
+    ap.add_argument("--sin-broll", action="store_true",
+                    help="Sin b-roll en esta ejecución.")
+    proyecto.add_salida(ap)
     return ap.parse_args()
 
 
@@ -161,13 +182,81 @@ def cargar_ganchos(base: Path, carpeta: Path):
         for k, v in (data.items() if isinstance(data, dict) else []):
             if isinstance(v, dict):
                 v = v.get("gancho_texto") or v.get("texto")
-            key = str(k).strip()
-            if key.lower().endswith(".mp4"):
-                key = key[:-4].strip()
+            key = proyecto.sin_extension(k)
             if isinstance(v, str) and v.strip():
                 ganchos[key] = v.strip()
         return ganchos, p
     return {}, None
+
+
+def leer_ganchos_raw(base: Path, carpeta: Path):
+    """(contenido de ganchos.json tal cual, ruta) o (None, None)."""
+    for p in (base / GANCHOS_JSON, carpeta / GANCHOS_JSON):
+        if p.exists():
+            try:
+                return json.loads(p.read_text(encoding="utf-8")), p
+            except Exception as e:
+                return f"no es un JSON válido: {e}", p
+    return None, None
+
+
+def validar_ganchos_carpeta(base: Path, carpeta: Path, cls: list, solo: set | None = None) -> bool:
+    """Valida ganchos.json contra los clips de la carpeta (validar.py)."""
+    raw, ruta = leer_ganchos_raw(base, carpeta)
+    nombres = [m.stem.strip() for m in cls]
+    if raw is None:
+        proyecto.decir(f"aviso: no hay {GANCHOS_JSON} en {base}: todos los clips saldrían sin gancho")
+        return True
+    if isinstance(raw, str):
+        proyecto.decir(f"ERROR {ruta}: {raw}")
+        return False
+    textos = {}
+    for n in nombres:
+        t = base / "textos" / f"{n}.txt"
+        if t.exists():
+            textos[n] = t.read_text(encoding="utf-8")
+    res = validar.validar_ganchos(raw, nombres, textos)
+    return validar.informar(res, GANCHOS_JSON, solo=solo, decir=proyecto.decir)
+
+
+def escribir_para_ganchos(base: Path, cls: list) -> tuple[Path, Path, int]:
+    """_para_ganchos.md (## <clip> (34 s) + su texto, todos los clips) y una
+    plantilla ganchos.json con todas las claves vacías (sin pisar lo escrito)."""
+    prep, textos = base / PREP_DIR, base / "textos"
+    partes, n = [f"# Ganchos de {base.name}",
+                 "Escribe en ganchos.json un gancho por clip (≤ 2 líneas, ~45 car., con "
+                 "¿¡ y tildes; se cumple en el clip; vacío = sin gancho).", ""], 0
+    for m in cls:
+        name = m.stem.strip()
+        t = textos / f"{name}.txt"
+        if not t.exists():
+            continue
+        dur = 0.0
+        pw = prep / f"{name}.words.json"
+        try:
+            d = json.loads(pw.read_text(encoding="utf-8"))
+            dur = float(d.get("dur") or 0) or herramientas.duracion(prep / f"{name}.mp4")
+        except Exception:
+            pass
+        partes += [f"## {m.name} ({dur:.0f} s)", t.read_text(encoding="utf-8").strip(), ""]
+        n += 1
+    md = base / PARA_GANCHOS
+    md.write_text("\n".join(partes), encoding="utf-8")
+    gj = base / GANCHOS_JSON
+    actual = {}
+    if gj.exists():
+        try:
+            actual = json.loads(gj.read_text(encoding="utf-8"))
+        except Exception:
+            actual = None          # no se pisa un ganchos.json ilegible
+    if isinstance(actual, dict):
+        tenidas = {proyecto.sin_extension(k) for k in actual}
+        nuevo = dict(actual)
+        for m in cls:
+            if m.stem.strip() not in tenidas:
+                nuevo[m.name] = ""
+        gj.write_text(json.dumps(nuevo, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return md, gj, n
 
 
 def reencuadre_persona(mp4: Path, sw: int, sh: int, dur: float, dest: Path, lado: str = "right"):
@@ -427,17 +516,17 @@ def reencuadre_izq_por_plano(mp4: Path, sw: int, sh: int, dur: float, dest: Path
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-def cargar_env() -> dict:
-    env = {}
+def _es_num(v) -> bool:
     try:
-        if pc.ENV_PATH.exists():
-            env = json.loads(pc.ENV_PATH.read_text(encoding="utf-8"))
-    except Exception:
-        env = {}
-    sup = resolver_env_supabase()
-    for k in ("SUPABASE_URL", "SUPABASE_ANON_KEY"):
-        if sup.get(k) and not env.get(k):
-            env[k] = sup[k]
+        float(v)
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
+def cargar_env() -> dict:
+    """Credenciales (pc.cargar_env) + carpetas de recursos del proyecto."""
+    env = pc.cargar_env()
     if MUSIC:
         env["MUSIC_DIR"] = str(MUSIC)
     if OVERLAYS:
@@ -446,65 +535,76 @@ def cargar_env() -> dict:
 
 
 def dims(mp4: Path):
-    """(w, h) del vídeo vía ffprobe; (0,0) si falla."""
-    try:
-        r = subprocess.run(
-            ["ffprobe", "-v", "error", "-select_streams", "v:0",
-             "-show_entries", "stream=width,height", "-of", "csv=p=0:s=x", str(mp4)],
-            capture_output=True, text=True)
-        w, h = r.stdout.strip().split("x")
-        return int(w), int(h)
-    except Exception:
-        return 0, 0
+    """(w, h) de PANTALLA del vídeo (con la rotación aplicada); (0,0) si falla."""
+    return herramientas.dimensiones(mp4)
 
 
 def duracion(mp4: Path) -> float:
-    try:
-        r = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-             "-of", "csv=p=0", str(mp4)], capture_output=True, text=True)
-        return float(r.stdout.strip())
-    except Exception:
-        return 0.0
+    return herramientas.duracion(mp4)
 
 
 def transcribir_words_y_texto(mp4: Path, lang: str = "es"):
-    """UNA transcripción -> (words_enmascaradas_para_subs, texto_verbatim_limpio)."""
-    from faster_whisper import WhisperModel
-    model = WhisperModel("large-v3", device="cpu", compute_type="int8")
-    segs, _info = model.transcribe(str(mp4), language=lang, word_timestamps=True)
-    words, raw = [], []
-    for s in segs:
-        for w in s.words:
-            t = w.word.strip()
-            if not t:
-                continue
-            words.append({"word": pc._mask_profanidad(t), "start": w.start, "end": w.end})
-            raw.append(t)
-    texto = " ".join(raw).strip()
-    for a, b in ((" ,", ","), (" .", "."), (" ?", "?"), (" !", "!"), (" :", ":"), (" ;", ";")):
-        texto = texto.replace(a, b)
-    return words, texto
+    """UNA transcripción -> (words enmascaradas, texto verbatim). El modelo de
+    faster-whisper se carga una sola vez para todo el lote (pc.whisper_model)."""
+    return pc.transcribe_words_y_texto(mp4, lang=lang)
+
+
+def lotes(clip_root: Path, p, solo_carpeta: str | None) -> list[tuple[str, Path, list]]:
+    """[(slug, carpeta de origen, clips)]. Cada subcarpeta es un lote; los clips
+    sueltos de la raíz forman `_sueltos` (proyectos de clipping, o si se pide)."""
+    out = []
+    for d in sorted(x for x in clip_root.iterdir() if x.is_dir()):
+        cls = sorted(f for f in d.iterdir() if f.is_file() and f.suffix.lower() in proyecto.EXT_CLIPS)
+        out.append((d.name, d, cls))
+    sueltos = sorted(f for f in clip_root.iterdir()
+                     if f.is_file() and f.suffix.lower() in proyecto.EXT_CLIPS)
+    if sueltos and (p.tipo == "clipping" or solo_carpeta == proyecto.SUELTOS):
+        out.append((proyecto.SUELTOS, clip_root, sueltos))
+    elif sueltos and not solo_carpeta:
+        proyecto.decir(f"nota: {len(sueltos)} vídeo(s) sueltos en {clip_root} (proyecto «{p.tipo}»: "
+                       f"son de la vía 1). Para tratarlos como clips: CARPETA «{proyecto.SUELTOS}».")
+    return out
 
 
 def main():
     global MUSIC, OVERLAYS
     args = parse_args()
-    p = proyecto.abrir(args.proyecto, "batch")
-    MUSIC, OVERLAYS = p.music_dir, p.overlays_dir
-    recursos = p.politica_render()          # None = lo de siempre (banco común + internet)
-    sil = proyecto.silencios_cli(p.silencios, args.umbral, args.margen)
-    lang = p.idioma
+    if args.validar_ganchos:
+        p = proyecto.abrir(args.proyecto, "batch", log=False, quiet=False)
+    else:
+        p = proyecto.abrir(args.proyecto, "batch", quiet=args.quiet)
     clip_root, solo_carpeta, modo_arg = repartir_posicionales(args.posicionales, p.input_dir, args.raiz)
-    modo_arg = modo_arg.lower() if modo_arg else None
+    modo_arg = proyecto.normalizar_modo(modo_arg) if modo_arg else None
     solo_transcribir = args.solo_transcribir
-    if args.solo and not solo_carpeta:
-        raise SystemExit("[!] --solo exige la CARPETA del clip.")
-    if (args.umbral or args.margen) and not args.solo:
-        print("[!] AVISO: --umbral/--margen sin --solo se aplican a TODOS los clips de esta "
-              "ejecución (no se guardan en proyecto.json).")
+    if (args.solo or args.validar_ganchos) and not solo_carpeta:
+        raise SystemExit("[!] --solo y --validar-ganchos exigen la CARPETA.")
     if not clip_root.exists():
         raise SystemExit(f"[!] No existe la raíz de clips: {clip_root}")
+    todos = lotes(clip_root, p, solo_carpeta)
+    if solo_carpeta:
+        todos = [t for t in todos if t[0] == solo_carpeta]
+        if not todos:
+            raise SystemExit(f"[!] No hay subcarpeta '{solo_carpeta}' en {clip_root}")
+
+    if args.validar_ganchos:
+        slug, carpeta, cls = todos[0]
+        solo = proyecto.filtrar_solo([m.stem.strip() for m in cls], args.solo)
+        ok = validar_ganchos_carpeta(p.transcripciones_dir / slug, carpeta, cls, solo)
+        sys.exit(0 if ok else 1)
+
+    if not solo_transcribir:
+        proyecto.decir(p.comprobar_recursos(args.sin_broll, args.sin_musica))
+    else:
+        p.comprobar_recursos(args.sin_broll, args.sin_musica)
+    MUSIC = None if args.sin_musica else p.music_dir
+    OVERLAYS = None if args.sin_broll else p.overlays_dir
+    # None = lo de siempre (banco común + internet)
+    recursos = p.politica_render(sin_broll=args.sin_broll, sin_musica=args.sin_musica)
+    sil = proyecto.silencios_cli(p.silencios, args.umbral, args.margen)
+    lang = p.idioma
+    if (args.umbral or args.margen) and not args.solo:
+        proyecto.decir("AVISO: --umbral/--margen sin --solo se aplican a TODOS los clips de esta "
+                       "ejecución (no se guardan en proyecto.json).")
 
     env = cargar_env()
     tiene_supabase = bool(env.get("SUPABASE_URL") and env.get("SUPABASE_ANON_KEY"))
@@ -526,32 +626,21 @@ def main():
     if WORKROOT.exists():
         shutil.rmtree(WORKROOT, ignore_errors=True)
 
-    subcarpetas = sorted([d for d in clip_root.iterdir() if d.is_dir()])
-    if solo_carpeta:
-        subcarpetas = [d for d in subcarpetas if d.name == solo_carpeta]
-        if not subcarpetas:
-            raise SystemExit(f"[!] No hay subcarpeta '{solo_carpeta}' en {clip_root}")
     if not args.forzar:
         # Lotes ya aprobados (siguen en input/ pero están en _Historico): no se rehacen.
-        aprobados = [d for d in subcarpetas if p.archivado(d.name)]
-        for d in aprobados:
-            print(f"= {d.name}: ya aprobado y archivado en {p.archivado(d.name)} -> salto "
-                  f"(--forzar para rehacerlo)", flush=True)
-        subcarpetas = [d for d in subcarpetas if d not in aprobados]
-    print(f"{len(subcarpetas)} carpeta(s) a procesar.\n", flush=True)
+        # Los sueltos que siguen en input/ son nuevos (aprobar se lleva los aprobados).
+        aprobados = [t for t in todos if t[0] != proyecto.SUELTOS and p.archivado(t[0])]
+        for t in aprobados:
+            proyecto.decir(f"= {t[0]}: ya aprobado y archivado en {p.archivado(t[0])} -> salto "
+                           f"(--forzar para rehacerlo)")
+        todos = [t for t in todos if t not in aprobados]
+    print(f"{len(todos)} carpeta(s) a procesar.\n", flush=True)
 
     hechos = fallos = saltados = preparados = 0
     sin_gancho = []   # "<carpeta>/<clip>" renderizados sin texto de gancho
+    lista_fallos = []
 
-    def _es_num(v):
-        try:
-            float(v)
-            return True
-        except ValueError:
-            return False
-
-    for carpeta in subcarpetas:
-        slug = carpeta.name
+    for slug, carpeta, cls in todos:
         base = p.transcripciones_dir / slug
         out = base / "finales"
         textos = base / "textos"
@@ -559,8 +648,9 @@ def main():
         out.mkdir(parents=True, exist_ok=True)
         textos.mkdir(parents=True, exist_ok=True)
         lado = modo_arg or p.modo_encuadre(slug)
+        modo_explicito = bool(modo_arg or p.modo_de_carpeta(slug))
 
-        cls = sorted(carpeta.glob("*.mp4"))
+        todos_cls = list(cls)
         solo = proyecto.filtrar_solo([m.stem.strip() for m in cls], args.solo)
         if solo is not None:
             cls = [m for m in cls if m.stem.strip() in solo]
@@ -571,6 +661,11 @@ def main():
         sin_ganchos = solo_transcribir or not p.gancho_texto
         ganchos, ganchos_path = ({}, None) if sin_ganchos else cargar_ganchos(base, carpeta)
         if not sin_ganchos:
+            # Validación antes de renderizar: si hay errores en estos clips, para.
+            if not validar_ganchos_carpeta(base, carpeta, todos_cls,
+                                           solo or {m.stem.strip() for m in cls}):
+                raise SystemExit(f"[!] {GANCHOS_JSON} de «{slug}» tiene errores: corrígelos "
+                                 f"(--validar-ganchos) y relanza. No se ha renderizado nada.")
             if ganchos_path:
                 print(f"   [gancho texto] {len(ganchos)} texto(s) en {ganchos_path}", flush=True)
             else:
@@ -596,14 +691,12 @@ def main():
                           f"{prep_meta} -> se rehace", flush=True)
                     hay_prep = False
 
-            # Idempotente: salta solo si ya es VERTICAL (h>w), salvo --solo/--forzar
+            # Idempotente: salta solo si ya es VERTICAL (h>w), salvo --solo/--forzar.
+            # Sus frases ya se guardaron cuando se renderizó: no se vuelven a subir.
             if final_path.exists() and solo is None and not args.forzar:
                 fw, fh = dims(final_path)
                 if fh > fw and txt_path.exists():
                     saltados += 1
-                    texto = txt_path.read_text(encoding="utf-8").strip()
-                    if texto:
-                        frases_carpeta.append({"phrase": texto})
                     print(f"= {name}: ya 9:16 -> salto", flush=True)
                     continue
             if solo_transcribir and hay_prep and txt_path.exists():
@@ -630,11 +723,15 @@ def main():
                     dur = duracion(mp4)
                     # 1) reencuadre 9:16
                     vert = work / "vert.mp4"
-                    if lado in ("left", "izq"):
+                    if herramientas.es_vertical(sw, sh) and not modo_explicito:
+                        # Fuente ya vertical: solo escalar (sin reencuadre).
+                        print(f"   [encuadre] fuente vertical {sw}x{sh}: solo escala", flush=True)
+                        C.escalar_vertical(mp4, vert)
+                    elif lado == "left":
                         # Multicam con Luis a la IZQUIERDA: recorte por plano en la
                         # cara más a la izquierda, altura completa (sin regazo/piernas).
                         reencuadre_izq_por_plano(mp4, sw, sh, dur, vert, sel="left")
-                    elif lado in ("center", "centro"):
+                    elif lado == "center":
                         # Multicam sin lado fijo: centra la cara dominante de cada plano
                         # (entrevistado y entrevistador), altura completa.
                         reencuadre_izq_por_plano(mp4, sw, sh, dur, vert, sel="center")
@@ -642,14 +739,14 @@ def main():
                         # Híbrido (Largo 4): primer plano -> centra la cara dominante;
                         # plano general -> la de la izquierda (Luis). Un recorte por plano.
                         reencuadre_izq_por_plano(mp4, sw, sh, dur, vert, sel="auto")
-                    elif lado in ("auto-right", "auto-derecha"):
-                        # Híbrido (Largo 5): primer plano -> cara dominante; plano
-                        # general -> la de la DERECHA (Luis). Un recorte por plano.
+                    elif lado == "auto-right":
+                        # Híbrido: primer plano -> cara dominante; plano general -> la
+                        # de la DERECHA. Un recorte por plano.
                         reencuadre_izq_por_plano(mp4, sw, sh, dur, vert, sel="auto-right")
                     elif lado == "right" or _es_num(lado):
                         # Plano a dos estático / centro fijo: BLOQUEA en el protagonista
                         reencuadre_persona(mp4, sw, sh, dur, vert, lado=lado)
-                    else:
+                    else:  # follow
                         # Plano de una sola persona: seguimiento de cara centrado
                         C.cortar_vertical(mp4, 0, dur, vert, src_w=sw, src_h=sh)
                     # 2) quitar silencios
@@ -666,11 +763,14 @@ def main():
                     # las correcciones lo reutilizan sin repetir nada.
                     prep.mkdir(parents=True, exist_ok=True)
                     shutil.copy(str(desil), str(prep_mp4))
-                    prep_words.write_text(json.dumps({"texto": texto, "words": words, "prep": prep_meta},
-                                                     ensure_ascii=False), encoding="utf-8")
+                    prep_words.write_text(json.dumps(
+                        {"texto": texto, "words": words, "prep": prep_meta,
+                         "dur": round(duracion(desil), 2)}, ensure_ascii=False), encoding="utf-8")
                     if solo_transcribir:
                         preparados += 1
                         print(f"   preparado -> textos/{name}.txt (+ {PREP_DIR}/)", flush=True)
+                        proyecto.decir(f"PREP {mp4.name} · {duracion(desil):.0f} s · "
+                                       f"{len(texto.split())} palabras")
                         continue
                 if texto:
                     frases_carpeta.append({"phrase": texto})
@@ -683,6 +783,7 @@ def main():
                     print(f"   [gancho texto] AVISO: {name} no tiene texto en {GANCHOS_JSON} "
                           f"-> se renderiza SIN gancho", flush=True)
                 out_tmp = work / "out.mp4"
+                info = {}
                 pc.burn_subs_and_music(
                     desil, MUSIC, out_tmp,
                     lang=lang, env=env, overlays_dir=OVERLAYS,
@@ -690,23 +791,27 @@ def main():
                     clip_text=texto or None,
                     words=words,
                     hook_text=gancho, hook_text_dur=p.gancho_duracion,
-                    recursos=recursos, seed=name,
+                    recursos=recursos, seed=name, info=info,
                 )
                 shutil.move(str(out_tmp), str(final_path))
                 hechos += 1
                 print(f"   OK -> {final_path}", flush=True)
+                proyecto.decir(linea_clip(name, info, False))
             except Exception as e:
                 fallos += 1
-                traceback.print_exc()
-                print(f"   [!] FALLO en {name}: {e}", flush=True)
+                lista_fallos.append(f"{slug}/{name}")
+                traceback.print_exc(file=sys.stdout)      # al log (y a consola con --verbose)
+                proyecto.decir(f"FALLO {mp4.name} · {herramientas.describir_error(e)} "
+                               f"(detalle en el log)")
             finally:
                 shutil.rmtree(work, ignore_errors=True)
 
         if prep.exists() and not any(prep.iterdir()):
             prep.rmdir()
         if solo_transcribir:
-            print(f"   [gancho texto] textos en {textos}. Escribe {base / GANCHOS_JSON} "
-                  f'({{"<clip>.mp4": "texto"}}) y relanza sin --solo-transcribir.', flush=True)
+            md, gj, n = escribir_para_ganchos(base, todos_cls)
+            proyecto.decir(f"{slug}: {n} texto(s) -> lee SOLO {md}; rellena {gj} y comprueba con "
+                           f"--validar-ganchos antes de renderizar.")
 
         if guardar_frases and frases_carpeta:
             phrases = [{"phrase": f["phrase"], "category": "clip", "angle": slug,
@@ -724,16 +829,18 @@ def main():
                 print(f"   [frases] error (ignorado): {e}", flush=True)
 
     shutil.rmtree(WORKROOT, ignore_errors=True)
-    print("\n==================== RESUMEN ====================", flush=True)
     if solo_transcribir:
-        print(f"preparados: {preparados}   saltados(ya 9:16): {saltados}   fallos: {fallos}", flush=True)
+        proyecto.decir(f"RESUMEN: preparados {preparados} · saltados (ya 9:16) {saltados} · "
+                       f"fallos {fallos}" + (f" ({', '.join(lista_fallos)})" if lista_fallos else ""))
     else:
-        print(f"OK/nuevos: {hechos}   saltados(ya 9:16): {saltados}   fallos: {fallos}", flush=True)
-        if sin_gancho:
-            print(f"AVISO sin gancho de texto ({len(sin_gancho)}): " + ", ".join(sin_gancho), flush=True)
+        proyecto.decir(f"RESUMEN: OK/nuevos {hechos} · saltados (ya 9:16) {saltados} · fallos {fallos}"
+                       + (f" ({', '.join(lista_fallos)})" if lista_fallos else "")
+                       + (f" · sin gancho de texto: {', '.join(sin_gancho)}" if sin_gancho else ""))
         if hechos:
-            print(f"QC: .venv\\Scripts\\python.exe qc.py --proyecto {p.id} \"<CARPETA>\"  "
-                  f"(y mira finales/_qc.jpg)", flush=True)
+            proyecto.decir(f"QC: .venv\\Scripts\\python.exe qc.py --proyecto {p.id} \"<CARPETA>\"  "
+                           f"(y mira finales/_qc.jpg)")
+    if fallos:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

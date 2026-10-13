@@ -17,8 +17,8 @@ Proyecto `<id>`. Estas reglas se suman a las generales de `TheEditor/CLAUDE.md`
   «epica»…), click opcional en `recursos/sfx/`. Nada de internet.
 - Para casar el b-roll por significado: `indexar_broll.py --proyecto <id> --frames`,
   describir cada clip en `recursos/broll/_descripciones.json` e
-  `indexar_broll.py --proyecto <id>` (crea `_indice.json`). Sin índice, el b-roll
-  va al azar sin repetir dentro del clip.
+  `indexar_broll.py --proyecto <id>` (crea `_indice.json`). Sin índice no hay casación
+  por significado: como mucho 1 b-roll al azar por clip.
 
 ## Encuadre (vía 2)
 - Modo por carpeta de `input/` en `proyecto.json → encuadre.carpetas`.

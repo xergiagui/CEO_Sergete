@@ -28,9 +28,14 @@ Política de recursos (`proyecto.json → recursos`), la hace cumplir el código
     gancho_texto   true | false
     guardar_frases true | false   (viral_phrases con la etiqueta proyecto:<id>)
 
+Salida de los scripts: con `--quiet` (por defecto cuando la salida NO es una
+terminal, p. ej. un agente) la consola solo recibe una línea por vídeo/clip y el
+RESUMEN (`decir()`); el detalle completo va al log de proyectos/<id>/logs/.
+`--verbose` lo enseña todo.
+
 CLI:
     python proyecto.py                       -> lista los proyectos y su política
-    python proyecto.py ver <id>              -> configuración resuelta
+    python proyecto.py ver <id>              -> política resuelta + recursos + reglas.md
     python proyecto.py nuevo <id> --nombre "Nombre" [--tipo clipping|largos]
     python proyecto.py aprobar <id> --video "<video|carpeta>" [--clips a.mp4,b.mp4]
                                [--cerrar] [--destino-pruebas <dir>]
@@ -62,6 +67,14 @@ HISTORICO = PRUEBAS_IA / "_Historico"                # aprobados: <id>/<video>/
 REVISADOS = PRUEBAS_IA / "CEO_Sergete" / "REVISADOS"  # <id>/1. pte Publicar/
 PTE_PUBLICAR = "1. pte Publicar"
 EXT_VIDEO = (".mp4", ".mkv", ".mov", ".avi", ".webm", ".m4a", ".mp3", ".wav")
+EXT_CLIPS = (".mp4", ".mov", ".m4v", ".mkv")   # clips ya cortados (vía 2)
+EXT_MUSICA = (".mp3", ".wav", ".m4a")
+EXT_BROLL = (".mp4", ".mov", ".webm", ".mkv", ".m4v", ".avi")
+SUELTOS = "_sueltos"                           # lote de los clips sueltos en input/
+
+# Modos de encuadre del batch (vía 2); alias -> modo.
+MODOS_ENCUADRE = ("right", "left", "center", "auto", "auto-right", "follow")
+_ALIAS_MODO = {"izq": "left", "centro": "center", "auto-derecha": "auto-right"}
 
 TIPOS = ("largos", "clipping")
 BROLL = ("banco_comun", "propio", "ninguno")
@@ -72,7 +85,7 @@ GANCHO_VISUAL = ("pexels", "ninguno")
 # restrictivo (nada de fuera) y se avisa.
 RECURSOS_RESTRICTIVOS = {
     "broll": "propio", "musica": "propia", "internet": False,
-    "gancho_visual": "ninguno", "gancho_texto": True, "guardar_frases": True,
+    "gancho_visual": "ninguno", "gancho_texto": True, "guardar_frases": False,
 }
 SILENCIOS_DEFECTO = {"umbral": "6%", "margen": "0.15s"}
 MODO_ENCUADRE_DEFECTO = "right"           # el de siempre del batch
@@ -80,6 +93,24 @@ MODO_ENCUADRE_DEFECTO = "right"           # el de siempre del batch
 
 class ProyectoError(SystemExit):
     """Error de proyecto: en un script sale con el mensaje; capturable."""
+
+
+def normalizar_modo(modo, origen: str = "MODO") -> str:
+    """Modo de encuadre válido (right|left|center|auto|auto-right|follow o una
+    fracción 0–1, p. ej. 0.81). Un modo desconocido es un error, nunca `follow`
+    en silencio."""
+    m = str(modo or "").strip().lower()
+    m = _ALIAS_MODO.get(m, m)
+    if m in MODOS_ENCUADRE:
+        return m
+    try:
+        f = float(m)
+        if 0.0 <= f <= 1.0:
+            return m
+    except ValueError:
+        pass
+    raise ProyectoError(f"[!] {origen} «{modo}» no es válido: "
+                        f"{' | '.join(MODOS_ENCUADRE)} | <fracción 0–1>.")
 
 
 def _ids_en_disco() -> list[str]:
@@ -185,13 +216,18 @@ class Proyecto:
         p = self.recursos_dir / "broll" / "_indice.json"
         return p if p.exists() else None
 
-    def politica_render(self) -> dict | None:
+    def politica_render(self, sin_broll: bool = False, sin_musica: bool = False) -> dict | None:
         """Política para `pipeline_core.burn_subs_and_music(recursos=…)`.
 
         None si es la de siempre (banco común + internet): así MongeMalo pasa
         exactamente por el mismo camino que antes de haber proyectos.
+        `sin_broll` / `sin_musica` (--sin-broll / --sin-musica): solo esta ejecución.
         """
-        r = self.recursos
+        r = dict(self.recursos)
+        if sin_broll:
+            r["broll"] = "ninguno"
+        if sin_musica:
+            r["musica"] = "ninguna"
         if r["broll"] == "banco_comun" and r["musica"] == "banco_comun" and r["internet"]:
             return None
         return {
@@ -203,6 +239,48 @@ class Proyecto:
             # común; si no, solo el del proyecto (recursos/sfx/).
             "sfx_dirs": None if r["musica"] == "banco_comun" else [self.recursos_dir / "sfx"],
         }
+
+    # ------------------------------------------------------------ recursos en disco
+    def contar_recursos(self) -> dict:
+        """{'broll': n, 'musica': n} de lo que permite la política (None = no aplica)."""
+        out = {"broll": None, "musica": None}
+        d = self.overlays_dir
+        if d is not None:
+            if not d.is_dir():
+                out["broll"] = 0
+            elif self.recursos["broll"] == "propio":   # con subcarpetas; lo que empieza por _ fuera
+                out["broll"] = sum(1 for f in d.rglob("*") if f.is_file()
+                                   and f.suffix.lower() in EXT_BROLL
+                                   and not any(x.startswith(("_", ".")) for x in f.relative_to(d).parts))
+            else:
+                out["broll"] = sum(1 for f in d.iterdir()
+                                   if f.is_file() and f.suffix.lower() in EXT_BROLL)
+        m = self.music_dir
+        if m is not None:
+            out["musica"] = sum(1 for f in m.rglob("*") if f.is_file()
+                                and f.suffix.lower() in EXT_MUSICA) if m.is_dir() else 0
+        return out
+
+    def comprobar_recursos(self, sin_broll: bool = False, sin_musica: bool = False) -> str:
+        """Cuenta los recursos según la política y PARA si falta b-roll o música
+        (salvo --sin-broll / --sin-musica). Devuelve la línea de resumen."""
+        n = self.contar_recursos()
+        faltan = []
+        if n["broll"] == 0 and not sin_broll:
+            faltan.append(f"b-roll ({self.overlays_dir})")
+        if n["musica"] == 0 and not sin_musica:
+            faltan.append(f"música ({self.music_dir})")
+        if faltan:
+            flags = " ".join(f for f, k in (("--sin-broll", "b-roll"), ("--sin-musica", "música"))
+                             if any(x.startswith(k) for x in faltan))
+            raise ProyectoError(f"[!] «{self.id}»: no hay {' ni '.join(faltan)}. Añade los "
+                                f"recursos o relanza con {flags}.")
+        b = ("no" if sin_broll or n["broll"] is None else
+             f"{n['broll']} ({self.recursos['broll']}"
+             + (", índice" if self.broll_indice else "") + ")")
+        m = ("no" if sin_musica or n["musica"] is None else
+             f"{n['musica']} ({self.recursos['musica']})")
+        return f"Recursos: b-roll {b} · música {m}"
 
     # ------------------------------------------------------------ frases
     @property
@@ -219,15 +297,21 @@ class Proyecto:
         return out
 
     # ------------------------------------------------------------ encuadre y silencios
-    def modo_encuadre(self, carpeta: str | None = None) -> str:
-        """Modo del batch para una carpeta: mapa del proyecto o su modo por defecto."""
-        enc = self.cfg.get("encuadre") or {}
-        mapa = enc.get("carpetas") or {}
+    def modo_de_carpeta(self, carpeta: str | None) -> str | None:
+        """Modo EXPLÍCITO de una carpeta (`encuadre.carpetas`) o None."""
+        mapa = (self.cfg.get("encuadre") or {}).get("carpetas") or {}
         if carpeta:
             for k, v in mapa.items():
                 if k.strip().lower() == carpeta.strip().lower() and str(v).strip():
-                    return str(v).strip().lower()
-        return str(enc.get("modo_por_defecto") or MODO_ENCUADRE_DEFECTO).strip().lower()
+                    return normalizar_modo(v, f"proyecto.json → encuadre.carpetas «{k}»")
+        return None
+
+    def modo_encuadre(self, carpeta: str | None = None) -> str:
+        """Modo del batch para una carpeta: mapa del proyecto o su modo por defecto."""
+        enc = self.cfg.get("encuadre") or {}
+        return self.modo_de_carpeta(carpeta) or normalizar_modo(
+            enc.get("modo_por_defecto") or MODO_ENCUADRE_DEFECTO,
+            "proyecto.json → encuadre.modo_por_defecto")
 
     @property
     def silencios(self) -> dict:
@@ -262,12 +346,13 @@ class Proyecto:
         if pc is not None:
             pc.bloquear_red_recursos(f"el proyecto «{self.id}» tiene internet=false")
 
-    def iniciar_log(self, nombre: str) -> Path:
-        """Duplica stdout/stderr en proyectos/<id>/logs/<nombre>_<fecha>.log."""
+    def iniciar_log(self, nombre: str, quiet: bool = False) -> Path:
+        """Duplica stdout/stderr en proyectos/<id>/logs/<nombre>_<fecha>.log.
+        Con `quiet`, stdout solo va al log (la consola recibe lo de `decir()`)."""
         self.logs_dir.mkdir(parents=True, exist_ok=True)
         path = self.logs_dir / f"{nombre}_{dt.datetime.now():%Y%m%d-%H%M%S}.log"
         fh = open(path, "a", encoding="utf-8", buffering=1)
-        sys.stdout = _Tee(sys.stdout, fh)
+        sys.stdout = _Tee(sys.stdout, fh, mudo=quiet)
         sys.stderr = _Tee(sys.stderr, fh)
         return path
 
@@ -280,25 +365,74 @@ class Proyecto:
 
 
 class _Tee:
-    def __init__(self, stream, fh):
-        self._s, self._fh = stream, fh
+    """stdout/stderr -> consola + log. `mudo`: solo al log (salida --quiet)."""
+
+    def __init__(self, stream, fh, mudo: bool = False):
+        self._s, self._fh, self.mudo = stream, fh, mudo
 
     def write(self, s):
-        try:
-            self._fh.write(s)
-        except Exception:
-            pass
-        return self._s.write(s)
+        if self._fh is not None:
+            try:
+                self._fh.write(s)
+            except Exception:
+                pass
+        return len(s) if self.mudo else self._s.write(s)
+
+    def consola(self, s):
+        """Siempre a la consola (y al log), también en modo --quiet."""
+        if self._fh is not None:
+            try:
+                self._fh.write(s)
+            except Exception:
+                pass
+        self._s.write(s)
+        self._s.flush()
 
     def flush(self):
-        try:
-            self._fh.flush()
-        except Exception:
-            pass
+        if self._fh is not None:
+            try:
+                self._fh.flush()
+            except Exception:
+                pass
         self._s.flush()
+
+    def isatty(self):
+        return False if self.mudo else self._s.isatty()
 
     def __getattr__(self, k):
         return getattr(self._s, k)
+
+
+def decir(msg: str = "") -> None:
+    """Línea para quien lanza el script (el LLM): sale SIEMPRE en consola, también
+    con --quiet, y queda en el log. Úsala para la línea por clip y el RESUMEN."""
+    out = sys.stdout
+    if isinstance(out, _Tee):
+        out.consola(f"{msg}\n")
+    else:
+        print(msg, flush=True)
+
+
+def es_quiet() -> bool:
+    return isinstance(sys.stdout, _Tee) and sys.stdout.mudo
+
+
+def add_salida(ap: argparse.ArgumentParser) -> None:
+    """--quiet / --verbose. Por defecto, --quiet si la salida no es una terminal."""
+    g = ap.add_mutually_exclusive_group()
+    g.add_argument("--quiet", dest="quiet", action="store_true", default=None,
+                   help="Una línea por clip + RESUMEN (detalle en el log). Por defecto si la "
+                        "salida no es una terminal.")
+    g.add_argument("--verbose", dest="quiet", action="store_false",
+                   help="Todo el detalle también en la consola.")
+
+
+def _silenciar_ruido() -> None:
+    """Fuera barras de progreso y avisos de librerías (no aportan nada al LLM)."""
+    os.environ.setdefault("TQDM_DISABLE", "1")
+    import warnings
+    warnings.filterwarnings("ignore", message=".*mean pooling.*")
+    warnings.filterwarnings("ignore", message=".*progress bars.*")
 
 
 def _pipeline_core():
@@ -380,24 +514,44 @@ def add_argumento(ap: argparse.ArgumentParser) -> None:
                     help="Id del proyecto (proyectos/<id>/). Obligatorio si hay varios.")
 
 
-def abrir(pid: str | None, script: str, log: bool = True) -> Proyecto:
-    """Resuelve el proyecto, aplica su política de red y abre el log del script."""
+def abrir(pid: str | None, script: str, log: bool = True, quiet: bool | None = None) -> Proyecto:
+    """Resuelve el proyecto, aplica su política de red y abre el log del script.
+
+    `quiet` None = automático: --quiet si stdout no es una terminal (solo en los
+    scripts con log; los cortos sin log lo enseñan todo)."""
     for s in (sys.stdout, sys.stderr):
         try:
             s.reconfigure(encoding="utf-8", errors="replace")
         except Exception:
             pass
+    if quiet is None:
+        try:
+            quiet = log and not sys.stdout.isatty()
+        except Exception:
+            quiet = bool(log)
+    _silenciar_ruido()
     p = resolver(pid)
     p.aplicar_red()
     if log:
-        ruta = p.iniciar_log(script)
-        print(f"{p.resumen()}\n[log] {ruta}", flush=True)
+        ruta = p.iniciar_log(script, quiet=quiet)
+        decir(f"{p.resumen()} · log {ruta}")
     else:
-        print(p.resumen(), flush=True)
+        if quiet:
+            sys.stdout = _Tee(sys.stdout, None, mudo=True)
+        decir(p.resumen())
     return p
 
 
 # ---------------------------------------------------------------- ayudas de los scripts
+def sin_extension(nombre: str) -> str:
+    """«clip 3.mp4» / «IMG_1.MOV» -> «clip 3» / «IMG_1» (solo extensiones de vídeo)."""
+    x = str(nombre or "").strip()
+    for ext in EXT_CLIPS:
+        if x.lower().endswith(ext):
+            return x[: -len(ext)].strip()
+    return x
+
+
 def filtrar_solo(nombres: list[str], solo: list[str] | None, que: str = "clip") -> set[str] | None:
     """Nombres pedidos con --solo (sin .mp4) que existen; error si alguno no.
     None si no hay --solo (= todos)."""
@@ -406,9 +560,7 @@ def filtrar_solo(nombres: list[str], solo: list[str] | None, que: str = "clip") 
     pedidos = []
     for s in solo:
         for x in str(s).split(","):
-            x = x.strip()
-            if x.lower().endswith(".mp4"):
-                x = x[:-4].strip()
+            x = sin_extension(x)
             if x:
                 pedidos.append(x)
     faltan = [x for x in pedidos if x not in nombres]
@@ -515,6 +667,8 @@ def _cmd_aprobar(a) -> int:
     hist = historico / p.id / v
     restantes = [x for x in disponibles if x not in pedidos]
     cerrar = bool(a.cerrar or not restantes)
+    if v == SUELTOS and hist.exists():          # cada tanda de sueltos, su archivo
+        hist = historico / p.id / f"{SUELTOS}_{dt.datetime.now():%Y%m%d-%H%M}"
     if cerrar and hist.exists():
         raise ProyectoError(f"[!] Ya existe {hist}: no archivo encima. Revísalo antes "
                             f"(no se ha movido nada).")
@@ -545,7 +699,14 @@ def _cmd_aprobar(a) -> int:
         shutil.move(str(base), str(hist))
         print(f"[aprobar] archivado: {base} -> {hist}")
         fuente = _fuente_en_input(p, v)
-        if fuente is None:
+        if v == SUELTOS:
+            sueltos = sorted(f for f in p.input_dir.iterdir()
+                             if f.is_file() and f.suffix.lower() in EXT_CLIPS) if p.input_dir.is_dir() else []
+            (hist / "_fuente").mkdir(parents=True, exist_ok=True)
+            for f in sueltos:
+                shutil.move(str(f), str(hist / "_fuente" / f.name))
+            print(f"[aprobar] fuente: {len(sueltos)} clip(s) sueltos de input/ -> {hist / '_fuente'}")
+        elif fuente is None:
             print(f"[aprobar] (no hay fuente de «{v}» en {p.input_dir}: nada que archivar)")
         elif fuente.is_dir():
             shutil.move(str(fuente), str(hist / "_fuente"))
@@ -569,7 +730,7 @@ def main() -> int:
             pass
     ap = argparse.ArgumentParser(description="Proyectos de TheEditor.")
     sub = ap.add_subparsers(dest="cmd")
-    v = sub.add_parser("ver", help="configuración resuelta de un proyecto")
+    v = sub.add_parser("ver", help="política resuelta, recursos y reglas.md de un proyecto")
     v.add_argument("id")
     n = sub.add_parser("nuevo", help="crea proyectos/<id>/ desde _plantilla")
     n.add_argument("id")
@@ -590,16 +751,24 @@ def main() -> int:
     if a.cmd == "aprobar":
         return _cmd_aprobar(a)
     if a.cmd == "ver":
+        # Todo lo que el editor necesita del proyecto en UNA llamada: política
+        # resuelta, recursos en disco y su reglas.md.
         p = cargar(a.id)
+        n = p.contar_recursos()
         print(p.resumen())
         print(f"  carpeta      {p.dir}")
         print(f"  b-roll       {p.overlays_dir or '-'}"
+              + (f"  ({n['broll']} vídeos)" if n["broll"] is not None else "")
               + (f"  (índice: {p.broll_indice.name})" if p.broll_indice else ""))
-        print(f"  música       {p.music_dir or '-'}")
+        print(f"  música       {p.music_dir or '-'}"
+              + (f"  ({n['musica']} audios)" if n["musica"] is not None else ""))
         print(f"  encuadre     por defecto «{p.modo_encuadre()}»; carpetas: "
               f"{(p.cfg.get('encuadre') or {}).get('carpetas') or '-'}")
         print(f"  silencios    {p.silencios}")
-        print(f"  frases       etiqueta {p.etiqueta}")
+        print(f"  gancho texto {p.gancho_duracion or 2.5} s · frases etiqueta {p.etiqueta}")
+        reglas = p.dir / "reglas.md"
+        print(f"\n--- {reglas.relative_to(RAIZ).as_posix()} ---")
+        print(reglas.read_text(encoding="utf-8").strip() if reglas.exists() else "(no hay reglas.md)")
         return 0
     for pid in listar():
         print(cargar(pid).resumen())

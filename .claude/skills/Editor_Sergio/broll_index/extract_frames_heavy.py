@@ -4,9 +4,12 @@ procesa vids[70:] en orden ascendente de tamaño -> idx 71..92.
 Output: frames/ (mismos) + broll_tech_heavy.json"""
 import json, re, subprocess, unicodedata
 from pathlib import Path
-import imageio_ffmpeg
+_RAIZ = Path(__file__).resolve().parents[4]  # TheEditor
+import sys as _sys
+_sys.path.insert(0, str(_RAIZ))
+import herramientas  # ffmpeg común de TheEditor
 
-FF = imageio_ffmpeg.get_ffmpeg_exe()
+FF = herramientas.exigir_ffmpeg()
 SRC = Path(r"C:\Users\ico858\Desktop\PruebasIA\TheEditor\superposiciones")
 OUT = Path(__file__).resolve().parent
 FRAMES = OUT / "frames"; FRAMES.mkdir(exist_ok=True)

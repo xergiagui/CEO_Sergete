@@ -19,6 +19,7 @@ Uso:
     python clips.py --proyecto x "video" --solo 03_nombre                -> solo ese clip
     python clips.py --proyecto x "video" --solo 03_nombre --umbral 3% --margen 0.3s
                                     -> corrección de silencios de un clip (no toca proyecto.json)
+    python clips.py --proyecto x "video" --validar   -> solo valida cortes.json (no corta)
 Si solo hay un proyecto, --proyecto se puede omitir. Un vídeo ya aprobado
 (_Historico/<id>/<video>/) no se vuelve a cortar salvo con --forzar.
 
@@ -45,6 +46,9 @@ Formato de cortes.json (lista de objetos):
                                 cae al titulo/hook, y si no hay Supabase no rompe.
 Si no se pasa --cortes, se busca en proyectos/<id>/transcripciones/<video>/cortes.json.
 
+Antes de cortar se VALIDA cortes.json (validar.py: nombres, tramos de 15–90 s
+sin solapes y ganchos de texto) y, si hay errores, no se corta nada.
+
 Los subtitulos NO se queman aqui. Se anaden UNA sola vez en la edicion final
 con la skill Editor_Sergio (b-roll + musica + subs), para no generarlos dos
 veces ni acabar con subtitulos duplicados en pantalla.
@@ -64,7 +68,9 @@ import sys
 import tempfile
 from pathlib import Path
 
+import herramientas
 import proyecto
+import validar
 
 # --- Encuadre 9:16 que SIGUE al hablante (A2) --------------------------------
 # El recorte vertical de un 16:9 conserva TODA la altura y toma una franja
@@ -157,32 +163,20 @@ RAIZ = Path(__file__).resolve().parent
 PY = sys.executable
 
 
-def resolver_ffmpeg() -> str:
-    """Localiza ffmpeg de forma robusta (no depende de una ruta fija de winget)."""
-    fijo = r"C:\Users\ico858\AppData\Local\Microsoft\WinGet\Packages\yt-dlp.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-N-125875-g5d4d3bdc61-win64-gpl\bin\ffmpeg.exe"
-    if Path(fijo).exists():
-        return fijo
-    try:
-        import imageio_ffmpeg
-        return imageio_ffmpeg.get_ffmpeg_exe()
-    except Exception:
-        pass
-    hallado = shutil.which("ffmpeg")
-    if hallado:
-        return hallado
-    raise SystemExit("[!] No se encontro ffmpeg (ni winget, ni imageio-ffmpeg, ni PATH).")
-
-
-FFMPEG = resolver_ffmpeg()
+FFMPEG = herramientas.exigir_ffmpeg()
 
 
 def resolver_video(arg: str, input_dir: Path) -> tuple[Path, str]:
     """Devuelve (ruta_video, nombre). Acepta ruta concreta o nombre en el
-    input/ del proyecto."""
+    input/ del proyecto (.mp4 u otra extensión de vídeo)."""
     p = Path(arg)
     if p.suffix and (p.is_absolute() or len(p.parts) > 1):
         return p.resolve(), p.stem
-    nombre = p.stem if p.suffix else arg
+    nombre = p.stem if p.suffix.lower() in proyecto.EXT_VIDEO else arg
+    for ext in (".mp4",) + tuple(e for e in proyecto.EXT_VIDEO if e != ".mp4"):
+        cand = Path(input_dir) / f"{nombre}{ext}"
+        if cand.exists():
+            return cand.resolve(), nombre
     return (Path(input_dir) / f"{nombre}.mp4").resolve(), nombre
 
 
@@ -190,36 +184,36 @@ def cargar_cortes(ruta: Path) -> list[dict]:
     if not ruta.exists():
         raise SystemExit(
             f"[!] Falta el spec de cortes: {ruta}\n"
-            f"    Genera un cortes.json (ver formato en la cabecera de clips.py) "
-            f"a partir de la transcripcion y vuelve a lanzar."
+            f"    Escribe cortes.json (formato en la cabecera de clips.py) leyendo "
+            f"<video>.cortes.txt y vuelve a lanzar."
         )
-    data = json.loads(ruta.read_text(encoding="utf-8"))
+    try:
+        data = json.loads(ruta.read_text(encoding="utf-8"))
+    except Exception as e:
+        raise SystemExit(f"[!] {ruta} no es un JSON válido: {e}")
     if not isinstance(data, list) or not data:
-        raise SystemExit(f"[!] {ruta} debe ser una lista no vacia de cortes.")
+        raise SystemExit(f"[!] {ruta} debe ser una lista no vacía de cortes.")
     for i, c in enumerate(data):
-        if not all(k in c for k in ("nombre", "inicio", "fin")):
+        if not isinstance(c, dict) or not all(k in c for k in ("nombre", "inicio", "fin")):
             raise SystemExit(f"[!] Corte #{i} incompleto (requiere nombre, inicio, fin): {c}")
     return data
 
 
+def validar_cortes(p, base: Path, nombre: str, cortes: list, duracion: float | None,
+                   solo: set | None = None) -> bool:
+    """Valida cortes.json (validar.py) e imprime errores y avisos. True si vale."""
+    res = validar.validar_cortes(cortes, duracion, base / f"{nombre}.json", p.gancho_texto)
+    return validar.informar(res, "cortes.json", solo=solo, decir=proyecto.decir)
+
+
 def run(cmd):
-    print("   $", " ".join(str(c) for c in cmd[:2]), "...")
-    r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
-    if r.returncode != 0:
-        print(r.stdout[-2000:])
-        print(r.stderr[-2000:])
-        raise SystemExit(f"[!] Fallo: {cmd[0]}")
-    return r
+    """Ejecuta sin eco; si falla, solo el nombre del binario y su error (RuntimeError)."""
+    return herramientas.ejecutar(cmd)
 
 
 def probe_dims(video: Path) -> tuple[int, int]:
-    """(ancho, alto) del vídeo, parseando stderr de ffmpeg (sin ffprobe)."""
-    r = subprocess.run([FFMPEG, "-i", str(video), "-hide_banner"],
-                       capture_output=True, text=True, errors="replace")
-    m = re.search(r"Video:.*?(\d{2,5})x(\d{2,5})", r.stderr)
-    if not m:
-        return 0, 0
-    return int(m.group(1)), int(m.group(2))
+    """(ancho, alto) de PANTALLA del vídeo (con la rotación aplicada)."""
+    return herramientas.dimensiones(video)
 
 
 def detectar_centro_x(video: Path, inicio, fin, src_w: int,
@@ -346,9 +340,11 @@ def detectar_cortes_escena(video: Path, inicio, dur, thr=0.3):
     en el mismo recorte). Best-effort: [] si algo falla.
     """
     try:
+        # Se mide sobre fotogramas reducidos (320 px): mucho más rápido en 4K.
         r = subprocess.run(
             [FFMPEG, "-ss", f"{inicio}", "-t", f"{dur}", "-i", str(video),
-             "-vf", f"select='gt(scene,{thr})',showinfo", "-an", "-f", "null", "-"],
+             "-vf", f"scale=320:-2,select='gt(scene,{thr})',showinfo",
+             "-an", "-sn", "-dn", "-f", "null", "-"],
             capture_output=True, text=True, errors="replace")
         ts = sorted({round(float(x[9:]), 2)
                      for x in re.findall(r"pts_time:[0-9.]+", r.stderr)})
@@ -407,8 +403,7 @@ def cortar_vertical(video: Path, inicio, fin, destino, src_w=0, src_h=0):
     segs = construir_segmentos(samples, sdur, src_w, src_h, cortes) if samples else None
 
     if segs:
-        _render_segmentado(video, inicio, dur, segs, destino, src_h)
-        return
+        return _render_segmentado(video, inicio, dur, segs, destino, src_h)
 
     # ---- Fallback: recorte de ALTURA COMPLETA (comportamiento previo) --------
     crop_w = int(((src_h * 9 / 16) // 2) * 2) if src_h else 0
@@ -428,6 +423,7 @@ def cortar_vertical(video: Path, inicio, fin, destino, src_w=0, src_h=0):
     run([FFMPEG, "-y", "-ss", f"{inicio}", "-t", f"{dur}", "-i", str(video),
          "-vf", vf, "-c:v", "libx264", "-crf", "20", "-preset", "veryfast",
          "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", str(destino)])
+    return f"altura completa ({encuadre})"
 
 
 def _encode_tramo(video: Path, ss, t, rect, destino):
@@ -442,11 +438,12 @@ def _encode_tramo(video: Path, ss, t, rect, destino):
 def _render_segmentado(video: Path, inicio, dur, segs, destino, src_h):
     """Renderiza el clip por tramos (un recorte por plano) y los concatena."""
     zooms = [s for s in segs if s[2][1] < 0.98 * src_h]
+    desc = f"busto {len(segs)} plano(s), {len(zooms)} con zoom"
     print(f"   [encuadre] busto adaptativo: {len(segs)} planos, "
           f"{len(zooms)} con zoom vertical (anti-piernas)")
     if len(segs) == 1:
         _encode_tramo(video, inicio + segs[0][0], dur, segs[0][2], destino)
-        return
+        return desc
     d = tempfile.mkdtemp(prefix="segmerge_")
     try:
         lista = os.path.join(d, "list.txt")
@@ -462,6 +459,19 @@ def _render_segmentado(video: Path, inicio, dur, segs, destino, src_h):
              "-c", "copy", "-movflags", "+faststart", str(destino)])
     finally:
         shutil.rmtree(d, ignore_errors=True)
+    return desc
+
+
+def escalar_vertical(video: Path, destino: Path, ss: float = 0.0, t: float | None = None):
+    """Fuente YA vertical (alto ≥ 1,7 × ancho): solo escala a 1080x1920 (con el
+    recorte mínimo para no deformar). Sin reencuadre."""
+    vf = "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1"
+    cmd = [FFMPEG, "-y", "-ss", f"{ss}"] + (["-t", f"{t}"] if t else []) + [
+        "-i", str(video), "-vf", vf, "-c:v", "libx264", "-crf", "20", "-preset", "veryfast",
+        "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart",
+        str(destino)]
+    run(cmd)
+    return "vertical: solo escala"
 
 
 def quitar_silencios(origen, destino, umbral: str = "6%", margen: str = "0.15s"):
@@ -475,8 +485,11 @@ def main():
     ap = argparse.ArgumentParser(description="Genera clips verticales 9:16 sin silencios.")
     ap.add_argument("video", help="Nombre en el input/ del proyecto o ruta al video.")
     proyecto.add_argumento(ap)
+    proyecto.add_salida(ap)
     ap.add_argument("--cortes", help="Ruta al cortes.json (por defecto "
                                      "proyectos/<id>/transcripciones/<video>/cortes.json).")
+    ap.add_argument("--validar", action="store_true",
+                    help="Solo valida cortes.json (nombres, tramos, ganchos) y sale; no corta.")
     ap.add_argument("--solo", action="append", metavar="NOMBRE",
                     help="Solo este corte (repetible o separado por comas). Para corregir un clip "
                          "sin tocar los demás.")
@@ -488,58 +501,83 @@ def main():
                     help="Cortar aunque el vídeo ya esté aprobado en _Historico/.")
     ap.add_argument("--keep-tmp", action="store_true", help="No borrar intermedios.")
     args = ap.parse_args()
-    p = proyecto.abrir(args.proyecto, "clips")
+    p = proyecto.abrir(args.proyecto, "clips", log=not args.validar,
+                       quiet=False if args.validar else args.quiet)
 
     video, nombre = resolver_video(args.video, p.input_dir)
+    base = p.transcripciones_dir / nombre
+    cortes_path = Path(args.cortes) if args.cortes else (base / "cortes.json")
+    cortes = cargar_cortes(cortes_path)
+    nombres = [c["nombre"] for c in cortes]
+    solo = proyecto.filtrar_solo(nombres, args.solo, "corte") if args.solo else None
+    dur_video = herramientas.duracion(video) if video.exists() else None
+    if args.validar:
+        sys.exit(0 if validar_cortes(p, base, nombre, cortes, dur_video, solo) else 1)
+
     if not video.exists():
         raise SystemExit(f"[!] No existe el video: {video}")
     arch = p.archivado(nombre)
     if arch and not args.forzar:
         raise SystemExit(f"[!] «{nombre}» ya está aprobado y archivado en {arch}. "
                          f"No se vuelve a cortar (usa --forzar si de verdad hace falta).")
+    if not validar_cortes(p, base, nombre, cortes, dur_video, solo):
+        raise SystemExit("[!] cortes.json tiene errores: corrígelos y relanza (no se ha cortado nada).")
 
-    base = p.transcripciones_dir / nombre
     salida = base / "clips"
     tmp = salida / "_tmp"
-    cortes_path = Path(args.cortes) if args.cortes else (base / "cortes.json")
     sil = proyecto.silencios_cli(p.silencios, args.umbral, args.margen)
-    cortes = cargar_cortes(cortes_path)
-    solo = proyecto.filtrar_solo([c["nombre"] for c in cortes], args.solo, "corte")
     if solo is not None:
         cortes = [c for c in cortes if c["nombre"] in solo]
     if (args.umbral or args.margen) and solo is None:
-        print("[!] AVISO: --umbral/--margen sin --solo se aplican a TODOS los cortes de esta "
-              "ejecución (no se guardan en proyecto.json).")
+        proyecto.decir("AVISO: --umbral/--margen sin --solo se aplican a TODOS los cortes de esta "
+                       "ejecución (no se guardan en proyecto.json).")
 
     salida.mkdir(parents=True, exist_ok=True)
     tmp.mkdir(parents=True, exist_ok=True)
     src_w, src_h = probe_dims(video)
-    encuadre = ("seguimiento de cara ON" if _CV2_OK
-               else "OpenCV NO disponible -> recorte centrado (instala "
-                    "opencv-python-headless para el seguimiento de cara)")
+    vertical = herramientas.es_vertical(src_w, src_h)
+    encuadre = ("fuente vertical: solo escala" if vertical else
+                "seguimiento de cara ON" if _CV2_OK
+                else "OpenCV NO disponible -> recorte centrado (instala "
+                     "opencv-python-headless para el seguimiento de cara)")
     print(f"Video: {video}  ({src_w}x{src_h})\n"
           f"Cortes: {cortes_path}  ({len(cortes)} clips"
           f"{', solo ' + ', '.join(sorted(solo)) if solo else ''})\nEncuadre 9:16: {encuadre}\n"
           f"Silencios: umbral {sil['umbral']} · margen {sil['margen']}"
           f"{'' if sil == p.silencios else ' (solo esta ejecución)'}\n")
 
+    hechos, fallos = 0, []
     for c in cortes:
-        cn, ini, fin = c["nombre"], c["inicio"], c["fin"]
+        cn, ini, fin = c["nombre"], float(c["inicio"]), float(c["fin"])
         titulo = c.get("titulo", "")
         print(f"\n=== {cn}  ({ini}s -> {fin}s)  {titulo}")
         vert = tmp / f"{cn}_vert.mp4"
         final = salida / f"{cn}.mp4"
-        cortar_vertical(video, ini, fin, vert, src_w=src_w, src_h=src_h)
-        quitar_silencios(vert, final, umbral=sil["umbral"], margen=sil["margen"])
+        try:
+            if vertical:
+                desc = escalar_vertical(video, vert, ss=ini, t=fin - ini)
+            else:
+                desc = cortar_vertical(video, ini, fin, vert, src_w=src_w, src_h=src_h)
+            quitar_silencios(vert, final, umbral=sil["umbral"], margen=sil["margen"])
+        except Exception as e:
+            fallos.append(cn)
+            proyecto.decir(f"FALLO {cn}.mp4 · {herramientas.describir_error(e)} (detalle en el log)")
+            continue
         # el clip ha cambiado: los word-timestamps guardados ya no valen
         (salida / f"{cn}.words.json").unlink(missing_ok=True)
+        hechos += 1
+        d = herramientas.duracion(final)
         print(f"   OK -> {final.name}  (sin subtitulos; los pone Editor_Sergio)")
+        proyecto.decir(f"OK {cn}.mp4 · {d:.0f} s (tramo {fin - ini:.0f} s) · {desc}")
 
     if tmp.exists() and not args.keep_tmp:
         shutil.rmtree(tmp, ignore_errors=True)
         print(f"   Intermedios eliminados: {tmp}")
 
-    print(f"\nListo. Clips (sin subs) en: {salida}")
+    proyecto.decir(f"RESUMEN clips: {hechos} OK · {len(fallos)} fallo(s)"
+                   + (f" ({', '.join(fallos)})" if fallos else "") + f" -> {salida}")
+    if fallos:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

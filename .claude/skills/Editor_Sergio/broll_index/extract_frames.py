@@ -9,9 +9,12 @@ Output:
 """
 import json, re, subprocess, sys, unicodedata
 from pathlib import Path
-import imageio_ffmpeg
+_RAIZ = Path(__file__).resolve().parents[4]  # TheEditor
+import sys as _sys
+_sys.path.insert(0, str(_RAIZ))
+import herramientas  # ffmpeg común de TheEditor
 
-FF = imageio_ffmpeg.get_ffmpeg_exe()
+FF = herramientas.exigir_ffmpeg()
 SRC = Path(r"C:\Users\ico858\Desktop\PruebasIA\TheEditor\superposiciones")
 OUT = Path(__file__).resolve().parent
 FRAMES = OUT / "frames"

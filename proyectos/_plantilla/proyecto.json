@@ -9,7 +9,7 @@
     "internet": false,
     "gancho_visual": "ninguno",
     "gancho_texto": true,
-    "guardar_frases": true
+    "guardar_frases": false
   },
   "encuadre": {
     "modo_por_defecto": "follow",
@@ -24,19 +24,5 @@
   },
   "frases": {
     "etiquetas_extra": []
-  },
-  "_ayuda": {
-    "tipo": "largos (vídeos largos: vía 1, o vía 2 si vienen en extractos) | clipping (vídeos ya cortados: vía 2 con recursos propios)",
-    "idioma": "idioma de la transcripción y de los subtítulos (es, en…)",
-    "recursos.broll": "banco_comun (superposiciones/ + catálogo broll_assets) | propio (solo recursos/broll/, con índice local si hay _indice.json) | ninguno",
-    "recursos.musica": "banco_comun (musicas/) | propia (solo recursos/musica/, en subcarpetas por tipología o suelta) | ninguna",
-    "recursos.internet": "false = nunca Pexels, imágenes libres ni catálogo común (el código lo bloquea)",
-    "recursos.gancho_visual": "pexels (mini-vídeo al inicio en la vía 1; exige internet: true) | ninguno",
-    "recursos.gancho_texto": "true = texto de gancho los primeros 2,5 s (cortes.json o ganchos.json)",
-    "recursos.guardar_frases": "true = guarda las frases en viral_phrases con la etiqueta proyecto:<id>",
-    "encuadre": "vía 2: modo del batch (right|left|center|auto|auto-right|follow|<fracción>) por defecto y por carpeta de input/",
-    "silencios": "ajuste global de auto-editor del proyecto (umbral %, margen s)",
-    "gancho.texto_duracion_s": "segundos del gancho de texto en pantalla",
-    "frases.etiquetas_extra": "etiquetas que se añaden a cada frase, además de proyecto:<id>"
   }
 }

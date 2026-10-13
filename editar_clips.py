@@ -35,11 +35,17 @@ Uso:
     python editar_clips.py --proyecto x "video" --sin-gancho-texto   # sin texto de gancho
     python editar_clips.py --proyecto x "video" --sin-frases         # no guarda en viral_phrases
     python editar_clips.py --proyecto x "video" --solo 03_nombre --sin-frases   # corregir un clip
+    python editar_clips.py --proyecto x "video" --sin-musica / --sin-broll   # sin ese recurso
 Si solo hay un proyecto, --proyecto se puede omitir.
+
+Solo se renderizan los clips de cortes.json, y antes se VALIDA (validar.py): si
+hay errores en los clips a renderizar, para. Con --quiet (por defecto si la
+salida no es una terminal) la consola recibe una línea por clip y el RESUMEN.
 """
 import argparse
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -58,7 +64,9 @@ for _s in (sys.stdout, sys.stderr):
 RAIZ = Path(__file__).resolve().parent
 sys.path.insert(0, str(RAIZ / ".claude" / "skills" / "Editor_Sergio"))
 import pipeline_core as pc  # noqa: E402
+import herramientas  # noqa: E402
 import proyecto  # noqa: E402
+import validar  # noqa: E402
 
 # Raíz ASCII bajo la que se crea el work dir ÚNICO por ejecución (ver main()).
 # whisper-cli/ffmpeg abren rutas ANSI, así que el intermedio va bajo whisper/
@@ -72,51 +80,20 @@ def resolver_nombre(arg: str) -> str:
     return p.stem if p.suffix else arg
 
 
-def resolver_env_supabase() -> dict:
-    """Env con credenciales de Supabase para el banco de frases virales.
-
-    Prioridad: 1) ~/.viral-pipeline/env.json (pc.ENV_PATH, el mismo que ya usa
-    el pipeline y trae SUPABASE_URL/ANON_KEY + PEXELS). 2) fallback al .env de
-    CEO_Sergete (carpeta hermana). Best-effort: devuelve {} si no hay nada.
-    """
-    env = {}
-    try:
-        if pc.ENV_PATH.exists():
-            env = json.loads(pc.ENV_PATH.read_text(encoding="utf-8"))
-    except Exception:
-        env = {}
-    if not (env.get("SUPABASE_URL") and env.get("SUPABASE_ANON_KEY")):
-        ceo_env = RAIZ.parent / "CEO_Sergete" / ".env"
-        try:
-            if ceo_env.exists():
-                for line in ceo_env.read_text(encoding="utf-8").splitlines():
-                    line = line.strip()
-                    if not line or line.startswith("#") or "=" not in line:
-                        continue
-                    k, v = line.split("=", 1)
-                    k = k.strip()
-                    v = v.strip().strip('"').strip("'")
-                    if k in ("SUPABASE_URL", "SUPABASE_ANON_KEY") and not env.get(k):
-                        env[k] = v
-        except Exception:
-            pass
-    return env
-
-
 def guardar_frases_virales(nombre: str, cortes_path: Path,
                            source_url: str = None, env: dict = None,
                            proyecto_obj=None) -> dict:
     """Lee cortes.json y guarda las frases virales en Supabase (best-effort).
 
-    Por cada corte usa `frase_viral` (texto verbatim); si falta, cae al `titulo`
-    y, en ultimo caso, al `hook_query`. Pasa tambien angle/virality/category/
+    Por cada corte usa `frase_viral` (texto verbatim); si falta, el `titulo`
+    (nunca el `hook_query`, que es una búsqueda de Pexels). Pasa también angle/virality/category/
     rationale/tags si el corte los trae. avatar_name = slug del video (nombre).
     Con `proyecto_obj`, cada frase lleva la etiqueta `proyecto:<id>`.
     Nunca lanza: si no hay env/Supabase o falla la red, avisa y continua. El
     dedup por phrase_hash en store_viral_phrases evita duplicados al re-ejecutar.
     """
     if env is None:
-        env = resolver_env_supabase()
+        env = pc.cargar_env()
     if not (env.get("SUPABASE_URL") and env.get("SUPABASE_ANON_KEY")):
         print("   [frases] sin credenciales Supabase -> no se guardan (best-effort).", flush=True)
         return {"ok": False, "reason": "sin Supabase"}
@@ -131,7 +108,7 @@ def guardar_frases_virales(nombre: str, cortes_path: Path,
 
     phrases = []
     for c in (cortes or []):
-        texto = (c.get("frase_viral") or c.get("titulo") or c.get("hook_query") or "").strip()
+        texto = (c.get("frase_viral") or c.get("titulo") or "").strip()
         if not texto:
             continue
         phrases.append({
@@ -215,10 +192,23 @@ def cargar_o_transcribir_words(clip: Path, ascii_in: Path, lang: str) -> list:
     return words
 
 
+def linea_clip(name: str, info: dict, visual: bool) -> str:
+    """Línea corta por clip para el LLM (lo demás va al log)."""
+    mus = info.get("musica")
+    mus = re.sub(r"^\s*\d+\s*[.\-)]?\s*", "", mus) if mus else "no"
+    out = (f"OK {name}.mp4 · {info.get('duracion', 0):.0f} s · "
+           f"gancho {'sí' if info.get('gancho_texto') else 'no'} · "
+           f"b-roll {info.get('broll', 0)} ({info.get('broll_sem', 0)} sem) · música {mus}")
+    if visual:
+        out += f" · visual {info.get('gancho_visual') or 'no'}"
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(description="Edicion final (Fase C) de los clips de un video.")
     ap.add_argument("video", help="Nombre del video (o ruta) cuyos clips se editan.")
     proyecto.add_argumento(ap)
+    proyecto.add_salida(ap)
     ap.add_argument("--cortes", help="Ruta al cortes.json (por defecto "
                                      "proyectos/<id>/transcripciones/<video>/cortes.json).")
     ap.add_argument("--work-dir", help="Work dir ASCII para intermedios (por defecto uno único por proceso bajo whisper/). "
@@ -227,12 +217,19 @@ def main():
                     help="No quema el texto de gancho (gancho_texto) al inicio.")
     ap.add_argument("--sin-frases", action="store_true",
                     help="No guarda las frases en viral_phrases (pruebas o re-render de correcciones).")
+    ap.add_argument("--sin-musica", action="store_true",
+                    help="Sin música en esta ejecución (p. ej. un proyecto propio aún sin música).")
+    ap.add_argument("--sin-broll", action="store_true",
+                    help="Sin b-roll en esta ejecución.")
     ap.add_argument("--solo", action="append", metavar="NOMBRE",
                     help="Solo este clip (repetible o separado por comas): corrige uno sin tocar los demás.")
     args = ap.parse_args()
-    p = proyecto.abrir(args.proyecto, "editar_clips")
-    MUSIC, OVERLAYS = p.music_dir, p.overlays_dir
-    recursos = p.politica_render()          # None = lo de siempre (banco común + internet)
+    p = proyecto.abrir(args.proyecto, "editar_clips", quiet=args.quiet)
+    proyecto.decir(p.comprobar_recursos(args.sin_broll, args.sin_musica))
+    MUSIC = None if args.sin_musica else p.music_dir
+    OVERLAYS = None if args.sin_broll else p.overlays_dir
+    # None = lo de siempre (banco común + internet)
+    recursos = p.politica_render(sin_broll=args.sin_broll, sin_musica=args.sin_musica)
     sin_gancho_texto = args.sin_gancho_texto or not p.gancho_texto
     sin_frases = args.sin_frases or not p.guardar_frases
 
@@ -241,32 +238,46 @@ def main():
     clips_dir = base / "clips"
     out = base / "finales"
     cortes_path = Path(args.cortes) if args.cortes else (base / "cortes.json")
+    if not cortes_path.exists():
+        raise SystemExit(f"[!] Falta {cortes_path}: solo se renderizan los clips de cortes.json.")
+    try:
+        cortes_lista = json.loads(cortes_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        raise SystemExit(f"[!] {cortes_path} no es un JSON válido: {e}")
     hooks = cargar_hooks(cortes_path)
     cortes_meta = cargar_cortes_meta(cortes_path)
 
     if not clips_dir.exists():
         raise SystemExit(f"[!] No hay clips en {clips_dir}. Ejecuta antes clips.py.")
 
-    # cargar env.json (trae PEXELS_API_KEY para el mini-video de gancho)
-    env = {}
-    try:
-        if pc.ENV_PATH.exists():
-            env = json.loads(pc.ENV_PATH.read_text())
-    except Exception:
-        env = {}
+    env = pc.cargar_env()        # Pexels (gancho visual) + Supabase (catálogo y frases)
     if MUSIC:
         env["MUSIC_DIR"] = str(MUSIC)
     if OVERLAYS:
         env["OVERLAYS_DIR"] = str(OVERLAYS)
     out.mkdir(parents=True, exist_ok=True)
 
-    # CONCURRENCIA: el work dir debe ser ÚNICO por ejecución. Antes se usaba un
-    # 'whisper/_edit' COMPARTIDO y se hacía rmtree al arrancar; con dos ediciones
-    # en paralelo la segunda borraba los intermedios de la primera (carrera: una
-    # edición se caía o se pisaba a media). Ahora cada proceso crea su propio dir
-    # aislado (tempfile.mkdtemp bajo whisper/, nombre ASCII garantizado y único)
-    # y solo limpia ESE al terminar; nunca un rmtree del dir global. Se puede
-    # forzar con --work-dir / EDIT_WORK_DIR (debe ser ASCII y estar bajo la raíz).
+    clips_disco = {c.stem: c for c in sorted(clips_dir.glob("*.mp4"))}
+    en_cortes = [n for n in cortes_meta if n in clips_disco]
+    sobran = sorted(set(clips_disco) - set(cortes_meta))
+    faltan = [n for n in cortes_meta if n not in clips_disco]
+    if sobran:
+        proyecto.decir(f"AVISO: clips/ sin corte en cortes.json (no se renderizan): {', '.join(sobran)}")
+    if faltan:
+        proyecto.decir(f"AVISO: cortes sin clip en clips/ (lanza clips.py): {', '.join(faltan)}")
+    solo = proyecto.filtrar_solo(en_cortes, args.solo)
+    nombres = [n for n in en_cortes if solo is None or n in solo]
+
+    # Validación de lo que se va a renderizar (sobre todo, los ganchos de texto).
+    inp = next((p.input_dir / f"{nombre}{e}" for e in proyecto.EXT_VIDEO
+                if (p.input_dir / f"{nombre}{e}").exists()), None)
+    res = validar.validar_cortes(cortes_lista, herramientas.duracion(inp) if inp else None,
+                                 base / f"{nombre}.json", not sin_gancho_texto)
+    if not validar.informar(res, "cortes.json", solo=set(nombres), decir=proyecto.decir):
+        raise SystemExit("[!] cortes.json tiene errores en los clips a renderizar: corrígelos y relanza.")
+
+    # CONCURRENCIA: work dir ÚNICO por ejecución (mkdtemp bajo whisper/, ASCII);
+    # solo se limpia ESE al terminar. Se puede forzar con --work-dir / EDIT_WORK_DIR.
     WORKBASE.mkdir(parents=True, exist_ok=True)
     supplied = args.work_dir or os.environ.get("EDIT_WORK_DIR")
     if supplied:
@@ -277,15 +288,11 @@ def main():
         workroot = Path(tempfile.mkdtemp(prefix="_edit_", dir=str(WORKBASE)))
         _work_es_propio = True
 
-    clips = sorted(clips_dir.glob("*.mp4"))
-    solo = proyecto.filtrar_solo([c.stem for c in clips], args.solo)
-    if solo is not None:
-        clips = [c for c in clips if c.stem in solo]
-    print(f"{len(clips)} clips a editar"
+    print(f"{len(nombres)} clips a editar"
           + (f" (solo {', '.join(sorted(solo))})" if solo else "") + "\n", flush=True)
-    sin_gancho, fallos = [], []
-    for clip in clips:
-        name = clip.stem
+    sin_gancho, fallos, hechos = [], [], 0
+    for name in nombres:
+        clip = clips_disco[name]
         hook = hooks.get(name) or name.split("_", 1)[-1].replace("_", " ")
         if not p.usa_gancho_visual:
             hook = None                      # proyecto sin gancho visual (o sin internet)
@@ -310,6 +317,7 @@ def main():
         ascii_in = work / "in.mp4"
         shutil.copy(str(clip), str(ascii_in))
         out_tmp = work / "out.mp4"
+        info = {}
         try:
             words = cargar_o_transcribir_words(clip, ascii_in, p.idioma)
             pc.burn_subs_and_music(
@@ -318,35 +326,35 @@ def main():
                 music_typology=music_typology, clip_text=clip_text,
                 words=words,
                 hook_text=gancho_texto, hook_text_dur=p.gancho_duracion,
-                recursos=recursos, seed=name,
+                recursos=recursos, seed=name, info=info,
             )
             shutil.move(str(out_tmp), str(out / f"{name}.mp4"))
+            hechos += 1
             print(f"   OK -> finales/{name}.mp4", flush=True)
+            proyecto.decir(linea_clip(name, info, p.usa_gancho_visual))
         except Exception as e:
             fallos.append(name)
-            traceback.print_exc()
-            print(f"   [!] FALLO en {name}: {e}", flush=True)
+            traceback.print_exc(file=sys.stdout)       # al log (y a consola con --verbose)
+            proyecto.decir(f"FALLO {name}.mp4 · {herramientas.describir_error(e)} (detalle en el log)")
 
     if _work_es_propio:
         shutil.rmtree(workroot, ignore_errors=True)
-    print(f"\nListo. Finales en: {out}", flush=True)
-    if sin_gancho:
-        print(f"AVISO sin gancho de texto ({len(sin_gancho)}): {', '.join(sin_gancho)}", flush=True)
-    if fallos:
-        print(f"FALLOS ({len(fallos)}): {', '.join(fallos)}", flush=True)
-    print(f"QC: .venv\\Scripts\\python.exe qc.py --proyecto {p.id} \"{nombre}\"  (y mira finales/_qc.jpg)",
-          flush=True)
 
     # --- Banco de frases virales (Supabase, best-effort) ---------------------
-    # Al terminar la edicion guardamos las frases virales de este video en la
-    # tabla viral_phrases para reutilizarlas mas adelante (historias, hooks...).
     if sin_frases:
         motivo = "--sin-frases" if args.sin_frases else "el proyecto tiene guardar_frases=false"
         print(f"   [frases] {motivo}: no se guardan en viral_phrases.", flush=True)
-        return
-    inp = p.input_dir / f"{nombre}.mp4"
-    source_url = str(inp) if inp.exists() else str(args.video)
-    guardar_frases_virales(nombre, cortes_path, source_url=source_url, proyecto_obj=p)
+    else:
+        source_url = str(inp) if inp else str(args.video)
+        guardar_frases_virales(nombre, cortes_path, source_url=source_url, env=env, proyecto_obj=p)
+
+    proyecto.decir(f"RESUMEN: {hechos} OK · {len(fallos)} fallo(s)"
+                   + (f" ({', '.join(fallos)})" if fallos else "")
+                   + (f" · sin gancho de texto: {', '.join(sin_gancho)}" if sin_gancho else "")
+                   + f" -> {out}")
+    proyecto.decir(f"QC: .venv\\Scripts\\python.exe qc.py --proyecto {p.id} \"{nombre}\"  (y mira finales/_qc.jpg)")
+    if fallos:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -83,10 +83,51 @@ def _exigir_red_recursos(que: str) -> None:
 # ============================================================
 # ENV (API keys + config)
 # ============================================================
+def _leer_dotenv(path: Path) -> dict:
+    """Pares CLAVE=valor de un .env (sin comentarios ni comillas)."""
+    out = {}
+    try:
+        for line in Path(path).read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            out[k.strip()] = v.strip().strip('"').strip("'")
+    except Exception:
+        pass
+    return out
+
+
+def cargar_env() -> dict:
+    """Credenciales de los scripts (el ÚNICO cargador).
+
+    1) `~/.viral-pipeline/env.json` (Supabase, Pexels y, en la vía 3, HeyGen y
+       ElevenLabs); 2) lo que falte de Supabase, de `../CEO_Sergete/.env`;
+    3) lo que falte de Pexels, de `TheEditor/.env`. Best-effort: {} si no hay nada.
+    """
+    env = {}
+    try:
+        if ENV_PATH.exists():
+            env = json.loads(ENV_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        env = {}
+    for path, claves in ((PROJECT_ROOT.parent / "CEO_Sergete" / ".env",
+                          ("SUPABASE_URL", "SUPABASE_ANON_KEY")),
+                         (PROJECT_ROOT / ".env", ("PEXELS_API_KEY",))):
+        if all(env.get(k) for k in claves) or not path.exists():
+            continue
+        extra = _leer_dotenv(path)
+        for k in claves:
+            if extra.get(k) and not env.get(k):
+                env[k] = extra[k]
+    return env
+
+
 def load_env() -> dict:
+    """Como `cargar_env()`, pero exige `env.json` (setup de la vía 3)."""
     if not ENV_PATH.exists():
         raise RuntimeError(f"Falta {ENV_PATH}. Ejecuta primero el modo setup.")
-    return json.loads(ENV_PATH.read_text())
+    return cargar_env()
 
 
 def save_env(env: dict):
@@ -97,19 +138,59 @@ def save_env(env: dict):
 # FFMPEG resolver (portable, via imageio-ffmpeg con libass)
 # ============================================================
 def get_ffmpeg_exe() -> str:
-    """Devuelve la ruta al ffmpeg bundled con libass.
-
-    Usa imageio-ffmpeg que distribuye binarios cross-platform con libass
-    compilado. Esto evita depender del ffmpeg del sistema (Homebrew/apt
-    suele no incluir libass por defecto y los subs ASS fallan).
-    """
+    """El ffmpeg de TheEditor (`herramientas.FFMPEG`): variable FFMPEG →
+    `../TheDescarga/tools/ffmpeg.exe` → imageio-ffmpeg → PATH. Todos llevan
+    libass (subtítulos ASS)."""
+    try:
+        if str(PROJECT_ROOT) not in sys.path:
+            sys.path.append(str(PROJECT_ROOT))
+        import herramientas
+        if herramientas.FFMPEG:
+            return herramientas.FFMPEG
+    except ImportError:
+        pass
     try:
         import imageio_ffmpeg
         return imageio_ffmpeg.get_ffmpeg_exe()
     except ImportError:
         raise RuntimeError(
-            "Falta `imageio-ffmpeg`. Instala con: pip install imageio-ffmpeg"
+            "Falta ffmpeg: ni herramientas.py, ni imageio-ffmpeg (pip install imageio-ffmpeg)"
         )
+
+
+# ============================================================
+# MODELOS LOCALES (cargados UNA vez por proceso)
+# ============================================================
+# Caché de fastembed junto a los modelos de Whisper (no en %TEMP%, que Windows
+# puede vaciar y dejaría sin modelo a los proyectos sin internet).
+FASTEMBED_CACHE = PROJECT_ROOT / "whisper" / "models" / "fastembed"
+_WHISPER_MODELS: dict = {}
+
+
+def whisper_model(nombre: str = "large-v3"):
+    """Modelo de faster-whisper (CPU, int8), cargado una sola vez por proceso
+    y compartido por las tres vías."""
+    if nombre not in _WHISPER_MODELS:
+        from faster_whisper import WhisperModel
+        _WHISPER_MODELS[nombre] = WhisperModel(nombre, device="cpu", compute_type="int8")
+    return _WHISPER_MODELS[nombre]
+
+
+def _fastembed_cache_dir() -> str:
+    """whisper/models/fastembed; la primera vez copia la caché vieja de %TEMP%
+    (si la hay) para no volver a descargar el modelo."""
+    d = FASTEMBED_CACHE
+    if not d.is_dir() or not any(d.iterdir()):
+        viejo = Path(tempfile.gettempdir()) / "fastembed_cache"
+        try:
+            if viejo.is_dir() and any(viejo.iterdir()):
+                import shutil as _sh
+                _sh.copytree(viejo, d, dirs_exist_ok=True)
+            else:
+                d.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            d.mkdir(parents=True, exist_ok=True)
+    return str(d)
 
 
 # ============================================================
@@ -208,9 +289,7 @@ def download_reel(url: str, out_dir: Path) -> Path:
 # ============================================================
 def transcribe_video(video_path: Path, lang: str = None) -> tuple[str, str]:
     """Returns (full_text, detected_language)."""
-    from faster_whisper import WhisperModel
-    model = WhisperModel("large-v3", device="cpu", compute_type="int8")
-    segs, info = model.transcribe(str(video_path), language=lang, word_timestamps=False)
+    segs, info = whisper_model().transcribe(str(video_path), language=lang, word_timestamps=False)
     text = " ".join(s.text.strip() for s in segs)
     return text, info.language
 
@@ -547,9 +626,10 @@ def fetch_pexels_clip(query: str, api_key: str, out_path: Path,
                       min_duration: int = 4, max_duration: int = 15) -> Path | None:
     """Descarga un clip vertical de Pexels que matchee `query`. Devuelve path o None."""
     _exigir_red_recursos("Pexels")
+    # Sin User-Agent de navegador, Pexels responde 403.
     r = httpx.get(
         "https://api.pexels.com/videos/search",
-        headers={"Authorization": api_key},
+        headers={"Authorization": api_key, "User-Agent": "Mozilla/5.0"},
         params={"query": query, "orientation": "portrait", "per_page": 10},
         timeout=30,
     )
@@ -570,7 +650,8 @@ def fetch_pexels_clip(query: str, api_key: str, out_path: Path,
                 url = vf.get("link", "")
                 if not url:
                     continue
-                with httpx.stream("GET", url, timeout=120) as resp:
+                with httpx.stream("GET", url, timeout=120, follow_redirects=True,
+                                  headers={"User-Agent": "Mozilla/5.0"}) as resp:
                     with open(out_path, "wb") as f:
                         for c in resp.iter_bytes():
                             f.write(c)
@@ -642,10 +723,9 @@ def fetch_free_image(query: str, out_path: Path) -> Path | None:
     Prioriza RELEVANCIA (se recorta a vertical luego, no se filtra por aspecto):
       1) Openverse — fotografías de uso comercial, ordenadas por relevancia.
       2) Wikimedia Commons — búsqueda de imágenes libres.
-      3) Lorem Picsum — fallback aleatorio (sin búsqueda).
-    Devuelve Path o None. Sin API key.
+    Devuelve Path o None (nunca una foto al azar). Sin API key.
     """
-    _exigir_red_recursos("imagen libre (Openverse/Wikimedia/Picsum)")
+    _exigir_red_recursos("imagen libre (Openverse/Wikimedia)")
     headers = {"User-Agent": "viral-pipeline/1.0 (editor local)"}
 
     # 1) Openverse — por relevancia, solo fotografías, uso comercial
@@ -684,9 +764,7 @@ def fetch_free_image(query: str, out_path: Path) -> Path | None:
     except Exception:
         pass
 
-    # 3) Fallback: Lorem Picsum (libre, aleatoria)
-    if _download_image("https://picsum.photos/1080/1920", out_path, headers):
-        return out_path
+    # Sin más respaldo: mejor sin gancho visual que con una foto al azar.
     return None
 
 
@@ -895,6 +973,7 @@ def _broll_windows_from_speech(phrases: list[dict], duration: float,
 # None y el caller cae a selección local al azar.
 # ============================================================
 _EMBED_MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+BROLL_AZAR_MAX = 1      # b-roll al azar (sin coincidencia ≥ 0,30) como mucho por clip
 _embed_model = None
 _broll_aviso_cache = None
 
@@ -902,8 +981,11 @@ _broll_aviso_cache = None
 def _get_embed_model():
     global _embed_model
     if _embed_model is None:
+        import warnings
+        warnings.filterwarnings("ignore", message=".*mean pooling.*")
         from fastembed import TextEmbedding
-        _embed_model = TextEmbedding(model_name=_EMBED_MODEL_NAME)
+        _embed_model = TextEmbedding(model_name=_EMBED_MODEL_NAME,
+                                     cache_dir=_fastembed_cache_dir())
     return _embed_model
 
 
@@ -1128,14 +1210,24 @@ def _music_typologies(music_dir: Path) -> dict:
     return out
 
 
+MUSIC_EXTS = (".mp3", ".wav", ".m4a")
+
+
 def _list_music_files(folder) -> list:
-    """MP3 dentro de una carpeta de tipología (sin recursión extra)."""
+    """Audios (.mp3, .wav, .m4a) de una carpeta de tipología (sin recursión).
+
+    Los MP3 se listan como siempre (glob «*.mp3» + «*.MP3»: en Windows cada uno
+    sale dos veces) para que la semilla de cada clip siga eligiendo la misma
+    canción; los .wav/.m4a se añaden detrás."""
     if not folder:
         return []
     f = Path(folder)
     if not f.is_dir():
         return []
-    return sorted(list(f.glob("*.mp3")) + list(f.glob("*.MP3")))
+    mp3 = sorted(list(f.glob("*.mp3")) + list(f.glob("*.MP3")))
+    otros = sorted(p for p in f.iterdir()
+                   if p.is_file() and p.suffix.lower() in MUSIC_EXTS[1:])
+    return mp3 + otros
 
 
 def _cosine(a, b) -> float:
@@ -1374,11 +1466,27 @@ AUDIO_ENC = ["-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2"]
 def transcribe_words(video: Path, lang: str = "es") -> list[dict]:
     """Word-timestamps (faster-whisper large-v3) con palabrotas enmascaradas:
     lo que usan los subtítulos y la sincronía del b-roll."""
-    from faster_whisper import WhisperModel
-    model = WhisperModel("large-v3", device="cpu", compute_type="int8")
-    segs, _info = model.transcribe(str(video), language=lang, word_timestamps=True)
+    segs, _info = whisper_model().transcribe(str(video), language=lang, word_timestamps=True)
     return [{"word": _mask_profanidad(w.word.strip()), "start": w.start, "end": w.end}
             for s in segs for w in s.words]
+
+
+def transcribe_words_y_texto(video: Path, lang: str = "es") -> tuple[list, str]:
+    """UNA transcripción -> (words enmascaradas para los subtítulos, texto
+    verbatim limpio). La usa el batch (vía 2)."""
+    segs, _info = whisper_model().transcribe(str(video), language=lang, word_timestamps=True)
+    words, raw = [], []
+    for s in segs:
+        for w in s.words:
+            t = w.word.strip()
+            if not t:
+                continue
+            words.append({"word": _mask_profanidad(t), "start": w.start, "end": w.end})
+            raw.append(t)
+    texto = " ".join(raw).strip()
+    for a, b in ((" ,", ","), (" .", "."), (" ?", "?"), (" !", "!"), (" :", ":"), (" ;", ";")):
+        texto = texto.replace(a, b)
+    return words, texto
 
 
 def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
@@ -1392,8 +1500,13 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
                         hook_text: str = None,
                         hook_text_dur: float = None,
                         recursos: dict = None,
-                        seed: str = None) -> Path:
+                        seed: str = None,
+                        info: dict = None) -> Path:
     """Render final: gancho + B-roll + música + de-click + subs ASS karaoke.
+
+    `info` (dict opcional): se rellena con el resumen del render para la línea
+    corta de los scripts: broll, broll_sem, musica (carpeta), gancho_texto,
+    gancho_visual, duracion.
 
     `seed` (nombre del clip): toda elección al azar (música y b-roll) sale de
     `random.Random(seed)`, así que re-renderizar un clip da la misma música y el
@@ -1424,16 +1537,19 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
 
     B-roll a pantalla completa SINCRONIZADO con la voz: cada corte entra al
     arrancar una frase y sale en la pausa siguiente (se transcribe el avatar
-    con word-timestamps y se derivan las ventanas); si no se detectan frases,
-    cae a intervalos regulares. Prioriza SUPERPOSICIONES LOCALES (carpeta
-    `superposiciones/`, o `env['OVERLAYS_DIR']`): coge vídeos locales al azar y
-    los coloca en esas ventanas. Pexels queda como fallback solo si no hay
-    superposiciones locales y `env['PEXELS_API_KEY']` + `broll_keywords` están
-    definidos.
+    con word-timestamps y se derivan las ventanas), nunca bajo los ganchos.
+    Cada ventana lleva el vídeo local (`superposiciones/`, `env['OVERLAYS_DIR']`
+    o el propio del proyecto) que casa por significado (≥ 0,30); sin
+    coincidencia, como mucho UNO al azar por clip (`BROLL_AZAR_MAX`). Pexels
+    queda como fallback solo si no hay superposiciones locales y
+    `env['PEXELS_API_KEY']` + `broll_keywords` están definidos.
     """
     import random
     rng = random.Random(str(seed)) if seed else random.Random()
     ff = get_ffmpeg_exe()
+    info = info if info is not None else {}
+    info.update({"broll": 0, "broll_sem": 0, "musica": None,
+                 "gancho_texto": False, "gancho_visual": False, "duracion": 0.0})
     pol = _politica_recursos(recursos)
     legacy = pol["legacy"]
     # Red para RECURSOS: la del proyecto y, además, la guarda del proceso.
@@ -1459,6 +1575,7 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
             print(f"  [música] AVISO: {music_log} -> sin música")
         else:
             print(f"  [música] {music_log}")
+            info["musica"] = music.parent.name if music.parent != Path(music_dir) else "(raíz)"
 
     # PASO 0: word-timestamps del avatar. El audio es idéntico en toda la
     # composición (hook y b-roll son overlays de vídeo: no tocan audio ni
@@ -1476,20 +1593,27 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
     # Ventanas de b-roll SINCRONIZADAS con la voz: (start, end, texto-de-frase).
     # Si no hay frases → intervalos (legacy).
     phrases = _phrases_from_words(words)
-    windows_full = _broll_windows_from_speech(phrases, duration)
+    # Nada de b-roll bajo los ganchos: ni el visual (2,5 s) ni el de texto
+    # (su duración real, que puede ser mayor).
+    hook_guard = HOOK_TEXT_DUR
+    if hook_text and hook_text.strip():
+        hook_guard = max(hook_guard, float(hook_text_dur or HOOK_TEXT_DUR))
+    windows_full = _broll_windows_from_speech(phrases, duration, hook_dur=hook_guard)
 
-    # B-roll a pantalla completa. Prioridad: superposiciones LOCALES; Pexels
-    # solo como fallback.
+    # B-roll a pantalla completa, CON INTENCIÓN: cada ventana lleva el b-roll que
+    # casa por significado (≥ 0,30). Sin coincidencia, como mucho UNO al azar
+    # por clip (BROLL_AZAR_MAX); el resto de ventanas se quedan sin b-roll.
     clips = []
     windows = []
+    n_sem = 0
     if pol["broll"] == "propio":
-        # SOLO el b-roll del proyecto: índice semántico local o azar SIN repetir
-        # dentro del clip. Nunca el catálogo común ni Pexels.
+        # SOLO el b-roll del proyecto: índice semántico local (o azar, máx. 1).
+        # Nunca el catálogo común ni Pexels.
         by_rel = list_overlays_recursive(overlays_dir) if overlays_dir else {}
         indice = IndiceBrollLocal.cargar(pol["broll_indice"])
         avisos = indice.avisos if indice else set()
         used = set()
-        n_sem = 0
+        n_azar = 0
         if by_rel and windows_full:
             for (s, e, text) in windows_full:
                 rel = indice.match(text, exclude=used) if (indice and text) else None
@@ -1497,21 +1621,20 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
                     src = "sem-local"; n_sem += 1
                 else:
                     pool = [r for r in by_rel if r not in used and r not in avisos]
-                    if not pool:
-                        print(f"  [broll] {s:.1f}-{e:.1f}s -> sin b-roll propio sin repetir (se omite)")
+                    if not pool or n_azar >= BROLL_AZAR_MAX:
+                        print(f"  [broll] {s:.1f}-{e:.1f}s -> sin coincidencia (se omite)")
                         continue
-                    rel = rng.choice(pool); src = "azar"
+                    rel = rng.choice(pool); src = "azar"; n_azar += 1
                 used.add(rel)
                 clips.append(by_rel[rel]); windows.append((s, e))
                 print(f"  [broll] {s:.1f}-{e:.1f}s -> {rel} ({src})")
             print(f"  [broll] {len(clips)} cortes propios sinc. con la voz "
                   f"({n_sem} por índice local{'' if indice else '; sin índice'})")
         elif by_rel:
-            n = max(1, int(duration // 6))
             pool = [r for r in by_rel if r not in avisos]
             rng.shuffle(pool)
-            clips = [by_rel[r] for r in pool[:n]]
-            print(f"  [broll] {len(clips)} b-roll propios (intervalos, sin frases): "
+            clips = [by_rel[r] for r in pool[:BROLL_AZAR_MAX]]
+            print(f"  [broll] {len(clips)} b-roll propio al azar (sin frases): "
                   + ", ".join(c.name for c in clips))
         else:
             print(f"  [broll] el proyecto no tiene b-roll propio en {overlays_dir} -> sin b-roll")
@@ -1526,46 +1649,46 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
         overlays = _list_overlay_videos(overlays_dir)
         if overlays and not net_ok:
             # Banco común SIN internet: nada de catálogo (Supabase) ni de clips
-            # que vinieron de internet (pexels_*); azar local sin repetir.
+            # que vinieron de internet (pexels_*); sin semántica -> máx. 1 al azar.
             overlays = [o for o in overlays if not o.name.lower().startswith("pexels_")]
-            used = set()
-            for (s, e, text) in windows_full:
-                pool = [o for o in overlays if o.name not in used]
-                if not pool:
+            for (s, e, text) in windows_full[:BROLL_AZAR_MAX]:
+                if not overlays:
                     break
-                clip = rng.choice(pool); used.add(clip.name)
+                clip = rng.choice(overlays)
                 clips.append(clip); windows.append((s, e))
                 print(f"  [broll] {s:.1f}-{e:.1f}s -> {clip.name} (azar, sin internet)")
             overlays = []
 
     if overlays and windows_full:
         # SELECCIÓN SEMÁNTICA: por cada ventana (=frase) pedimos a Supabase
-        # (match_broll) el b-roll más afín; si no supera umbral o no hay
-        # Supabase, caemos a uno LOCAL al azar. Evitamos repetir clip y los
-        # marcados 'aviso-*' (marca/persona/calidad).
+        # (match_broll) el b-roll más afín. Sin coincidencia ≥ umbral (o sin
+        # Supabase), como mucho UNO local al azar por clip. Sin repetir clip y
+        # sin los marcados 'aviso-*' (marca/persona/calidad).
         by_name = {p.name: p for p in overlays}
         avisos = _broll_avisos(env or {})
         used = set()
-        n_sem = 0
+        n_azar = 0
         for (s, e, text) in windows_full:
             fn = broll_match_filename(text, env or {}, exclude=used) if (env and text) else None
             if fn and fn in by_name:
                 clip = by_name[fn]; used.add(fn); src = "sem"; n_sem += 1
-            else:
+            elif n_azar < BROLL_AZAR_MAX:
                 pool = ([o for o in overlays if o.name not in used and o.name not in avisos]
                         or [o for o in overlays if o.name not in used] or overlays)
-                clip = rng.choice(pool); used.add(clip.name); src = "azar"
+                clip = rng.choice(pool); used.add(clip.name); src = "azar"; n_azar += 1
+            else:
+                print(f"  [broll] {s:.1f}-{e:.1f}s -> sin coincidencia (se omite)")
+                continue
             clips.append(clip); windows.append((s, e))
             print(f"  [broll] {s:.1f}-{e:.1f}s -> {clip.name} ({src})")
         print(f"  [broll] {len(clips)} cortes sinc. con la voz ({n_sem} por semántica)")
     elif overlays:
-        # sin frases detectadas → intervalos regulares (legacy), clips al azar
+        # sin frases detectadas → sin semántica posible: como mucho 1 al azar
         avisos = _broll_avisos(env or {})
-        n = max(1, int(duration // 6))
         pool = [o for o in overlays if o.name not in avisos] or overlays
         rng.shuffle(pool)
-        clips = (pool * (n // len(pool) + 1))[:n]
-        print(f"  [broll] {len(clips)} superposiciones locales (intervalos, sin frases): "
+        clips = pool[:BROLL_AZAR_MAX]
+        print(f"  [broll] {len(clips)} superposición local al azar (sin frases): "
               + ", ".join(c.name for c in clips))
     elif banco_broll and net_ok and not clips:
         pexels_key = (env or {}).get("PEXELS_API_KEY", "").strip()
@@ -1581,6 +1704,7 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
                 else:
                     print(f"    [{i}] '{kw}' → SIN RESULTADO")
 
+    info["broll"], info["broll_sem"] = len(clips), n_sem
     if clips:
         base_video = heygen_mp4.parent / "with_broll.mp4"
         if windows:
@@ -1610,6 +1734,7 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
                 apply_hook_video(base_video, clip, hooked)
                 base_video = hooked
                 done = True
+                info["gancho_visual"] = "pexels"
             else:
                 print(f"  [hook] sin video Pexels para '{hook_query}'")
         if not done:
@@ -1618,6 +1743,7 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
                 print(f"  [hook] (fallback) imagen libre '{hook_query}' → {img.name}")
                 apply_hook_image(base_video, img, hooked)
                 base_video = hooked
+                info["gancho_visual"] = "imagen"
             else:
                 print(f"  [hook] sin gancho disponible para '{hook_query}' (se omite)")
 
@@ -1688,11 +1814,12 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
         # Gancho de texto: PNG transparente superpuesto desde t=0, con fundido de
         # salida, y los subtítulos quemados ENCIMA (mismo pase: sin reencode extra).
         hook_png = base_video.parent / "hook_text.png"
-        info = render_hook_text_png(hook_text, hook_png)
+        hk_info = render_hook_text_png(hook_text, hook_png)
         hk_dur = max(0.5, min(float(hook_text_dur or HOOK_TEXT_DUR), dur - 0.05))
         fade_st = max(0.0, hk_dur - HOOK_TEXT_FADE)
-        print(f"  [gancho texto] «{' / '.join(info['lines'])}» "
-              f"({info['font_size']} px, 0-{hk_dur:.1f}s)")
+        print(f"  [gancho texto] «{' / '.join(hk_info['lines'])}» "
+              f"({hk_info['font_size']} px, 0-{hk_dur:.1f}s)")
+        info["gancho_texto"] = True
         filt2 = (
             f"[1:v]format=rgba,fade=t=out:st={fade_st:.3f}:d={HOOK_TEXT_FADE}:alpha=1[hk];"
             f"[0:v][hk]overlay=x=0:y=0:eof_action=pass:format=auto[hv];"
@@ -1710,6 +1837,7 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
             "-vf", vf_subs, *enc,
         ], check=True, capture_output=True)
     pass1.unlink(missing_ok=True)
+    info["duracion"] = round(dur, 1)
     return out_mp4
 
 
@@ -1740,11 +1868,11 @@ def _find_broll_sfx(music_dir: Path):
     """Localiza el SFX de click para las entradas de b-roll.
 
     Busca en <assets>/sfx/*.mp3|wav (assets = carpeta padre de music_dir),
-    en <cwd>/viral-pipeline-assets/sfx/, o un click.* junto a music_dir.
-    Devuelve Path o None.
+    en <TheEditor>/viral-pipeline-assets/sfx/, o un click.* junto a music_dir.
+    Devuelve Path o None (no depende del cwd).
     """
     cands = []
-    for base in (music_dir.parent, Path.cwd() / "viral-pipeline-assets"):
+    for base in (Path(music_dir).parent, PROJECT_ROOT / "viral-pipeline-assets"):
         sfx_dir = base / "sfx"
         if sfx_dir.is_dir():
             cands += sorted(sfx_dir.glob("*.mp3")) + sorted(sfx_dir.glob("*.wav"))
@@ -1848,6 +1976,30 @@ def _merge_number_tokens(words):
     return out
 
 
+# Medida de un grupo de subtítulos con la MISMA fuente y tamaño que libass
+# (Style: Montserrat 76, Outline 6; libass reparte el tamaño entre ascendente y
+# descendente, así que el em real es 76 * upem / (asc + desc) ≈ 62 px).
+_SUBS_FONT_SIZE, _SUBS_OUTLINE, _SUBS_MARGIN = 76, 6, 80
+_SUBS_MAX_W = 1080 - 2 * _SUBS_MARGIN       # 920 px: zona segura (para unir grupos)
+_SUBS_FRAME_W = 1080 - 2 * _SUBS_OUTLINE    # lo que cabe en pantalla (para partir)
+_subs_font = None
+
+
+def _subs_ancho(grp: list) -> float:
+    """Ancho en px (1080 de ancho) del grupo tal como se quema; 0 si no hay fuente."""
+    global _subs_font
+    try:
+        if _subs_font is None:
+            from PIL import ImageFont
+            ttf = str(FONTS_DIR / "Montserrat-Bold.ttf")
+            a, d = ImageFont.truetype(ttf, 100).getmetrics()
+            _subs_font = ImageFont.truetype(ttf, round(_SUBS_FONT_SIZE * 100 / (a + d)))
+        texto = _cap_first_alpha(" ".join((w.get("word") or "").strip() for w in grp).lower())
+        return _subs_font.getlength(texto) + 2 * _SUBS_OUTLINE
+    except Exception:
+        return 0.0
+
+
 def _subs_weak(word: str) -> bool:
     """¿Palabra débil (artículo, preposición, «que»…) que no debe cerrar un
     grupo de subtítulos? Con puntuación detrás (pausa o fin de frase) no lo es."""
@@ -1861,7 +2013,10 @@ def _generate_ass_karaoke(words, ass_path: Path):
     """Subtítulos legibles y limpios (sin animación):
       - 1 sola línea, máximo 3 palabras, en minúsculas; el grupo se corta tras
         un fin de frase y nunca acaba en palabra débil (`_HOOK_WEAK`) si hay
-        otra detrás (unidad de sentido).
+        otra detrás (unidad de sentido). Un grupo de UNA palabra se une al
+        anterior (o, si no puede, al siguiente) si quedan ≤ 4 y no cruza un fin
+        de frase ni una pausa larga (ni se sale de la zona segura). Un grupo que
+        no cabe en pantalla se parte, y nunca se solapa con el siguiente.
       - Montserrat, blanco con RESEGUIDO NEGRO grueso + sombra suave.
       - Centrados horizontalmente y ubicados a la altura de la BARBILLA
         (ni tapan boca/ojos ni quedan al fondo de la pantalla).
@@ -1877,13 +2032,8 @@ def _generate_ass_karaoke(words, ass_path: Path):
     # agrupar: así el número queda en una sola unidad, nunca a caballo entre dos
     # líneas/grupos ni con un espacio espurio en medio.
     ws = _merge_number_tokens(ws)
-    chunks = []
+    grupos = []
     i = 0
-    # Estilo en minúsculas PERO respetando ortografía: la 1ª letra del texto y
-    # la 1ª letra tras un punto (y por coherencia tras ? ! …) van en MAYÚSCULA.
-    # `cap_next` persiste ENTRE chunks (el fin de oración puede caer al final de
-    # un grupo y la mayúscula toca a la 1ª palabra del grupo siguiente).
-    cap_next = True
     while i < len(ws):
         grp = ws[i:i + 3]  # máximo 3 palabras
         # cortar el grupo si hay un silencio grande entre palabras o si una
@@ -1895,10 +2045,56 @@ def _generate_ass_karaoke(words, ass_path: Path):
                 cut = j
                 break
         grp = grp[:cut]
+        # un grupo que no cabe en pantalla (se cortaría por los lados) se parte
+        while len(grp) > 1 and _subs_ancho(grp) > _SUBS_FRAME_W:
+            grp = grp[:-1]
         # unidad de sentido: el grupo no acaba en artículo/preposición/«que»…
         # (_HOOK_WEAK) si hay palabra después; esa palabra pasa al grupo siguiente
         while len(grp) > 1 and i + len(grp) < len(ws) and _subs_weak(grp[-1]["word"]):
             grp = grp[:-1]
+        grupos.append(grp)
+        i += len(grp)
+
+    # Sin grupos de UNA palabra cuando se pueda: se une al grupo anterior si
+    # quedan ≤ 4 palabras, sin cruzar un fin de frase ni una pausa larga, y sin
+    # dejar una palabra débil al final si hay más detrás.
+    # Si no puede ir con el anterior (p. ej. abre frase), va con el siguiente en
+    # las mismas condiciones.
+    unidos = []
+    pendiente = None                       # palabra suelta a anteponer al siguiente
+    for k, grp in enumerate(grupos):
+        if pendiente is not None:
+            grp = pendiente + grp
+            pendiente = None
+        if len(grp) == 1:
+            w = grp[0]
+            hay_mas = k + 1 < len(grupos)
+            if unidos:
+                prev = unidos[-1]
+                if (len(prev) + 1 <= 4
+                        and not _SUBS_SENT_END_RE.search((prev[-1]["word"] or "").strip())
+                        and w["start"] - prev[-1]["end"] <= 0.7
+                        and not (hay_mas and _subs_weak(w["word"]))
+                        and _subs_ancho(prev + grp) <= _SUBS_MAX_W):
+                    unidos[-1] = prev + grp
+                    continue
+            if hay_mas:
+                sig = grupos[k + 1]
+                if (len(sig) + 1 <= 4
+                        and not _SUBS_SENT_END_RE.search((w["word"] or "").strip())
+                        and sig[0]["start"] - w["end"] <= 0.7
+                        and _subs_ancho(grp + sig) <= _SUBS_MAX_W):
+                    pendiente = grp
+                    continue
+        unidos.append(grp)
+
+    chunks = []
+    # Estilo en minúsculas PERO respetando ortografía: la 1ª letra del texto y
+    # la 1ª letra tras un punto (y por coherencia tras ? ! …) van en MAYÚSCULA.
+    # `cap_next` persiste ENTRE chunks (el fin de oración puede caer al final de
+    # un grupo y la mayúscula toca a la 1ª palabra del grupo siguiente).
+    cap_next = True
+    for grp in unidos:
         parts = []
         for w in grp:
             raw = (w["word"] or "").strip()
@@ -1914,7 +2110,11 @@ def _generate_ass_karaoke(words, ass_path: Path):
         if end <= grp[0]["start"]:
             end = grp[0]["start"] + 0.3
         chunks.append({"start": grp[0]["start"], "end": end, "text": text})
-        i += len(grp)
+    # Un grupo nunca se solapa con el siguiente (libass los apilaría en dos
+    # líneas): su fin se recorta al inicio del siguiente.
+    for a, b in zip(chunks, chunks[1:]):
+        if a["end"] > b["start"] > a["start"]:
+            a["end"] = b["start"]
 
     lines = [
         "[Script Info]", "ScriptType: v4.00+", "PlayResX: 1080", "PlayResY: 1920",
@@ -2061,6 +2261,16 @@ def _hook_layout(tokens: list[str], max_w: int):
     if cur:
         lines.append(cur)
     return font, stroke, lines
+
+
+def hook_text_lines(text: str, width: int = _HOOK_W) -> list[str]:
+    """Líneas en que se partiría el gancho de texto (el MISMO cálculo que
+    `render_hook_text_png`), sin dibujar nada. La usa la validación."""
+    disp = format_hook_text(text)
+    if not disp:
+        return []
+    max_w = width - 2 * _HOOK_SIDE - 2 * _HOOK_PAD_X
+    return _hook_layout(_hook_tokens(disp), max_w)[2]
 
 
 def render_hook_text_png(text: str, out_png: Path,

@@ -32,35 +32,18 @@ import tempfile
 from fractions import Fraction
 from pathlib import Path
 
+import herramientas
 import proyecto
 
 RAIZ = Path(__file__).resolve().parent
-_WINGET_BIN = Path(r"C:\Users\ico858\AppData\Local\Microsoft\WinGet\Packages"
-                   r"\yt-dlp.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe"
-                   r"\ffmpeg-N-125875-g5d4d3bdc61-win64-gpl\bin")
 
 BITRATE_MIN, BITRATE_MAX = 8.0, 12.0      # Mb/s (vídeo)
 THUMB_W, THUMB_H = 216, 384               # miniaturas de la hoja (1/5 de 1080x1920)
 
-
-def _bin(nombre: str) -> str:
-    """ffmpeg/ffprobe: el de winget (build completo) o el del PATH."""
-    fijo = _WINGET_BIN / f"{nombre}.exe"
-    if fijo.exists():
-        return str(fijo)
-    hallado = shutil.which(nombre)
-    if hallado:
-        return hallado
-    if nombre == "ffmpeg":
-        try:
-            import imageio_ffmpeg
-            return imageio_ffmpeg.get_ffmpeg_exe()
-        except Exception:
-            pass
-    raise SystemExit(f"[!] No encuentro {nombre} (ni winget ni PATH).")
-
-
-FFMPEG, FFPROBE = _bin("ffmpeg"), _bin("ffprobe")
+FFMPEG = herramientas.exigir_ffmpeg()
+FFPROBE = herramientas.FFPROBE
+if not FFPROBE:
+    raise SystemExit("[!] qc.py necesita ffprobe (TheDescarga/tools, FFPROBE o el PATH).")
 
 
 def _fps(s: str | None) -> float | None:
@@ -166,8 +149,9 @@ def fuente_fps(p, v: str, clip: str) -> float | None:
     en _Historico/<id>/<v>/_fuente/."""
     cands = []
     for base in (p.input_dir, p.historico_dir / v / "_fuente"):
-        cands.append(base / v / f"{clip}.mp4")
-        cands.append(base / f"{clip}.mp4")
+        for ext in proyecto.EXT_CLIPS:
+            cands.append(base / v / f"{clip}{ext}")
+            cands.append(base / f"{clip}{ext}")
         cands += [base / f"{v}{ext}" for ext in (".mp4", ".mkv", ".mov", ".webm")]
     for c in cands:
         if c.is_file():

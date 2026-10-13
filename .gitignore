@@ -40,3 +40,8 @@ desktop.ini
 
 # Logs de ejecuciones (batch, fixes)
 *.log
+
+# Salidas de la indexación del catálogo común (broll_index/): se regeneran
+.claude/skills/Editor_Sergio/broll_index/frames/
+.claude/skills/Editor_Sergio/broll_index/sem/
+.claude/skills/Editor_Sergio/broll_index/broll_*.json
