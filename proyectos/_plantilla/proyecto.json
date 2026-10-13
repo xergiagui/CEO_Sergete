@@ -6,9 +6,7 @@
   "nicho": "<de qué escribe>",
   "autor": "<quién firma>",
   "marca": "marca/BRAND.md y marca/VOICE.md",
-  "landing": "<url de la landing para los CTA, o vacío>",
-  "afiliado": "<parámetro de afiliado (p. ej. ?via=…), o vacío>",
-  "_cta": "<dónde están las URL reales de las ofertas para los CTA, si las hay>",
   "enlaces_internos": [],
-  "reglas": []
+  "reglas": [],
+  "_identidad": "Landing, afiliado, voz, palabras prohibidas y afiliación: CEO_Sergete/proyectos.json → identidad. URL de las ofertas: TheCopy/proyectos/<id>/ofertas.json."
 }

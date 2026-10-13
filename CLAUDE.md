@@ -29,9 +29,13 @@ SERP). **También pendiente:** formato de entrega final (Markdown por defecto).
 ## Por proyecto
 
 Cada proyecto (índice en `CEO_Sergete/proyectos.json`) tiene `proyectos/<id>/`:
-- `proyecto.json`: blog de destino, nicho, autor, idioma, `landing` y
-  `afiliado` (para los CTA), enlaces internos y reglas;
-- `marca/BRAND.md` y `marca/VOICE.md` (voz).
+- `proyecto.json`: blog de destino, nicho, autor, idioma, enlaces internos y
+  reglas propias del blog;
+- `marca/BRAND.md` y `marca/VOICE.md` (voz del blog, si se definen).
+
+La **identidad** del proyecto (landing y parámetro de afiliado para los CTA, voz,
+palabras prohibidas, afiliación, no suplantar) es fuente única en
+`CEO_Sergete/proyectos.json → identidad`: léela de ahí, no la copies aquí.
 
 Blog, marca, voz y autor se definen **por proyecto**. Si no se dice el proyecto
 y solo hay uno, es ese; si hay varios, pregunta. Proyecto nuevo: copia
@@ -41,8 +45,9 @@ y solo hay uno, es ese; si hay varios, pregunta. Proyecto nuevo: copia
 
 ## Arranque: lo único que se lee
 
-1. Este `CLAUDE.md`, `referencias/checklist.md` y `proyectos/<id>/proyecto.json`
-   (y `marca/*.md` solo si existen y no están PENDIENTES).
+1. Este `CLAUDE.md`, `referencias/checklist.md`, `proyectos/<id>/proyecto.json`
+   (y `marca/*.md` solo si existen y no están PENDIENTES) y la identidad:
+   `"$PY" -c "import json;print(json.dumps([p['identidad'] for p in json.load(open('C:/Users/ico858/Desktop/PruebasIA/CEO_Sergete/proyectos.json',encoding='utf-8'))['proyectos'] if p['id']=='<id>'][0],ensure_ascii=False,indent=1))"`
 2. **Comprueba los PENDIENTES antes de leer nada más:**
    - **Bloqueantes:** tema/keyword, público y, si se pide un tipo concreto, que
      ese tipo no siga PENDIENTE. Si falta uno, devuelve al CEO las preguntas
@@ -51,8 +56,8 @@ y solo hay uno, es ese; si hay varios, pregunta. Proyecto nuevo: copia
      - autor → firma provisional `author: "[AUTOR PENDIENTE]"`;
      - blog de destino → `{siteUrl}` y `{organizacion}` se quedan como
        marcador en el schema; canonical N/A;
-     - voz → voz provisional = `tono` de TheCopy (solo ese campo):
-       `"$PY" -c "import json;print(json.load(open('C:/Users/ico858/Desktop/PruebasIA/TheCopy/proyectos/<id>/proyecto.json',encoding='utf-8'))['tono'])"`
+     - voz del blog → voz provisional = `identidad.voz` (persona y tono), con
+       sus `palabras_prohibidas`.
 
 ## Cómo se ejecutan los scripts (Windows, Git Bash)
 

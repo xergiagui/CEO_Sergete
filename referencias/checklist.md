@@ -34,8 +34,8 @@
 - **Puntuación:** la raya de inciso (—así—) está permitida en español; úsala
   con moderación y nunca para pegar dos oraciones (ahí va punto o dos puntos).
   Comillas españolas « ».
-- **Voz:** la de `marca/VOICE.md` o, si está PENDIENTE, la provisional (`tono`
-  de TheCopy). Español de España.
+- **Voz:** la de `marca/VOICE.md` o, si está PENDIENTE, la provisional
+  (`identidad.voz`: persona y tono). Español de España.
 
 ### Muletillas de IA en español
 
@@ -170,21 +170,22 @@ robots, sitemap y enlaces de vuelta. En el informe: `SEO X/12`.
 
 ## 6. Reglas del proyecto
 
-- Cumple las `reglas` de `proyecto.json`.
+- Cumple las `reglas` de `proyecto.json` y la identidad (`no_suplantar`,
+  `palabras_prohibidas`, `transparencia_afiliacion`).
 - **Aviso de afiliación visible** si hay algún enlace de afiliado, antes del
   primero (tras los «Puntos clave» basta): «Este artículo contiene enlaces de
   afiliado: si compras a través de ellos, el autor recibe una comisión sin
   coste extra para ti».
-- **Enlaces de afiliado** (los que llevan el parámetro `afiliado`) en HTML con
+- **Enlaces de afiliado** (los que llevan el parámetro `identidad.afiliado`) en HTML con
   `rel="sponsored"`: `<a href="URL?via=…" rel="sponsored">ancla</a>`. Solo URL
-  reales (ver `_cta` en `proyecto.json`), nunca inventadas. Los enlaces a la
-  `landing` son normales.
+  reales (las de las ofertas: `TheCopy/proyectos/<id>/ofertas.json`), nunca
+  inventadas. Los enlaces a la `identidad.landing` son normales.
 - **Ninguna promesa de ingresos ni de resultados:** nada de «gana X €»,
   «garantizado» ni plazos de éxito. Resultados de otros, solo con fuente y sin
   presentarlos como lo esperable.
 - Dinero y negocio son temas YMYL: prudencia y nada de asesoramiento
   financiero ni legal personalizado.
-- Un solo CTA, acorde con el tema: la oferta que encaje o la `landing`.
+- Un solo CTA, acorde con el tema: la oferta que encaje o la `identidad.landing`.
 
 ## 7. Autor (E-E-A-T)
 
