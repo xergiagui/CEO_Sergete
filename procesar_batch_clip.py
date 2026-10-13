@@ -27,7 +27,10 @@ Gancho de texto (lo escribe el editor/LLM, nunca se genera mecánicamente):
        (también vale un ganchos.json dentro de la carpeta de origen).
     3) Sin el flag: renderiza reutilizando _prep/ (ni reencuadra ni transcribe otra
        vez) y quema el gancho de cada clip. Clip sin texto -> sale SIN gancho y se
-       avisa. Al terminar cada clip se borran sus intermedios de _prep/.
+       avisa.
+_prep/ se CONSERVA hasta archivar (`proyecto.py aprobar` lo borra): corregir un
+gancho (`--solo`) no repite reencuadre ni Whisper. Cada _prep/<clip>.words.json
+guarda con qué MODO y silencios se hizo; si cambian, ese clip se rehace solo.
 
 Además guarda en Supabase (viral_phrases) la transcripción verbatim de cada clip
 como frase viral, con la etiqueta `proyecto:<id>` (best-effort, dedup por hash),
@@ -37,13 +40,22 @@ Eficiencia: transcribe cada clip UNA sola vez (sobre el 9:16 ya desilenciado) y
 reutiliza esos word-timestamps para subtítulos + b-roll (words= a burn_subs).
 
 Resumible/idempotente: si ya existe finales/<name>.mp4 Y es vertical (h>w), salta
-el clip. Los finales antiguos en 16:9 se REPROCESAN automáticamente.
+el clip (salvo con --solo o --forzar). Los finales antiguos en 16:9 se REPROCESAN.
+Sin CARPETA, salta los lotes ya aprobados (_Historico/<id>/<carpeta>/), salvo
+con --forzar.
+
+Correcciones de UN clip (sin tocar los demás ni proyecto.json):
+    … "<CARPETA>" --solo "<clip>" --sin-frases                  # p. ej. gancho nuevo
+    … "<CARPETA>" --solo "<clip>" --umbral 3% --margen 0.3s --sin-frases   # silencios
+La música y el b-roll al azar salen de una semilla con el nombre del clip: el
+re-render da lo mismo salvo lo que se ha corregido.
 
 Uso ([RAIZ] es opcional: si el primer argumento no es una ruta, es la CARPETA):
     python procesar_batch_clip.py --proyecto x                      # todas las carpetas de su input/
     python procesar_batch_clip.py --proyecto x "Carpeta"            # una sola (modo del proyecto)
     python procesar_batch_clip.py --proyecto x "Carpeta" follow --solo-transcribir
     python procesar_batch_clip.py --proyecto x "C:/otra/raiz" "Carpeta" right   # otra raíz
+    python procesar_batch_clip.py --proyecto x "Carpeta" --solo "clip 3" --sin-frases
 Si solo hay un proyecto, --proyecto se puede omitir.
 """
 import argparse
@@ -89,6 +101,15 @@ def parse_args():
                          "Sirve para escribir ganchos.json antes del render.")
     ap.add_argument("--sin-frases", action="store_true",
                     help="No guarda las transcripciones en viral_phrases.")
+    ap.add_argument("--solo", action="append", metavar="CLIP",
+                    help="Solo este clip de la CARPETA (repetible o separado por comas); lo "
+                         "re-renderiza aunque ya tenga final.")
+    ap.add_argument("--umbral", default=None,
+                    help="Umbral de silencio SOLO para esta ejecución (p. ej. 3%%); no toca proyecto.json.")
+    ap.add_argument("--margen", default=None,
+                    help="Margen de silencio SOLO para esta ejecución (p. ej. 0.3s); no toca proyecto.json.")
+    ap.add_argument("--forzar", action="store_true",
+                    help="Procesa también lotes ya aprobados (_Historico/) y re-renderiza finales existentes.")
     return ap.parse_args()
 
 
@@ -472,11 +493,16 @@ def main():
     p = proyecto.abrir(args.proyecto, "batch")
     MUSIC, OVERLAYS = p.music_dir, p.overlays_dir
     recursos = p.politica_render()          # None = lo de siempre (banco común + internet)
-    sil = p.silencios
+    sil = proyecto.silencios_cli(p.silencios, args.umbral, args.margen)
     lang = p.idioma
     clip_root, solo_carpeta, modo_arg = repartir_posicionales(args.posicionales, p.input_dir, args.raiz)
     modo_arg = modo_arg.lower() if modo_arg else None
     solo_transcribir = args.solo_transcribir
+    if args.solo and not solo_carpeta:
+        raise SystemExit("[!] --solo exige la CARPETA del clip.")
+    if (args.umbral or args.margen) and not args.solo:
+        print("[!] AVISO: --umbral/--margen sin --solo se aplican a TODOS los clips de esta "
+              "ejecución (no se guardan en proyecto.json).")
     if not clip_root.exists():
         raise SystemExit(f"[!] No existe la raíz de clips: {clip_root}")
 
@@ -487,7 +513,8 @@ def main():
     print(f"Raíz: {clip_root}")
     print(f"Encuadre 9:16 (cara): {'ON' if C._CV2_OK else 'OpenCV NO -> centrado'}  "
           f"modo={modo_arg or 'el de cada carpeta (proyecto.json)'}")
-    print(f"Silencios: umbral {sil['umbral']} · margen {sil['margen']}")
+    print(f"Silencios: umbral {sil['umbral']} · margen {sil['margen']}"
+          + ("" if sil == p.silencios else "  (solo esta ejecución)"))
     print(f"Supabase: {'sí' if tiene_supabase else 'NO'}"
           + ("  (frases desactivadas)" if tiene_supabase and not guardar_frases else ""))
     if not p.gancho_texto:
@@ -504,6 +531,13 @@ def main():
         subcarpetas = [d for d in subcarpetas if d.name == solo_carpeta]
         if not subcarpetas:
             raise SystemExit(f"[!] No hay subcarpeta '{solo_carpeta}' en {clip_root}")
+    if not args.forzar:
+        # Lotes ya aprobados (siguen en input/ pero están en _Historico): no se rehacen.
+        aprobados = [d for d in subcarpetas if p.archivado(d.name)]
+        for d in aprobados:
+            print(f"= {d.name}: ya aprobado y archivado en {p.archivado(d.name)} -> salto "
+                  f"(--forzar para rehacerlo)", flush=True)
+        subcarpetas = [d for d in subcarpetas if d not in aprobados]
     print(f"{len(subcarpetas)} carpeta(s) a procesar.\n", flush=True)
 
     hechos = fallos = saltados = preparados = 0
@@ -527,7 +561,12 @@ def main():
         lado = modo_arg or p.modo_encuadre(slug)
 
         cls = sorted(carpeta.glob("*.mp4"))
-        print(f"\n########## {slug}  ({len(cls)} clips, encuadre {lado}) ##########", flush=True)
+        solo = proyecto.filtrar_solo([m.stem.strip() for m in cls], args.solo)
+        if solo is not None:
+            cls = [m for m in cls if m.stem.strip() in solo]
+        prep_meta = {"modo": lado, "umbral": sil["umbral"], "margen": sil["margen"]}
+        print(f"\n########## {slug}  ({len(cls)} clips, encuadre {lado}"
+              + (f", solo {', '.join(sorted(solo))}" if solo else "") + ") ##########", flush=True)
         frases_carpeta = []
         sin_ganchos = solo_transcribir or not p.gancho_texto
         ganchos, ganchos_path = ({}, None) if sin_ganchos else cargar_ganchos(base, carpeta)
@@ -545,9 +584,20 @@ def main():
             prep_mp4 = prep / f"{name}.mp4"
             prep_words = prep / f"{name}.words.json"
             hay_prep = prep_mp4.exists() and prep_words.exists()
+            prep_data = None
+            if hay_prep:
+                try:
+                    prep_data = json.loads(prep_words.read_text(encoding="utf-8"))
+                except Exception:
+                    prep_data = None
+                hecho = (prep_data or {}).get("prep")
+                if prep_data is None or (hecho and hecho != prep_meta):
+                    print(f"   [prep] {name}: _prep/ hecho con {hecho or '¿?'} y ahora es "
+                          f"{prep_meta} -> se rehace", flush=True)
+                    hay_prep = False
 
-            # Idempotente: salta solo si ya es VERTICAL (h>w)
-            if final_path.exists():
+            # Idempotente: salta solo si ya es VERTICAL (h>w), salvo --solo/--forzar
+            if final_path.exists() and solo is None and not args.forzar:
                 fw, fh = dims(final_path)
                 if fh > fw and txt_path.exists():
                     saltados += 1
@@ -570,9 +620,8 @@ def main():
                     # quitar silencios ni Whisper otra vez.
                     desil = work / "desil.mp4"
                     shutil.copy(str(prep_mp4), str(desil))
-                    data = json.loads(prep_words.read_text(encoding="utf-8"))
-                    words = data.get("words") or []
-                    texto = (data.get("texto") or "").strip()
+                    words = prep_data.get("words") or []
+                    texto = (prep_data.get("texto") or "").strip()
                     if not txt_path.exists():
                         txt_path.write_text(texto, encoding="utf-8")
                     print("   [prep] reutilizo reencuadre + silencios + transcripción de _prep/", flush=True)
@@ -613,12 +662,13 @@ def main():
                     # 3) transcribir el 9:16 desilenciado (una vez)
                     words, texto = transcribir_words_y_texto(desil, lang=lang)
                     txt_path.write_text(texto, encoding="utf-8")
+                    # Deja el 9:16 + words en _prep/ (hasta archivar): el render y
+                    # las correcciones lo reutilizan sin repetir nada.
+                    prep.mkdir(parents=True, exist_ok=True)
+                    shutil.copy(str(desil), str(prep_mp4))
+                    prep_words.write_text(json.dumps({"texto": texto, "words": words, "prep": prep_meta},
+                                                     ensure_ascii=False), encoding="utf-8")
                     if solo_transcribir:
-                        # Deja el 9:16 + words para el render (sin repetir nada).
-                        prep.mkdir(parents=True, exist_ok=True)
-                        shutil.copy(str(desil), str(prep_mp4))
-                        prep_words.write_text(json.dumps({"texto": texto, "words": words},
-                                                         ensure_ascii=False), encoding="utf-8")
                         preparados += 1
                         print(f"   preparado -> textos/{name}.txt (+ {PREP_DIR}/)", flush=True)
                         continue
@@ -640,14 +690,11 @@ def main():
                     clip_text=texto or None,
                     words=words,
                     hook_text=gancho, hook_text_dur=p.gancho_duracion,
-                    recursos=recursos,
+                    recursos=recursos, seed=name,
                 )
                 shutil.move(str(out_tmp), str(final_path))
                 hechos += 1
                 print(f"   OK -> {final_path}", flush=True)
-                # intermedios de _prep/ de este clip: ya no hacen falta
-                prep_mp4.unlink(missing_ok=True)
-                prep_words.unlink(missing_ok=True)
             except Exception as e:
                 fallos += 1
                 traceback.print_exc()
@@ -684,6 +731,9 @@ def main():
         print(f"OK/nuevos: {hechos}   saltados(ya 9:16): {saltados}   fallos: {fallos}", flush=True)
         if sin_gancho:
             print(f"AVISO sin gancho de texto ({len(sin_gancho)}): " + ", ".join(sin_gancho), flush=True)
+        if hechos:
+            print(f"QC: .venv\\Scripts\\python.exe qc.py --proyecto {p.id} \"<CARPETA>\"  "
+                  f"(y mira finales/_qc.jpg)", flush=True)
 
 
 if __name__ == "__main__":

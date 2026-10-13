@@ -32,6 +32,12 @@ CLI:
     python proyecto.py                       -> lista los proyectos y su política
     python proyecto.py ver <id>              -> configuración resuelta
     python proyecto.py nuevo <id> --nombre "Nombre" [--tipo clipping|largos]
+    python proyecto.py aprobar <id> --video "<video|carpeta>" [--clips a.mp4,b.mp4]
+                               [--cerrar] [--destino-pruebas <dir>]
+        -> mueve los finales aprobados a CEO_Sergete/REVISADOS/<id>/1. pte Publicar/
+           y, si finales/ queda vacío (o con --cerrar), archiva transcripciones/<v>/
+           en PruebasIA/_Historico/<id>/<v>/ (sin _prep/) y la fuente de input/ en
+           …/<v>/_fuente/.
 """
 from __future__ import annotations
 
@@ -51,6 +57,11 @@ PLANTILLA = "_plantilla"
 BANCO_BROLL = RAIZ / "superposiciones"     # banco común de b-roll
 BANCO_MUSICA = RAIZ / "musicas"            # banco común de música
 SKILL_DIR = RAIZ / ".claude" / "skills" / "Editor_Sergio"
+PRUEBAS_IA = RAIZ.parent
+HISTORICO = PRUEBAS_IA / "_Historico"                # aprobados: <id>/<video>/
+REVISADOS = PRUEBAS_IA / "CEO_Sergete" / "REVISADOS"  # <id>/1. pte Publicar/
+PTE_PUBLICAR = "1. pte Publicar"
+EXT_VIDEO = (".mp4", ".mkv", ".mov", ".avi", ".webm", ".m4a", ".mp3", ".wav")
 
 TIPOS = ("largos", "clipping")
 BROLL = ("banco_comun", "propio", "ninguno")
@@ -118,6 +129,18 @@ class Proyecto:
     @property
     def recursos_dir(self) -> Path:
         return self.dir / "recursos"
+
+    @property
+    def historico_dir(self) -> Path:
+        return HISTORICO / self.id
+
+    def archivado(self, nombre: str) -> Path | None:
+        """Carpeta de _Historico/<id>/<nombre>/ si ese vídeo o lote ya se aprobó."""
+        nombre = (nombre or "").strip()
+        if not nombre:
+            return None
+        d = self.historico_dir / nombre
+        return d if d.is_dir() else None
 
     # ------------------------------------------------------------ política
     @property
@@ -374,6 +397,38 @@ def abrir(pid: str | None, script: str, log: bool = True) -> Proyecto:
     return p
 
 
+# ---------------------------------------------------------------- ayudas de los scripts
+def filtrar_solo(nombres: list[str], solo: list[str] | None, que: str = "clip") -> set[str] | None:
+    """Nombres pedidos con --solo (sin .mp4) que existen; error si alguno no.
+    None si no hay --solo (= todos)."""
+    if not solo:
+        return None
+    pedidos = []
+    for s in solo:
+        for x in str(s).split(","):
+            x = x.strip()
+            if x.lower().endswith(".mp4"):
+                x = x[:-4].strip()
+            if x:
+                pedidos.append(x)
+    faltan = [x for x in pedidos if x not in nombres]
+    if faltan:
+        raise ProyectoError(f"[!] --solo: no hay ningún {que} «{', '.join(faltan)}». "
+                         f"Disponibles: {', '.join(nombres) or '(ninguno)'}")
+    return set(pedidos)
+
+
+def silencios_cli(sil: dict, umbral: str | None, margen: str | None) -> dict:
+    """Silencios de esta ejecución: los del proyecto, con --umbral/--margen
+    encima. Nunca se escriben en proyecto.json."""
+    out = dict(sil)
+    if umbral:
+        out["umbral"] = umbral if str(umbral).endswith("%") else f"{umbral}%"
+    if margen:
+        out["margen"] = margen if str(margen).endswith("s") else f"{margen}s"
+    return out
+
+
 # ---------------------------------------------------------------- CLI
 def _sustituir(carpeta: Path, pid: str, nombre: str) -> None:
     for f in carpeta.rglob("*"):
@@ -403,6 +458,109 @@ def _cmd_nuevo(a) -> int:
     return 0
 
 
+def _nombre_unico(destino: Path, nombre: str) -> Path:
+    """destino/nombre, o destino/<stem>_2.mp4, _3… si ya existe."""
+    dst = destino / nombre
+    k = 2
+    while dst.exists():
+        dst = destino / f"{Path(nombre).stem}_{k}{Path(nombre).suffix}"
+        k += 1
+    return dst
+
+
+def _fuente_en_input(p: Proyecto, v: str) -> Path | None:
+    """El vídeo largo input/<v>.<ext> o la carpeta de extractos input/<v>/."""
+    d = p.input_dir / v
+    if d.is_dir():
+        return d
+    for ext in EXT_VIDEO:
+        f = p.input_dir / f"{v}{ext}"
+        if f.is_file():
+            return f
+    return None
+
+
+def _cmd_aprobar(a) -> int:
+    """Mueve los finales aprobados a REVISADOS y, al cerrar, archiva el vídeo."""
+    p = cargar(a.id)
+    v = (a.video or "").strip().rstrip("/\\")
+    if v.lower().endswith(".mp4"):
+        v = v[:-4]
+    base = p.transcripciones_dir / v
+    fin = base / "finales"
+    if not base.is_dir():
+        arch = p.archivado(v)
+        raise ProyectoError(f"[!] No existe {base}" + (f" (ya está archivado en {arch})." if arch else "."))
+    disponibles = sorted(f.name for f in fin.glob("*.mp4")) if fin.is_dir() else []
+
+    if a.clips:
+        pedidos = []
+        for x in a.clips.split(","):
+            x = x.strip()
+            if x:
+                pedidos.append(x if x.lower().endswith(".mp4") else f"{x}.mp4")
+        faltan = [x for x in pedidos if x not in disponibles]
+        if faltan:
+            raise ProyectoError(f"[!] No están en {fin}: {', '.join(faltan)}. "
+                                f"Finales: {', '.join(disponibles) or '(ninguno)'}.")
+    else:
+        pedidos = list(disponibles)
+    if not pedidos and not a.cerrar:
+        raise ProyectoError(f"[!] No hay finales que aprobar en {fin} (usa --cerrar para archivar).")
+
+    pruebas = Path(a.destino_pruebas).resolve() if a.destino_pruebas else None
+    revisados = (pruebas / "REVISADOS") if pruebas else REVISADOS
+    historico = (pruebas / "_Historico") if pruebas else HISTORICO
+    destino = revisados / p.id / PTE_PUBLICAR
+    hist = historico / p.id / v
+    restantes = [x for x in disponibles if x not in pedidos]
+    cerrar = bool(a.cerrar or not restantes)
+    if cerrar and hist.exists():
+        raise ProyectoError(f"[!] Ya existe {hist}: no archivo encima. Revísalo antes "
+                            f"(no se ha movido nada).")
+    if pruebas:
+        print(f"[aprobar] MODO PRUEBA: destino {pruebas} (ni REVISADOS ni _Historico reales).")
+
+    destino.mkdir(parents=True, exist_ok=True)
+    for name in pedidos:
+        dst = _nombre_unico(destino, name)
+        if dst.name != name:
+            print(f"[aprobar] AVISO: ya había un «{name}» en {destino}: se guarda como «{dst.name}».")
+        shutil.move(str(fin / name), str(dst))
+        print(f"[aprobar] {name} -> {dst}")
+    print(f"[aprobar] {len(pedidos)} clip(s) en {destino}")
+
+    if not cerrar:
+        print(f"[aprobar] Quedan {len(restantes)} final(es) en {fin}: {', '.join(restantes)}. "
+              f"No se archiva (usa --cerrar para archivar igualmente).")
+    else:
+        prep = base / "_prep"
+        if prep.exists():
+            shutil.rmtree(prep, ignore_errors=True)
+            print("[aprobar] _prep/ borrado")
+        tmp = base / "clips" / "_tmp"
+        if tmp.exists():
+            shutil.rmtree(tmp, ignore_errors=True)
+        hist.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(base), str(hist))
+        print(f"[aprobar] archivado: {base} -> {hist}")
+        fuente = _fuente_en_input(p, v)
+        if fuente is None:
+            print(f"[aprobar] (no hay fuente de «{v}» en {p.input_dir}: nada que archivar)")
+        elif fuente.is_dir():
+            shutil.move(str(fuente), str(hist / "_fuente"))
+            print(f"[aprobar] fuente: {fuente} -> {hist / '_fuente'}")
+        else:
+            (hist / "_fuente").mkdir(parents=True, exist_ok=True)
+            shutil.move(str(fuente), str(hist / "_fuente" / fuente.name))
+            print(f"[aprobar] fuente: {fuente.name} -> {hist / '_fuente'}")
+
+    if pedidos:
+        print(f"\nSiguiente (TheCopy): copys.py pendientes --proyecto {p.id}"
+              + ("   [prueba: TheCopy no verá estos clips]" if pruebas else ""))
+    return 0
+
+
 def main() -> int:
     for s in (sys.stdout, sys.stderr):
         try:
@@ -417,9 +575,20 @@ def main() -> int:
     n.add_argument("id")
     n.add_argument("--nombre", required=True)
     n.add_argument("--tipo", choices=TIPOS, default=None)
+    ok = sub.add_parser("aprobar", help="mueve finales aprobados a REVISADOS y archiva el vídeo")
+    ok.add_argument("id")
+    ok.add_argument("--video", required=True, help="Vídeo (vía 1) o carpeta de extractos (vía 2).")
+    ok.add_argument("--clips", default=None,
+                    help="Clips aprobados separados por comas (por defecto, todos los finales).")
+    ok.add_argument("--cerrar", action="store_true",
+                    help="Archiva el vídeo aunque queden finales sin aprobar.")
+    ok.add_argument("--destino-pruebas", default=None,
+                    help="Raíz de prueba en vez de REVISADOS y _Historico reales.")
     a = ap.parse_args()
     if a.cmd == "nuevo":
         return _cmd_nuevo(a)
+    if a.cmd == "aprobar":
+        return _cmd_aprobar(a)
     if a.cmd == "ver":
         p = cargar(a.id)
         print(p.resumen())

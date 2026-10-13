@@ -11,7 +11,8 @@ recursos propios, con o sin internet).
 ## Estructura
 
 ```
-proyecto.py                    proyectos: elegir, validar, crear (CLI)
+proyecto.py                    proyectos: elegir, validar, crear, aprobar (CLI)
+qc.py                          QC de los finales exportados (+ hoja _qc.jpg)
 proyectos/
   _plantilla/                  base de los proyectos nuevos (pensada para clipping)
   <id>/
@@ -21,8 +22,8 @@ proyectos/
     transcripciones/<video>/
       <video>.txt/.srt/.json   Paso 1
       cortes.json              Paso 3 (momentos + titulo + gancho_texto)
-      clips/                   Paso 3 (9:16 sin subs)
-      finales/                 Paso 4 (reels listos)
+      clips/                   Paso 3 (9:16 sin subs; <clip>.words.json del Paso 4)
+      finales/                 Paso 4 (reels listos + _qc.jpg)
     logs/                      un log por ejecución
     recursos/broll|musica|sfx  recursos propios (si su política lo dice)
 superposiciones/  musicas/     BANCO COMÚN (git-ignored), solo para quien lo permita
@@ -61,6 +62,7 @@ más de 35 min).
 .venv\Scripts\python.exe transcribir.py --proyecto <id>                 :: todo su input\
 .venv\Scripts\python.exe transcribir.py --proyecto <id> "video.mp4"     :: uno de su input\ (o una ruta)
 ```
+Salta lo ya transcrito o ya aprobado (`_Historico/`), salvo con `--forzar`.
 
 ## Paso 2 — Limpiar transcripción (`revisar_srt.py` + revisión manual)
 
@@ -84,12 +86,29 @@ Recorte 9:16 con seguimiento de cara y encuadre de busto + quitar silencios
 ## Paso 4 — Edición final (`editar_clips.py`, motor de la skill `Editor_Sergio`)
 
 ```bat
-.venv\Scripts\python.exe editar_clips.py --proyecto <id> "<video>" [--sin-gancho-texto] [--sin-frases]
+.venv\Scripts\python.exe editar_clips.py --proyecto <id> "<video>" [--sin-gancho-texto] [--sin-frases] [--solo <clip>]
 ```
 
 Capas: gancho visual (Pexels, solo si el proyecto lo tiene) → b-roll a pantalla
 completa sincronizado con la voz → música + de-click → gancho de texto (2,5 s) →
-subtítulos palabra a palabra, una sola vez. Salida en `finales/`.
+subtítulos palabra a palabra, una sola vez. Salida en `finales/`. Exporta
+1080x1920 H.264 a 10 Mb/s (VBV 12), AAC 48 kHz estéreo con limitador.
+
+## QC (`qc.py`) y aprobar (`proyecto.py aprobar`)
+
+```bat
+.venv\Scripts\python.exe qc.py --proyecto <id> "<video|carpeta>"      :: una línea por clip + finales\_qc.jpg
+.venv\Scripts\python.exe proyecto.py aprobar <id> --video "<video|carpeta>" [--clips a.mp4,b.mp4] [--cerrar]
+```
+`aprobar` mueve los finales a `CEO_Sergete/REVISADOS/<id>/1. pte Publicar/` y, si
+`finales/` queda vacío, archiva el vídeo (y su fuente) en `_Historico/<id>/<v>/`.
+
+## Corregir un solo clip (`--solo`)
+
+`--solo <clip>` (repetible) en `clips.py`, `editar_clips.py` y el batch; con
+`--umbral`/`--margen` para los silencios de esa ejecución (no tocan
+`proyecto.json`). Música y b-roll salen de una semilla con el nombre del clip:
+re-renderizar da lo mismo. Órdenes exactas en `CLAUDE.md` → «Correcciones».
 
 ## Batch de clips ya cortados (`procesar_batch_clip.py`, vía 2)
 
@@ -106,7 +125,8 @@ del argumento o de `proyecto.json → encuadre` (por carpeta). En tres pasos:
 ```
 
 Otra raíz: `procesar_batch_clip.py --proyecto <id> "C:/otra/raiz" "<CARPETA>" <MODO>`.
-No lances dos batch a la vez (comparten `whisper/_edit_batch`).
+No lances dos batch a la vez (comparten `whisper/_edit_batch`). `_prep/` se
+conserva hasta archivar; sin `CARPETA` se saltan los lotes ya aprobados (`--forzar`).
 
 ## B-roll propio: índice semántico local (`indexar_broll.py`)
 
@@ -151,7 +171,10 @@ Copia `proyectos/_plantilla/` (o lo hace el `nuevo_proyecto.py` del CEO). Despu�
 ## Vía 3 — avatar IA (skill `Editor_Sergio`)
 
 `phase_c_edit(…, proyecto="<id>")` y `step1b_store_viral_phrases(…, proyecto="<id>")`
-(por defecto `mongemalo`) usan los recursos y la etiqueta del proyecto.
+(por defecto `mongemalo`) usan los recursos y la etiqueta del proyecto. Corre con
+el `.venv` de TheEditor y baja los reels con `..\TheDescarga\tools\yt-dlp.exe`.
+Necesita las claves de HeyGen y ElevenLabs en `~/.viral-pipeline/env.json`
+(`setup.py faltan` dice cuáles faltan).
 
 ## Instalación
 

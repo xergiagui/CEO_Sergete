@@ -65,22 +65,29 @@ recursos/broll/ recursos/musica/ recursos/sfx/   solo si tiene recursos propios
 Buzón: `proyectos/<id>/input/`. Todo automático; no se edita código por vídeo.
 
 1. `transcribir.py --proyecto <id> "<video>.mp4"` →
-   `transcripciones/<video>/<video>.{txt,srt,json}`.
+   `transcripciones/<video>/<video>.{txt,srt,json}`. **Se salta** lo ya transcrito
+   (en `transcripciones/`) o ya aprobado (en `_Historico/`), salvo con `--forzar`.
 2. **Generar `cortes.json`** (el único paso con criterio) desde la transcripción
    con tiempos (ver «Recorte y hook»; esquema en `cortes.example.json`), con un
-   **`gancho_texto`** por corte (si falta, el `titulo`); `hook_query` solo si el
-   proyecto tiene gancho visual. Por defecto ~1 clip cada 3 min (mín. 3, máx. 6).
+   **`gancho_texto`** por corte; si no hay uno bueno, déjalo vacío: el clip sale
+   **sin gancho** y el script lo avisa (nunca se usa el `titulo` ni nada mecánico).
+   `hook_query` solo si el proyecto tiene gancho visual. Por defecto ~1 clip cada
+   3 min (mín. 3, máx. 6).
 3. `clips.py --proyecto <id> "<video>"` → recorte 9:16 + quitar silencios → `…/clips/`.
+   No vuelve a cortar un vídeo ya archivado en `_Historico/` (salvo `--forzar`).
 4. `editar_clips.py --proyecto <id> "<video>"` → Fase C (gancho visual si lo hay +
    gancho de texto + b-roll + música + subs) → `…/finales/`. Guarda frases si el
    proyecto lo permite. `--sin-gancho-texto` y `--sin-frases` (pruebas o
-   re-render de una corrección).
+   re-render de una corrección). Guarda los tiempos de palabra en
+   `clips/<nombre>.words.json` y los reutiliza al re-renderizar (no repite Whisper).
+5. **QC** (ver «Exportación y QC»): `qc.py --proyecto <id> "<video>"` y mirar
+   `finales/_qc.jpg`.
 
 `transcribir.py` y `editar_clips.py` usan una carpeta de trabajo **única por
 proceso**: se pueden lanzar en paralelo para vídeos distintos.
 
 ### 2. Clips ya cortados → reels (batch)
-`procesar_batch_clip.py --proyecto <id> [RAIZ] [CARPETA] [MODO] [--solo-transcribir] [--sin-frases]`
+`procesar_batch_clip.py --proyecto <id> [RAIZ] [CARPETA] [MODO] [--solo-transcribir] [--sin-frases] [--solo CLIP] [--umbral 3%] [--margen 0.3s] [--forzar]`
 - `RAIZ`: por defecto `proyectos/<id>/input/` (cada subcarpeta = un lote). Solo
   hace falta para otra raíz (si el primer argumento no es una ruta, es la `CARPETA`).
 - `MODO` de encuadre: `right` · `left` · `center` · `auto` · `auto-right` ·
@@ -88,7 +95,8 @@ proceso**: se pueden lanzar en paralelo para vídeos distintos.
   `proyecto.json → encuadre.carpetas` o su `modo_por_defecto`.
 - Por cada MP4: reencuadre 9:16 → quitar silencios → Fase C **sin gancho visual**
   y con gancho de texto. Transcribe una sola vez. Es reanudable: salta los
-  finales que ya existen en vertical.
+  finales que ya existen en vertical. Sin `CARPETA`, **salta los lotes ya
+  aprobados** (`_Historico/<id>/<carpeta>/`); `--forzar` lo rehace todo.
 - **Siempre en tres pasos** (si el proyecto lleva gancho de texto):
   1. `… "<CARPETA>" --solo-transcribir` → deja `transcripciones/<CARPETA>/textos/<clip>.txt`
      y el 9:16 + tiempos en `_prep/`. No renderiza.
@@ -97,7 +105,9 @@ proceso**: se pueden lanzar en paralelo para vídeos distintos.
   3. `… "<CARPETA>"` → renderiza reutilizando `_prep/` y quema el gancho.
   - Clip **sin texto** en `ganchos.json` → sale sin gancho y el batch lo avisa.
     **Nunca** pongas un gancho mecánico (primera frase, nombre de archivo…).
-  - Si cambias el `MODO` tras el paso 1, borra antes `_prep/<clip>.*`.
+  - `_prep/` **se conserva hasta archivar** (lo borra `proyecto.py aprobar`): corregir
+    un gancho no repite reencuadre ni Whisper. Cada clip guarda con qué `MODO` y
+    silencios se preparó; si cambian, ese clip se rehace solo.
 - Usa `whisper/_edit_batch` **compartido**: **no lances dos batch a la vez**
   (tampoco un `--solo-transcribir` con otro batch en marcha), ni de proyectos distintos.
 
@@ -108,6 +118,12 @@ Código en `.claude/skills/Editor_Sergio/`. `phase_c_edit(…, proyecto="<id>")`
 `step1b_store_viral_phrases(…, proyecto="<id>")` (por defecto `mongemalo`) usan
 los recursos y la etiqueta del proyecto. Salida en
 `~/Desktop/viral_pipeline_output/<Avatar>/<slug>/`. **No lleva gancho de texto.**
+- Python: el de TheEditor (`.venv\Scripts\python.exe`); no hace falta bootstrap.
+  La descarga usa `..\TheDescarga\tools\yt-dlp.exe` (el venv no trae `yt_dlp`).
+- El setup solo se salta si `env.json` tiene las claves de HeyGen y ElevenLabs:
+  `setup.py faltan` (desde la carpeta de la skill) dice `SETUP_OK` o cuáles faltan.
+  Las claves las pone Sergio (en octubre de 2026 faltaban `HEYGEN_API_KEY`,
+  `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID` y `HEYGEN_ENGINE` + su ID de avatar).
 
 ---
 
@@ -117,10 +133,17 @@ los recursos y la etiqueta del proyecto. Salida en
 - **Nunca un tramo con solo piernas/cuerpo sin la cara.** Encuadre tipo
   **busto**: recorte también vertical hacia cara + torso. Si no se puede, tapar
   el tramo con b-roll más largo.
+  - **Excepción deliberada:** los modos del batch `right`, `left`, `center`,
+    `auto` (y `auto-right`) y `<fracción>` recortan a **altura completa** (solo
+    franja horizontal). En un plano a dos **sentado**, la altura completa
+    encuadra cabeza y torso y no deja «solo piernas», y un zoom vertical
+    cortaría la cabeza o daría un busto inestable. No es un fallo: no lo
+    «arregles». El busto con zoom vertical es el de `follow` y la vía 1.
 - **Un solo recorte FIJO por plano** (por corte de cámara). Nunca sub-ventanas ni
   microrreajustes dentro del mismo plano.
 - En primeros planos, centrar la **cara dominante** (detección con filtro de piel
-  YCrCb para descartar falsos positivos).
+  YCrCb para descartar falsos positivos; también en `clips._detectar_cara`, la
+  de la vía 1 y `follow`).
 - La detección de hablante por movimiento de boca **está desactivada** (poco
   fiable). No la reactives sin que Sergio lo pida.
 - Mantener grande el elemento principal: priorizar al protagonista del proyecto
@@ -141,8 +164,10 @@ los recursos y la etiqueta del proyecto. Salida en
 - Minúsculas, pero **mayúscula en la primera letra y tras `.`, `?` y `!`**. Los
   números de miles no se parten («10.000»).
 - Se queman **una sola vez**, en la Fase C. Palabrotas enmascaradas (`P***`).
-- Unidad de sentido: 3 palabras por defecto, agrupando por idea si mejora la
-  lectura; no dejar artículos o preposiciones sueltos al final.
+- Unidad de sentido: 3 palabras como máximo. El código corta el grupo **tras un
+  fin de frase** (`.`, `?`, `!`, `…`) y tras una pausa larga, y **un grupo nunca
+  acaba en palabra débil** (artículo, preposición, «que», «y»…: `_HOOK_WEAK`) si
+  hay otra detrás: esa palabra pasa al grupo siguiente.
 
 ### Gancho de texto en pantalla
 El **primer fotograma ya lleva un texto que abre un bucle** y el clip lo cumple.
@@ -157,12 +182,29 @@ El **primer fotograma ya lleva un texto que abre un bucle** y el clip lo cumple.
 ### Silencios
 - Ajuste global: `auto-editor` con umbral **6 %** y margen **0,15 s** (o el de
   `proyecto.json → silencios`).
-- Si un clip queda atropellado, reprocesa **solo ese** con **3 % / 0,3 s** y
-  reemplaza su MP4 en `finales/`. **No cambies el ajuste global.**
+- Si un clip queda atropellado, reprocesa **solo ese** con **3 % / 0,3 s**.
+  `--umbral`/`--margen` valen solo para esa ejecución: **nunca** escriben en
+  `proyecto.json`. **No cambies el ajuste global.**
+  - Vía 1: `clips.py --proyecto <id> "<video>" --solo <clip> --umbral 3% --margen 0.3s`
+    y después `editar_clips.py --proyecto <id> "<video>" --solo <clip> --sin-frases`.
+  - Vía 2: `procesar_batch_clip.py --proyecto <id> "<CARPETA>" --solo "<clip>" --umbral 3% --margen 0.3s --sin-frases`
+    (rehace su `_prep/` porque cambian los silencios).
 
 ### Correcciones: solo lo pedido
-Una corrección sobre un clip concreto se aplica **solo a ese clip** (carpeta
-temporal y sustituir su MP4). Nunca la conviertas en comportamiento global.
+Una corrección sobre un clip concreto se aplica **solo a ese clip**; nunca la
+conviertas en comportamiento global. Con `--solo` (repetible, o nombres separados
+por comas) se re-renderiza solo ese clip y se sustituye su MP4 en `finales/`; el
+resto no se toca. La música y el b-roll al azar salen de una **semilla con el
+nombre del clip**: el re-render da la misma música y el mismo b-roll, y solo
+cambia lo corregido.
+- **Gancho** (vía 1): edita su `gancho_texto` en `cortes.json` →
+  `editar_clips.py --proyecto <id> "<video>" --solo <clip> --sin-frases`.
+- **Gancho** (vía 2): edita `ganchos.json` →
+  `procesar_batch_clip.py --proyecto <id> "<CARPETA>" --solo "<clip>" --sin-frases`
+  (reutiliza `_prep/`: ni reencuadre ni Whisper).
+- **Tramo o encuadre** (vía 1): ajusta `inicio`/`fin` en `cortes.json` →
+  `clips.py … --solo <clip>` → `editar_clips.py … --solo <clip> --sin-frases`.
+- Tras corregir: `qc.py` de nuevo.
 
 ### Recorte y hook
 - **Empieza tarde y termina pronto:** entra una frase más tarde y sal justo tras
@@ -174,6 +216,8 @@ temporal y sustituir su MP4). Nunca la conviertas en comportamiento global.
 - Música claramente por debajo de la voz (**6–12 dB**), sin clipping, con
   de-click. La voz se tiene que entender en el altavoz de un móvil. La música no
   es obligatoria si no encaja.
+- La mezcla termina en un limitador (`…normalize=0,alimiter=limit=0.95:level=0`):
+  pico por debajo de 0 dBFS. Salida AAC 192k, **48 kHz estéreo**.
 
 ### Zona segura e higiene visual
 - Cara, texto y elementos clave en una zona central conservadora; aire abajo y en
@@ -182,9 +226,18 @@ temporal y sustituir su MP4). Nunca la conviertas en comportamiento global.
   marcas de agua.
 
 ### Exportación y QC
-- 1080×1920, MP4 H.264, fps de la fuente, 8–12 Mb/s, AAC 48 kHz estéreo.
-- Revisar el **archivo exportado**: primer y último fotograma, negros,
-  congelados, restos de superposiciones, segundos vacíos.
+- 1080×1920, MP4 H.264, fps de la fuente, 8–12 Mb/s, AAC 48 kHz estéreo. Las
+  tres vías exportan igual (`pipeline_core.VIDEO_ENC`/`AUDIO_ENC`): objetivo
+  10 Mb/s con VBV a 12 (`-b:v 10M -maxrate 12M -bufsize 24M`; con CRF 18 un busto
+  reescalado se quedaba en ~6,5 Mb/s).
+- **Tras renderizar, `qc.py` y mira `_qc.jpg`:**
+  `qc.py --proyecto <id> "<video|carpeta>"` (o una ruta, p. ej. la salida de la
+  vía 3). Una línea por clip: resolución, códec, fps frente a la fuente,
+  bitrate, audio, pico, negros (`blackdetect` 0,25 s), congelados
+  (`freezedetect` 2 s) y silencios (`silencedetect` −40 dB 1,5 s); `FALLA` si no
+  cumple la exportación, `REVISAR` si hay algo que mirar. Deja
+  `finales/_qc.jpg` con el primer y el último fotograma de cada clip: revisa el
+  gancho, la cola y restos de superposiciones antes de dar los clips.
 
 ---
 
@@ -201,7 +254,21 @@ temporal y sustituir su MP4). Nunca la conviertas en comportamiento global.
 
 ## Al dar OK
 
-Los MP4 aprobados se **mueven** a `../CEO_Sergete/REVISADOS/<id>/1. pte Publicar/`
-y su carpeta `proyectos/<id>/transcripciones/<video>/` a `../_Historico/<id>/`.
-Lo orquesta el CEO (después, TheCopy escribe el copy). En `transcripciones/` solo
-queda lo que está en curso o pendiente de revisar.
+Por script, nunca a mano:
+
+```
+proyecto.py aprobar <id> --video "<video|carpeta>" [--clips a.mp4,b.mp4] [--cerrar] [--destino-pruebas <dir>]
+```
+
+- **Mueve** esos MP4 (sin `--clips`, todos) de `transcripciones/<v>/finales/` a
+  `../CEO_Sergete/REVISADOS/<id>/1. pte Publicar/`. Si ya hay uno con el mismo
+  nombre, añade `_2`, `_3`… y avisa.
+- Si `finales/` queda vacío (o con `--cerrar`), **archiva**
+  `transcripciones/<v>/` en `../_Historico/<id>/<v>/` (borra `_prep/`) y la fuente
+  de `input/` en `../_Historico/<id>/<v>/_fuente/`. Si ya existe ese archivo, no
+  mueve nada y avisa.
+- Imprime la orden siguiente para TheCopy (`copys.py pendientes --proyecto <id>`).
+- `--destino-pruebas <dir>`: lo mismo, pero en `<dir>/REVISADOS` y
+  `<dir>/_Historico` (pruebas; no toca los reales).
+
+En `transcripciones/` solo queda lo que está en curso o pendiente de revisar.

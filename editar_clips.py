@@ -13,10 +13,16 @@ recursos que permite su `proyecto.json → recursos`.
 Por cada clip de proyectos/<id>/transcripciones/<video>/clips/ aplica:
   gancho visual (mini-video de Pexels / imagen libre; solo si el proyecto tiene
   gancho_visual=pexels e internet) + gancho de TEXTO en la franja superior los
-  primeros ~2,5 s (`gancho_texto` del cortes.json; si falta, el `titulo`) +
+  primeros ~2,5 s (`gancho_texto` del cortes.json; si falta, el clip sale SIN
+  gancho y se avisa: nunca se usa el `titulo` ni otro texto mecánico) +
   b-roll (banco común superposiciones/ o el propio del proyecto) + música (banco
   común musicas/ o la propia) + de-click + subtitulos palabra a palabra (una sola
   vez, enmascarando palabrotas).
+
+Reproducible: la música y el b-roll al azar salen de una semilla con el nombre
+del clip, así que re-renderizar un clip (--solo) da lo mismo y no cambia los
+demás. Los word-timestamps de cada clip se guardan en clips/<nombre>.words.json
+y se reutilizan en los re-renders (clips.py los borra si vuelve a cortar el clip).
 
 Trabaja en una carpeta ASCII ÚNICA por proceso (whisper/_edit_XXXX via mkdtemp)
 para evitar problemas de rutas con tildes en el filtro de subtitulos de ffmpeg y
@@ -28,6 +34,7 @@ Uso:
     python editar_clips.py --proyecto mongemalo "video" --cortes cortes.json
     python editar_clips.py --proyecto x "video" --sin-gancho-texto   # sin texto de gancho
     python editar_clips.py --proyecto x "video" --sin-frases         # no guarda en viral_phrases
+    python editar_clips.py --proyecto x "video" --solo 03_nombre --sin-frases   # corregir un clip
 Si solo hay un proyecto, --proyecto se puede omitir.
 """
 import argparse
@@ -187,6 +194,27 @@ def cargar_cortes_meta(cortes_path: Path) -> dict:
     return meta
 
 
+def cargar_o_transcribir_words(clip: Path, ascii_in: Path, lang: str) -> list:
+    """Word-timestamps del clip: los de clips/<nombre>.words.json si existen y no
+    son más viejos que el clip; si no, Whisper sobre la copia ASCII y se guardan
+    (así corregir el gancho o la música no repite la transcripción)."""
+    wj = clip.with_suffix(".words.json")
+    if wj.exists() and wj.stat().st_mtime >= clip.stat().st_mtime:
+        try:
+            words = json.loads(wj.read_text(encoding="utf-8")).get("words")
+            if isinstance(words, list) and words:
+                print(f"   [words] reutilizo {wj.name}", flush=True)
+                return words
+        except Exception:
+            pass
+    words = pc.transcribe_words(ascii_in, lang=lang)
+    try:
+        wj.write_text(json.dumps({"words": words}, ensure_ascii=False), encoding="utf-8")
+    except Exception as e:
+        print(f"   [words] no pude guardar {wj.name} ({e})", flush=True)
+    return words
+
+
 def main():
     ap = argparse.ArgumentParser(description="Edicion final (Fase C) de los clips de un video.")
     ap.add_argument("video", help="Nombre del video (o ruta) cuyos clips se editan.")
@@ -196,9 +224,11 @@ def main():
     ap.add_argument("--work-dir", help="Work dir ASCII para intermedios (por defecto uno único por proceso bajo whisper/). "
                                        "Si se suministra, NO se borra al terminar.")
     ap.add_argument("--sin-gancho-texto", action="store_true",
-                    help="No quema el texto de gancho (gancho_texto/titulo) al inicio.")
+                    help="No quema el texto de gancho (gancho_texto) al inicio.")
     ap.add_argument("--sin-frases", action="store_true",
                     help="No guarda las frases en viral_phrases (pruebas o re-render de correcciones).")
+    ap.add_argument("--solo", action="append", metavar="NOMBRE",
+                    help="Solo este clip (repetible o separado por comas): corrige uno sin tocar los demás.")
     args = ap.parse_args()
     p = proyecto.abrir(args.proyecto, "editar_clips")
     MUSIC, OVERLAYS = p.music_dir, p.overlays_dir
@@ -248,7 +278,12 @@ def main():
         _work_es_propio = True
 
     clips = sorted(clips_dir.glob("*.mp4"))
-    print(f"{len(clips)} clips a editar\n", flush=True)
+    solo = proyecto.filtrar_solo([c.stem for c in clips], args.solo)
+    if solo is not None:
+        clips = [c for c in clips if c.stem in solo]
+    print(f"{len(clips)} clips a editar"
+          + (f" (solo {', '.join(sorted(solo))})" if solo else "") + "\n", flush=True)
+    sin_gancho, fallos = [], []
     for clip in clips:
         name = clip.stem
         hook = hooks.get(name) or name.split("_", 1)[-1].replace("_", " ")
@@ -259,41 +294,48 @@ def main():
         music_typology = corte.get("tipologia_musica")
         clip_text = (corte.get("frase_viral") or corte.get("titulo")
                      or hook or "").strip() or None
-        # Gancho de TEXTO en pantalla: gancho_texto del corte; si falta, el titulo.
+        # Gancho de TEXTO en pantalla: SOLO el gancho_texto que escribió el
+        # editor. Sin él, el clip sale sin gancho (nunca el titulo ni nada mecánico).
         gancho_texto = None
         if not sin_gancho_texto:
-            gancho_texto = (corte.get("gancho_texto") or corte.get("titulo") or "").strip() or None
+            gancho_texto = (corte.get("gancho_texto") or "").strip() or None
         print(f"=== {name}   gancho='{hook}'"
               + (f"   mood='{music_typology}'" if music_typology else ""), flush=True)
-        if sin_gancho_texto:
-            pass
-        elif not gancho_texto:
-            print("   [gancho texto] AVISO: el corte no trae gancho_texto ni titulo -> sin texto de gancho",
+        if not sin_gancho_texto and not gancho_texto:
+            sin_gancho.append(name)
+            print("   [gancho texto] AVISO: el corte no trae gancho_texto -> sale SIN gancho de texto",
                   flush=True)
-        elif not (corte.get("gancho_texto") or "").strip():
-            print("   [gancho texto] sin gancho_texto: uso el titulo", flush=True)
         work = workroot / name
         work.mkdir(parents=True, exist_ok=True)
         ascii_in = work / "in.mp4"
         shutil.copy(str(clip), str(ascii_in))
         out_tmp = work / "out.mp4"
         try:
+            words = cargar_o_transcribir_words(clip, ascii_in, p.idioma)
             pc.burn_subs_and_music(
                 ascii_in, MUSIC, out_tmp,
                 lang=p.idioma, env=env, overlays_dir=OVERLAYS, hook_query=hook,
                 music_typology=music_typology, clip_text=clip_text,
+                words=words,
                 hook_text=gancho_texto, hook_text_dur=p.gancho_duracion,
-                recursos=recursos,
+                recursos=recursos, seed=name,
             )
             shutil.move(str(out_tmp), str(out / f"{name}.mp4"))
             print(f"   OK -> finales/{name}.mp4", flush=True)
         except Exception as e:
+            fallos.append(name)
             traceback.print_exc()
             print(f"   [!] FALLO en {name}: {e}", flush=True)
 
     if _work_es_propio:
         shutil.rmtree(workroot, ignore_errors=True)
     print(f"\nListo. Finales en: {out}", flush=True)
+    if sin_gancho:
+        print(f"AVISO sin gancho de texto ({len(sin_gancho)}): {', '.join(sin_gancho)}", flush=True)
+    if fallos:
+        print(f"FALLOS ({len(fallos)}): {', '.join(fallos)}", flush=True)
+    print(f"QC: .venv\\Scripts\\python.exe qc.py --proyecto {p.id} \"{nombre}\"  (y mira finales/_qc.jpg)",
+          flush=True)
 
     # --- Banco de frases virales (Supabase, best-effort) ---------------------
     # Al terminar la edicion guardamos las frases virales de este video en la

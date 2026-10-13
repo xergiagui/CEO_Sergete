@@ -115,6 +115,36 @@ def get_ffmpeg_exe() -> str:
 # ============================================================
 # 1. DOWNLOAD
 # ============================================================
+DESCARGA_TOOLS = PROJECT_ROOT.parent / "TheDescarga" / "tools"
+
+
+def _yt_dlp_cmd() -> list[str]:
+    """Orden base de yt-dlp (+ --ffmpeg-location para muxar vídeo y audio).
+
+    1) `../TheDescarga/tools/yt-dlp(.exe)` (el venv de TheEditor no trae yt_dlp);
+    2) `python -m yt_dlp` si el módulo está instalado; 3) `yt-dlp` del PATH.
+    """
+    import importlib.util
+    import shutil as _sh
+    exe = DESCARGA_TOOLS / ("yt-dlp.exe" if sys.platform.startswith("win") else "yt-dlp")
+    if exe.exists():
+        cmd = [str(exe)]
+    elif importlib.util.find_spec("yt_dlp") is not None:
+        cmd = [sys.executable, "-m", "yt_dlp"]
+    elif _sh.which("yt-dlp"):
+        cmd = [_sh.which("yt-dlp")]
+    else:
+        raise RuntimeError(
+            f"No hay yt-dlp: ni {exe}, ni el módulo yt_dlp, ni yt-dlp en el PATH.")
+    ff_desc = DESCARGA_TOOLS / ("ffmpeg.exe" if sys.platform.startswith("win") else "ffmpeg")
+    try:
+        ff_loc = str(ff_desc) if ff_desc.exists() else get_ffmpeg_exe()
+        cmd += ["--ffmpeg-location", ff_loc]
+    except Exception:
+        pass
+    return cmd
+
+
 def download_reel(url: str, out_dir: Path) -> Path:
     """Descarga reel forzando vídeo H.264 + audio AAC muxado a MP4.
 
@@ -124,7 +154,8 @@ def download_reel(url: str, out_dir: Path) -> Path:
       -f "bv*+ba/b"     → mejor vídeo + mejor audio (garantiza pista de audio),
                           con fallback a mejor formato combinado
       --merge-output-format mp4 → muxa a un único source.mp4
-    No depende de un yt-dlp del PATH — usa el del venv (sys.executable).
+    yt-dlp: el de TheDescarga (`../TheDescarga/tools/yt-dlp.exe`, el que se
+    mantiene al día) si existe; si no, el módulo del Python actual o el del PATH.
     """
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / "source.mp4"
@@ -132,7 +163,7 @@ def download_reel(url: str, out_dir: Path) -> Path:
         out.unlink()
 
     common = [
-        sys.executable, "-m", "yt_dlp",
+        *_yt_dlp_cmd(),
         "-S", "codec:h264:aac,res,br",
         "-f", "bv*+ba/b",
         "--merge-output-format", "mp4",
@@ -1154,7 +1185,7 @@ def _infer_music_mood(text: str, available: dict):
 
 
 def select_music(music_dir: Path, typology: str = None, clip_text: str = None,
-                 env: dict = None):
+                 env: dict = None, rng=None):
     """Elige (music_path, log) en DOS pasos: tipología por contenido + audio.
 
     Prioridad de tipología:
@@ -1164,8 +1195,12 @@ def select_music(music_dir: Path, typology: str = None, clip_text: str = None,
          entre TODAS las tipologías (y la raíz por compatibilidad).
     Dentro de la tipología elegida: audio por defecto (random). Si la carpeta
     está vacía, se pasa a la siguiente opción. Devuelve (None, motivo) si no hay
-    ningún mp3 en absoluto. Nunca lanza por la selección en sí."""
+    ningún mp3 en absoluto. Nunca lanza por la selección en sí.
+
+    `rng` (random.Random): con la semilla del clip la elección es reproducible
+    (re-renderizar un clip da la misma música). None = azar sin semilla."""
     import random
+    rng = rng or random.Random()
     typs = _music_typologies(music_dir)
 
     chosen, reason = None, None
@@ -1193,16 +1228,16 @@ def select_music(music_dir: Path, typology: str = None, clip_text: str = None,
     for norm, why in order:
         files = _list_music_files(typs.get(norm))
         if files:
-            music = random.choice(files)
+            music = rng.choice(files)
             return music, f"{why}; audio={music.name}"
 
     # último recurso: random entre TODAS las tipologías + raíz (compat. plano)
     allf = []
-    for f in typs.values():
-        allf += _list_music_files(f)
+    for k in sorted(typs):
+        allf += _list_music_files(typs[k])
     allf += _list_music_files(music_dir)
     if allf:
-        music = random.choice(allf)
+        music = rng.choice(allf)
         return music, f"fallback random total; audio={music.name}"
     return None, f"sin ningún mp3 en {music_dir}"
 
@@ -1326,6 +1361,26 @@ def store_viral_phrases(env: dict, phrases, source_url: str = None,
 # ============================================================
 # 8. RENDER FINAL (subs ASS karaoke + música + de-click + B-roll opcional)
 # ============================================================
+# Exportación de las tres vías (regla de Sergio: 1080x1920, H.264, fps de la
+# fuente, 8–12 Mb/s, AAC 48 kHz estéreo). Con CRF 18 un busto reescalado sale
+# a ~6,5 Mb/s (por debajo del mínimo), así que se fija el bitrate: objetivo
+# 10 Mb/s (mejor calidad que CRF 18 en ese material) y el VBV (maxrate/bufsize)
+# impide pasar de 12 Mb/s en los tramos complejos.
+VIDEO_ENC = ["-c:v", "libx264", "-preset", "medium", "-b:v", "10M",
+             "-maxrate", "12M", "-bufsize", "24M", "-pix_fmt", "yuv420p"]
+AUDIO_ENC = ["-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2"]
+
+
+def transcribe_words(video: Path, lang: str = "es") -> list[dict]:
+    """Word-timestamps (faster-whisper large-v3) con palabrotas enmascaradas:
+    lo que usan los subtítulos y la sincronía del b-roll."""
+    from faster_whisper import WhisperModel
+    model = WhisperModel("large-v3", device="cpu", compute_type="int8")
+    segs, _info = model.transcribe(str(video), language=lang, word_timestamps=True)
+    return [{"word": _mask_profanidad(w.word.strip()), "start": w.start, "end": w.end}
+            for s in segs for w in s.words]
+
+
 def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
                         lang: str = "es", env: dict = None,
                         broll_keywords: list[str] = None,
@@ -1336,8 +1391,17 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
                         words: list = None,
                         hook_text: str = None,
                         hook_text_dur: float = None,
-                        recursos: dict = None) -> Path:
+                        recursos: dict = None,
+                        seed: str = None) -> Path:
     """Render final: gancho + B-roll + música + de-click + subs ASS karaoke.
+
+    `seed` (nombre del clip): toda elección al azar (música y b-roll) sale de
+    `random.Random(seed)`, así que re-renderizar un clip da la misma música y el
+    mismo b-roll y no cambia los demás. None = azar sin semilla.
+
+    Exportación (las tres vías): H.264 1080x1920 a 10 Mb/s con VBV a 12
+    (`VIDEO_ENC`, 8–12 Mb/s), AAC 48 kHz estéreo y la mezcla acabada en un
+    limitador (`alimiter=limit=0.95`, pico < 0 dBFS).
 
     `recursos` = política de recursos del PROYECTO (ver `_politica_recursos`).
     None → comportamiento de siempre (banco común + internet: MongeMalo, vía 3).
@@ -1368,6 +1432,7 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
     definidos.
     """
     import random
+    rng = random.Random(str(seed)) if seed else random.Random()
     ff = get_ffmpeg_exe()
     pol = _politica_recursos(recursos)
     legacy = pol["legacy"]
@@ -1387,7 +1452,7 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
         print("  [música] AVISO: el proyecto no tiene carpeta de música -> sin música")
     else:
         music, music_log = select_music(music_dir, typology=music_typology,
-                                        clip_text=clip_text, env=env)
+                                        clip_text=clip_text, env=env, rng=rng)
         if not music:
             if legacy or pol["musica"] == "banco_comun":
                 raise RuntimeError(f"No hay MP3 en {music_dir} ({music_log})")
@@ -1406,11 +1471,7 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
     # Si el llamador ya transcribió (batch), reutilizamos sus `words` para no
     # correr whisper large-v3 dos veces por clip; si no, transcribimos aquí.
     if words is None:
-        from faster_whisper import WhisperModel
-        model = WhisperModel("large-v3", device="cpu", compute_type="int8")
-        segs, _info = model.transcribe(str(heygen_mp4), language=lang, word_timestamps=True)
-        words = [{"word": _mask_profanidad(w.word.strip()), "start": w.start, "end": w.end}
-                 for s in segs for w in s.words]
+        words = transcribe_words(heygen_mp4, lang=lang)
 
     # Ventanas de b-roll SINCRONIZADAS con la voz: (start, end, texto-de-frase).
     # Si no hay frases → intervalos (legacy).
@@ -1439,7 +1500,7 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
                     if not pool:
                         print(f"  [broll] {s:.1f}-{e:.1f}s -> sin b-roll propio sin repetir (se omite)")
                         continue
-                    rel = random.choice(pool); src = "azar"
+                    rel = rng.choice(pool); src = "azar"
                 used.add(rel)
                 clips.append(by_rel[rel]); windows.append((s, e))
                 print(f"  [broll] {s:.1f}-{e:.1f}s -> {rel} ({src})")
@@ -1448,9 +1509,10 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
         elif by_rel:
             n = max(1, int(duration // 6))
             pool = [r for r in by_rel if r not in avisos]
-            random.shuffle(pool)
+            rng.shuffle(pool)
             clips = [by_rel[r] for r in pool[:n]]
-            print(f"  [broll] {len(clips)} b-roll propios (intervalos, sin frases)")
+            print(f"  [broll] {len(clips)} b-roll propios (intervalos, sin frases): "
+                  + ", ".join(c.name for c in clips))
         else:
             print(f"  [broll] el proyecto no tiene b-roll propio en {overlays_dir} -> sin b-roll")
         overlays = []
@@ -1471,7 +1533,7 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
                 pool = [o for o in overlays if o.name not in used]
                 if not pool:
                     break
-                clip = random.choice(pool); used.add(clip.name)
+                clip = rng.choice(pool); used.add(clip.name)
                 clips.append(clip); windows.append((s, e))
                 print(f"  [broll] {s:.1f}-{e:.1f}s -> {clip.name} (azar, sin internet)")
             overlays = []
@@ -1492,7 +1554,7 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
             else:
                 pool = ([o for o in overlays if o.name not in used and o.name not in avisos]
                         or [o for o in overlays if o.name not in used] or overlays)
-                clip = random.choice(pool); used.add(clip.name); src = "azar"
+                clip = rng.choice(pool); used.add(clip.name); src = "azar"
             clips.append(clip); windows.append((s, e))
             print(f"  [broll] {s:.1f}-{e:.1f}s -> {clip.name} ({src})")
         print(f"  [broll] {len(clips)} cortes sinc. con la voz ({n_sem} por semántica)")
@@ -1501,9 +1563,10 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
         avisos = _broll_avisos(env or {})
         n = max(1, int(duration // 6))
         pool = [o for o in overlays if o.name not in avisos] or overlays
-        random.shuffle(pool)
+        rng.shuffle(pool)
         clips = (pool * (n // len(pool) + 1))[:n]
-        print(f"  [broll] {len(clips)} superposiciones locales (intervalos, sin frases)")
+        print(f"  [broll] {len(clips)} superposiciones locales (intervalos, sin frases): "
+              + ", ".join(c.name for c in clips))
     elif banco_broll and net_ok and not clips:
         pexels_key = (env or {}).get("PEXELS_API_KEY", "").strip()
         if pexels_key and broll_keywords:
@@ -1597,7 +1660,8 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
         f"dynaudnorm=f=200:g=11[voz];"
         f"{mus_chain}"
         f"{sfx_chain}"
-        f"[voz]{'[mus]' if music else ''}{sfx_mix}amix=inputs={total_mix}:duration=first:dropout_transition=0:normalize=0[a]"
+        f"[voz]{'[mus]' if music else ''}{sfx_mix}amix=inputs={total_mix}:duration=first:dropout_transition=0:"
+        f"normalize=0,alimiter=limit=0.95:level=0[a]"
     )
     dur = _get_duration(base_video, ff)
 
@@ -1609,7 +1673,7 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
         *extra_inputs,
         "-filter_complex", filt,
         "-map", "0:v", "-map", "[a]",
-        "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
+        "-c:v", "copy", *AUDIO_ENC,
         "-t", str(dur), "-movflags", "+faststart", str(pass1),
     ], check=True, capture_output=True)
 
@@ -1619,9 +1683,7 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
     ass_ff = str(ass_path).replace("\\", "/").replace(":", "\\:")
     fonts_ff = str(FONTS_DIR).replace("\\", "/").replace(":", "\\:")
     vf_subs = f"ass='{ass_ff}':fontsdir='{fonts_ff}'"
-    enc = ["-c:v", "libx264", "-preset", "medium", "-crf", "18",
-           "-c:a", "copy", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
-           str(out_mp4)]
+    enc = [*VIDEO_ENC, "-c:a", "copy", "-movflags", "+faststart", str(out_mp4)]
     if hook_text and hook_text.strip():
         # Gancho de texto: PNG transparente superpuesto desde t=0, con fundido de
         # salida, y los subtítulos quemados ENCIMA (mismo pase: sin reencode extra).
@@ -1786,9 +1848,20 @@ def _merge_number_tokens(words):
     return out
 
 
+def _subs_weak(word: str) -> bool:
+    """¿Palabra débil (artículo, preposición, «que»…) que no debe cerrar un
+    grupo de subtítulos? Con puntuación detrás (pausa o fin de frase) no lo es."""
+    raw = (word or "").strip()
+    if not raw or re.search(r"[.,;:!?…]$", raw):
+        return False
+    return raw.lower().strip("¿¡\"'«»()“”‘’") in _HOOK_WEAK
+
+
 def _generate_ass_karaoke(words, ass_path: Path):
     """Subtítulos legibles y limpios (sin animación):
-      - 1 sola línea, máximo 3 palabras, en minúsculas.
+      - 1 sola línea, máximo 3 palabras, en minúsculas; el grupo se corta tras
+        un fin de frase y nunca acaba en palabra débil (`_HOOK_WEAK`) si hay
+        otra detrás (unidad de sentido).
       - Montserrat, blanco con RESEGUIDO NEGRO grueso + sombra suave.
       - Centrados horizontalmente y ubicados a la altura de la BARBILLA
         (ni tapan boca/ojos ni quedan al fondo de la pantalla).
@@ -1813,13 +1886,19 @@ def _generate_ass_karaoke(words, ass_path: Path):
     cap_next = True
     while i < len(ws):
         grp = ws[i:i + 3]  # máximo 3 palabras
-        # cortar el grupo si hay un silencio grande entre palabras
+        # cortar el grupo si hay un silencio grande entre palabras o si una
+        # palabra cierra frase (. ? ! …): la frase siguiente empieza grupo nuevo
         cut = len(grp)
         for j in range(1, len(grp)):
-            if grp[j]["start"] - grp[j - 1]["end"] > 0.7:
+            if (grp[j]["start"] - grp[j - 1]["end"] > 0.7
+                    or _SUBS_SENT_END_RE.search((grp[j - 1]["word"] or "").strip())):
                 cut = j
                 break
         grp = grp[:cut]
+        # unidad de sentido: el grupo no acaba en artículo/preposición/«que»…
+        # (_HOOK_WEAK) si hay palabra después; esa palabra pasa al grupo siguiente
+        while len(grp) > 1 and i + len(grp) < len(ws) and _subs_weak(grp[-1]["word"]):
+            grp = grp[:-1]
         parts = []
         for w in grp:
             raw = (w["word"] or "").strip()

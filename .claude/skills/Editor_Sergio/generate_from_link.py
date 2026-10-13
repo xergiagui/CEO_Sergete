@@ -185,7 +185,7 @@ def phase_c_edit(env: dict, heygen_path: str, avatar: str, slug: str,
             heygen_mp4, music_dir, workdir / "final.mp4",
             lang=lang, env=env, broll_keywords=broll_keywords,
             overlays_dir=overlays_dir, hook_query=hook_query,
-            recursos=recursos,
+            recursos=recursos, seed=f"{avatar}/{slug}",
         )
         local = save_local(avatar, slug, "Video Editado", final)
         ff = get_ffmpeg_exe()

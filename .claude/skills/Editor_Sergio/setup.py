@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 from pipeline_core import (
-    ENV_PATH, HOME_DIR, save_env, heygen_upload_photo, get_ffmpeg_exe,
+    ENV_PATH, HOME_DIR, PROJECT_ROOT, save_env, heygen_upload_photo, get_ffmpeg_exe,
 )
 
 
@@ -127,13 +127,42 @@ SCHEMA_FIELDS = [
 
 
 def get_venv_python() -> Path:
-    """Devuelve el path al python del venv. Raise si no existe."""
-    py = HOME_DIR / "venv" / "bin" / "python3"
-    if not py.exists():
-        raise RuntimeError(
-            f"venv no encontrado en {py}. Ejecuta primero: bash bootstrap.sh"
-        )
-    return py
+    """Python con el que corre la skill: el .venv de TheEditor si existe (el de
+    este equipo); si no, el venv de bootstrap. Raise si no hay ninguno."""
+    cands = [PROJECT_ROOT / ".venv" / "Scripts" / "python.exe",
+             PROJECT_ROOT / ".venv" / "bin" / "python",
+             HOME_DIR / "venv" / "Scripts" / "python.exe",
+             HOME_DIR / "venv" / "bin" / "python3"]
+    for py in cands:
+        if py.exists():
+            return py
+    raise RuntimeError(
+        f"No hay venv ({PROJECT_ROOT / '.venv'} ni {HOME_DIR / 'venv'}). "
+        f"Ejecuta primero bootstrap.py."
+    )
+
+
+# Claves sin las que la vía del avatar no puede arrancar (TTS + HeyGen). El
+# setup solo se salta si están TODAS en env.json.
+CLAVES_AVATAR = ["HEYGEN_API_KEY", "ELEVENLABS_API_KEY", "ELEVENLABS_VOICE_ID",
+                 "HEYGEN_ENGINE"]
+
+
+def faltan_claves_setup(env: dict | None = None) -> list[str]:
+    """Claves de HeyGen/ElevenLabs que faltan en env.json ([] = setup hecho).
+
+    Incluye el ID del avatar según el engine (HEYGEN_LOOK_ID para avatar_v;
+    HEYGEN_TALKING_PHOTO_ID o AVATAR_PHOTO para avatar_iv)."""
+    import json
+    if env is None:
+        env = json.loads(ENV_PATH.read_text(encoding="utf-8")) if ENV_PATH.exists() else {}
+    faltan = [k for k in CLAVES_AVATAR if not str(env.get(k) or "").strip()]
+    engine = str(env.get("HEYGEN_ENGINE") or "").lower()
+    if engine == "avatar_v" and not env.get("HEYGEN_LOOK_ID"):
+        faltan.append("HEYGEN_LOOK_ID")
+    elif engine == "avatar_iv" and not (env.get("HEYGEN_TALKING_PHOTO_ID") or env.get("AVATAR_PHOTO")):
+        faltan.append("HEYGEN_TALKING_PHOTO_ID")
+    return faltan
 
 
 def validate_config(env: dict) -> list[str]:
@@ -238,6 +267,11 @@ def verify_look_avatar_v(look_id: str, api_key: str) -> bool:
 
 
 if __name__ == "__main__":
+    if sys.argv[1:2] == ["faltan"]:
+        # ¿Se puede saltar el setup? SETUP_OK o la lista de claves que faltan.
+        f = faltan_claves_setup()
+        print("SETUP_OK" if not f else "FALTAN: " + ", ".join(f))
+        sys.exit(0 if not f else 1)
     print("Setup helpers para viral-pipeline v1.")
     print(f"Config se guardará en: {ENV_PATH}")
     print()

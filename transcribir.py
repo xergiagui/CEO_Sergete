@@ -24,7 +24,12 @@ Uso:
     python transcribir.py --proyecto mongemalo "video.mp4"  -> uno de su input/
     python transcribir.py --proyecto mongemalo "C:/ruta/v.mp4"   (cualquier ruta)
     python transcribir.py --proyecto x "largo.mp4" --umbral-min 35 --chunk-min 10
+    python transcribir.py --proyecto x "video.mp4" --forzar   -> aunque ya esté hecho
 Si solo hay un proyecto, --proyecto se puede omitir.
+
+Se SALTA lo que ya está transcrito (transcripciones/<nombre>/<nombre>.txt) o ya
+aprobado y archivado (_Historico/<id>/<nombre>/), salvo con --forzar: así, sin
+argumento, no se reprocesan los vídeos que siguen en input/ ya aprobados.
 """
 import argparse
 import json
@@ -228,6 +233,17 @@ def transcribir(origen: Path, idioma: str = "es",
     print(f"   OK -> {base}/  ({origen.stem}.txt + .srt + .json)")
 
 
+def ya_hecho(p, ruta: Path) -> str | None:
+    """Motivo para saltar `ruta` (ya transcrita o ya aprobada) o None."""
+    stem = ruta.stem
+    if (p.transcripciones_dir / stem / f"{stem}.txt").exists():
+        return f"ya transcrito en transcripciones/{stem}/"
+    arch = p.archivado(stem)
+    if arch:
+        return f"ya aprobado y archivado en {arch}"
+    return None
+
+
 def main():
     parser = argparse.ArgumentParser(description="Paso 1 — Transcripcion con whisper.cpp large-v3 + DTW")
     parser.add_argument("archivo", nargs="?",
@@ -243,6 +259,8 @@ def main():
                         help="Directorio intermedio a usar (ASCII, bajo la raiz). "
                              "Por defecto se crea uno UNICO por ejecucion (seguro "
                              "para transcripciones en paralelo).")
+    parser.add_argument("--forzar", action="store_true",
+                        help="Transcribir aunque ya esté en transcripciones/ o en _Historico/.")
     args = parser.parse_args()
     p = proyecto.abrir(args.proyecto, "transcribir")
     entrada, salida = p.input_dir, p.transcripciones_dir
@@ -268,11 +286,19 @@ def main():
     umbral_seg = args.umbral_min * 60
     chunk_seg = args.chunk_min * 60
     work_dir = Path(args.work_dir) if args.work_dir else None
+    saltados = 0
     for ruta in objetivos:
         if not ruta.exists():
             print(f"[!] No existe: {ruta}")
             continue
+        motivo = None if args.forzar else ya_hecho(p, ruta)
+        if motivo:
+            saltados += 1
+            print(f"= {ruta.name}: {motivo} -> salto (--forzar para repetir)")
+            continue
         transcribir(ruta, idioma, umbral_seg, chunk_seg, work_dir, salida=salida)
+    if saltados:
+        print(f"\n{saltados} archivo(s) saltado(s) por estar ya hechos o aprobados.")
 
     print(f"\nListo. Transcripciones en: {salida}")
 

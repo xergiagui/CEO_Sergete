@@ -16,7 +16,11 @@ Uso:
     python clips.py --proyecto mongemalo "Mi Adicción"   -> su input/Mi Adicción.mp4
     python clips.py --proyecto mongemalo "C:/ruta/video.mp4"   -> ruta concreta
     python clips.py --proyecto x "video" --cortes cortes.json  -> spec explicito
-Si solo hay un proyecto, --proyecto se puede omitir.
+    python clips.py --proyecto x "video" --solo 03_nombre                -> solo ese clip
+    python clips.py --proyecto x "video" --solo 03_nombre --umbral 3% --margen 0.3s
+                                    -> corrección de silencios de un clip (no toca proyecto.json)
+Si solo hay un proyecto, --proyecto se puede omitir. Un vídeo ya aprobado
+(_Historico/<id>/<video>/) no se vuelve a cortar salvo con --forzar.
 
 Formato de cortes.json (lista de objetos):
     [
@@ -30,7 +34,8 @@ Formato de cortes.json (lista de objetos):
   - gancho_texto (opcional)  -> texto de gancho en pantalla (2,5 s, franja
                                 superior) que quema editar_clips.py; max. 2
                                 lineas (~45 car.), con tildes, abre un bucle que
-                                el clip cumple. Si falta, se usa el titulo.
+                                el clip cumple. Si falta, el clip sale SIN
+                                gancho (con aviso): nunca se usa el titulo.
   - hook_query (opcional)    -> lo usa editar_clips.py para la imagen-gancho
   - frase_viral(opcional)    -> texto VERBATIM mas potente/gancho del clip; lo
                                 usa editar_clips.py para guardarlo en el banco de
@@ -84,16 +89,40 @@ except Exception:
     _CV2_OK = False
 
 
-def _detectar_cara(gray):
-    """Mayor cara (x,y,w,h) por Haar frontal; si no hay, perfil (ambos lados)."""
-    faces = _HAAR.detectMultiScale(gray, 1.1, 5, minSize=(24, 24))
-    if len(faces):
+SKIN_MIN_FRAC = 0.20   # fracción mínima de píxeles de piel (YCrCb) en una cara
+
+
+def _es_piel(color, x, y, w, h) -> bool:
+    """¿La detección tiene tono de piel? Filtro YCrCb (el mismo del batch) para
+    descartar falsos positivos de Haar (estampados, logos, fondos)."""
+    H, W = color.shape[:2]
+    x0, y0 = max(0, int(x)), max(0, int(y))
+    x1, y1 = min(W, int(x + w)), min(H, int(y + h))
+    if x1 <= x0 or y1 <= y0:
+        return False
+    ycc = cv2.cvtColor(color[y0:y1, x0:x1], cv2.COLOR_BGR2YCrCb)
+    skin = cv2.inRange(ycc, (0, 133, 77), (255, 173, 127))
+    return (skin.mean() / 255.0) > SKIN_MIN_FRAC
+
+
+def _detectar_cara(gray, color=None):
+    """Mayor cara (x,y,w,h) por Haar frontal; si no hay, perfil (ambos lados).
+
+    Con `color` (el fotograma BGR), solo cuentan las detecciones con tono de
+    piel (filtro YCrCb): la cara dominante es la del protagonista, no un falso
+    positivo. Sin `color`, como antes."""
+    def ok(f):
+        return color is None or _es_piel(color, *f)
+
+    faces = [f for f in _HAAR.detectMultiScale(gray, 1.1, 5, minSize=(24, 24)) if ok(f)]
+    if faces:
         return max(faces, key=lambda f: f[2] * f[3])
     if _HAAR_PROF is not None and not _HAAR_PROF.empty():
         cand = list(_HAAR_PROF.detectMultiScale(gray, 1.1, 4, minSize=(24, 24)))
         flip = cv2.flip(gray, 1)
         for (x, y, w, h) in _HAAR_PROF.detectMultiScale(flip, 1.1, 4, minSize=(24, 24)):
             cand.append((gray.shape[1] - x - w, y, w, h))  # des-espejar
+        cand = [f for f in cand if ok(f)]
         if cand:
             return max(cand, key=lambda f: f[2] * f[3])
     return None
@@ -296,7 +325,7 @@ def muestrear_caras(video: Path, inicio, fin, src_w, src_h, fps=5):
             H, W = fr.shape[:2]
             sx, sy = src_w / W, src_h / H  # escala a pixeles del fuente
             gray = cv2.cvtColor(fr, cv2.COLOR_BGR2GRAY)
-            f = _detectar_cara(gray)
+            f = _detectar_cara(gray, fr)
             if f is not None:
                 fx, fy, fw, fh = f
                 samples.append({"cx": (fx + fw / 2) * sx,
@@ -448,6 +477,15 @@ def main():
     proyecto.add_argumento(ap)
     ap.add_argument("--cortes", help="Ruta al cortes.json (por defecto "
                                      "proyectos/<id>/transcripciones/<video>/cortes.json).")
+    ap.add_argument("--solo", action="append", metavar="NOMBRE",
+                    help="Solo este corte (repetible o separado por comas). Para corregir un clip "
+                         "sin tocar los demás.")
+    ap.add_argument("--umbral", default=None,
+                    help="Umbral de silencio SOLO para esta ejecución (p. ej. 3%%); no toca proyecto.json.")
+    ap.add_argument("--margen", default=None,
+                    help="Margen de silencio SOLO para esta ejecución (p. ej. 0.3s); no toca proyecto.json.")
+    ap.add_argument("--forzar", action="store_true",
+                    help="Cortar aunque el vídeo ya esté aprobado en _Historico/.")
     ap.add_argument("--keep-tmp", action="store_true", help="No borrar intermedios.")
     args = ap.parse_args()
     p = proyecto.abrir(args.proyecto, "clips")
@@ -455,13 +493,23 @@ def main():
     video, nombre = resolver_video(args.video, p.input_dir)
     if not video.exists():
         raise SystemExit(f"[!] No existe el video: {video}")
+    arch = p.archivado(nombre)
+    if arch and not args.forzar:
+        raise SystemExit(f"[!] «{nombre}» ya está aprobado y archivado en {arch}. "
+                         f"No se vuelve a cortar (usa --forzar si de verdad hace falta).")
 
     base = p.transcripciones_dir / nombre
     salida = base / "clips"
     tmp = salida / "_tmp"
     cortes_path = Path(args.cortes) if args.cortes else (base / "cortes.json")
-    sil = p.silencios
+    sil = proyecto.silencios_cli(p.silencios, args.umbral, args.margen)
     cortes = cargar_cortes(cortes_path)
+    solo = proyecto.filtrar_solo([c["nombre"] for c in cortes], args.solo, "corte")
+    if solo is not None:
+        cortes = [c for c in cortes if c["nombre"] in solo]
+    if (args.umbral or args.margen) and solo is None:
+        print("[!] AVISO: --umbral/--margen sin --solo se aplican a TODOS los cortes de esta "
+              "ejecución (no se guardan en proyecto.json).")
 
     salida.mkdir(parents=True, exist_ok=True)
     tmp.mkdir(parents=True, exist_ok=True)
@@ -470,7 +518,10 @@ def main():
                else "OpenCV NO disponible -> recorte centrado (instala "
                     "opencv-python-headless para el seguimiento de cara)")
     print(f"Video: {video}  ({src_w}x{src_h})\n"
-          f"Cortes: {cortes_path}  ({len(cortes)} clips)\nEncuadre 9:16: {encuadre}\n")
+          f"Cortes: {cortes_path}  ({len(cortes)} clips"
+          f"{', solo ' + ', '.join(sorted(solo)) if solo else ''})\nEncuadre 9:16: {encuadre}\n"
+          f"Silencios: umbral {sil['umbral']} · margen {sil['margen']}"
+          f"{'' if sil == p.silencios else ' (solo esta ejecución)'}\n")
 
     for c in cortes:
         cn, ini, fin = c["nombre"], c["inicio"], c["fin"]
@@ -480,6 +531,8 @@ def main():
         final = salida / f"{cn}.mp4"
         cortar_vertical(video, ini, fin, vert, src_w=src_w, src_h=src_h)
         quitar_silencios(vert, final, umbral=sil["umbral"], margen=sil["margen"])
+        # el clip ha cambiado: los word-timestamps guardados ya no valen
+        (salida / f"{cn}.words.json").unlink(missing_ok=True)
         print(f"   OK -> {final.name}  (sin subtitulos; los pone Editor_Sergio)")
 
     if tmp.exists() and not args.keep_tmp:

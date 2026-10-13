@@ -178,7 +178,7 @@ c = phase_c_edit(env, b["heygen_path"], avatar, slug, lang=lang, hook_query="<qu
 
 **Subtítulos (REGLAS DURAS, `_generate_ass_karaoke`):**
 - **Fuente Montserrat** (en `fonts/`, se pasa `fontsdir` a ffmpeg), **blanco con reseguido negro grueso + sombra suave**. Nada de blanco sin borde, ni tipografías que se descuadren con acentos.
-- **1 sola línea, máximo 3 palabras**, en **minúsculas**. Limpio y fácil de leer.
+- **1 sola línea, máximo 3 palabras**, en **minúsculas** (mayúscula al inicio y tras `.`, `?`, `!`). El grupo se corta tras un fin de frase y nunca acaba en artículo, preposición o «que» si hay otra palabra detrás. Limpio y fácil de leer.
 - **Ubicación: a la altura de la BARBILLA** (centrado horizontal, `Alignment=2` + `MarginV≈640`). NUNCA tapar boca ni ojos (conexión emocional), ni dejarlo al fondo de la pantalla.
 - **Estáticos, SIN animación/movimiento** (aparecen y desaparecen). Nada de karaoke, zoom, letra en movimiento → más retención.
 - Palabrotas enmascaradas (`_mask_profanidad`, p.ej. `j***`).
@@ -202,19 +202,35 @@ Esta versión NO sube a Airtable: la salida es local. El código Airtable queda 
 
 ---
 
-## ⚙️ Setup automático (cross-platform)
+## ⚙️ Python y setup
+
+**En el equipo de Sergio (TheEditor) no hay que hacer bootstrap.** Todo se ejecuta
+con el venv de TheEditor, con el cwd en la carpeta de la skill:
+```
+C:\Users\ico858\Desktop\PruebasIA\TheEditor\.venv\Scripts\python.exe
+```
+(nunca el Python global ni `python3`, que en Windows es el acceso directo de la
+Microsoft Store). `download_reel` usa el `yt-dlp.exe` de TheDescarga
+(`..\TheDescarga\tools\yt-dlp.exe`, con su `ffmpeg.exe`), porque el venv de
+TheEditor no trae el módulo `yt_dlp`.
+
+En otro equipo sin TheEditor (cross-platform):
 ```bash
 bash <SKILL_DIR>/bootstrap.sh      # macOS / Linux
 python <SKILL_DIR>/bootstrap.py    # Windows (o universal)
 ```
-Idempotentes: crean venv en `~/.viral-pipeline/venv/`, instalan `httpx`/`faster-whisper`/`Pillow`/`imageio-ffmpeg`/`yt-dlp`, verifican libass.
+Crean venv en `~/.viral-pipeline/venv/` (`bin/python3` o `Scripts/python.exe`),
+instalan `httpx`/`faster-whisper`/`Pillow`/`imageio-ffmpeg`/`yt-dlp` y verifican libass.
 
-| OS | Python del venv |
-|----|------------------|
-| macOS / Linux | `~/.viral-pipeline/venv/bin/python3` |
-| Windows | `~/.viral-pipeline/venv/Scripts/python.exe` |
-
-Si `~/.viral-pipeline/env.json` ya existe → SKIP setup, lanza directamente popup `Descripción del avatar` (si falta `AVATAR_DESCRIPTION`) o `Link del reel`.
+**¿Saltar el setup?** Solo si `env.json` tiene las claves de HeyGen y ElevenLabs.
+Compruébalo (desde la carpeta de la skill):
+```
+<python> setup.py faltan     → «SETUP_OK» o «FALTAN: HEYGEN_API_KEY, …»
+```
+- `SETUP_OK` → SKIP setup: popup `Descripción del avatar` (si falta `AVATAR_DESCRIPTION`) o `Link del reel`.
+- `FALTAN: …` → popups del setup solo para lo que falta (`Config APIs`, `Voz`,
+  `Avatar HeyGen`), conservando lo que ya hay en `env.json` (Supabase, Pexels…).
+  Que exista `env.json` **no** basta: hoy solo trae Supabase y Pexels.
 
 ---
 
