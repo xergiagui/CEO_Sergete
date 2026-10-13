@@ -6,6 +6,9 @@
   "nicho": "ventas, copywriting, emprendimiento y dinero (ideas de Luis Monge)",
   "autor": "PENDIENTE (quién firma: E-E-A-T)",
   "marca": "marca/BRAND.md y marca/VOICE.md (PENDIENTES)",
+  "landing": "https://the-landing-ten.vercel.app",
+  "afiliado": "?via=sergio-aguilar",
+  "_cta": "CTA a la landing (web propia, enlace normal) o a la página de una oferta con el parámetro de afiliado (enlace con rel=\"sponsored\"). URL reales de cada oferta, ya con ?via=: TheCopy/proyectos/mongemalo/ofertas.json.",
   "enlaces_internos": [],
   "reglas": [
     "Perfil independiente de afiliado: no hablar como Luis Monge ni prometer resultados económicos.",

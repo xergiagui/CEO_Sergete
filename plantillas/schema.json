@@ -1,0 +1,55 @@
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "BlogPosting",
+      "@id": "{siteUrl}/blog/{slug}#article",
+      "headline": "{title}",
+      "description": "{description}",
+      "inLanguage": "es-ES",
+      "datePublished": "{date}",
+      "dateModified": "{lastUpdated}",
+      "author": { "@id": "{siteUrl}/autor/{autor-slug}#person" },
+      "publisher": { "@id": "{siteUrl}#organization" },
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": "{siteUrl}/blog/{slug}",
+        "breadcrumb": { "@id": "{siteUrl}/blog/{slug}#breadcrumb" }
+      },
+      "keywords": ["{keyword}", "{tag}"],
+      "wordCount": 0
+    },
+    {
+      "@type": "Person",
+      "@id": "{siteUrl}/autor/{autor-slug}#person",
+      "name": "{autor}",
+      "url": "{siteUrl}/autor/{autor-slug}"
+    },
+    {
+      "@type": "Organization",
+      "@id": "{siteUrl}#organization",
+      "name": "{organizacion}",
+      "url": "{siteUrl}"
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "{siteUrl}/blog/{slug}#breadcrumb",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "{siteUrl}" },
+        { "@type": "ListItem", "position": 2, "name": "Blog", "item": "{siteUrl}/blog" },
+        { "@type": "ListItem", "position": 3, "name": "{title}", "item": "{siteUrl}/blog/{slug}" }
+      ]
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "{siteUrl}/blog/{slug}#faq",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "{pregunta visible}",
+          "acceptedAnswer": { "@type": "Answer", "text": "{respuesta visible, literal}" }
+        }
+      ]
+    }
+  ]
+}
