@@ -45,15 +45,25 @@ cd "/c/Users/ico858/Desktop/PruebasIA/TheCopy"
        que se dice en el clip (`contexto.transcripcion` / `frase_viral`). Sigue el
        `tono` y las `reglas_copy` y termina con el CTA. Si la oferta no es
        genérica, nómbrala. **Sin hashtags dentro del copy.** No inventes cifras.
-     - `hashtags`: **solo los TEMÁTICOS** (en MongeMalo, 1–2), preferiblemente
-       del banco temático. Los **fijos** los añade el script: no los escribas.
+     - `hashtags`: **solo los TEMÁTICOS**, elegidos **por tamaño** del banco
+       (`copys.py hashtags` enseña las reglas, el banco nicho/medio/amplio y los
+       últimos conjuntos usados). En MongeMalo/Instagram: 2–4 temáticos, 3–5 en
+       total con el fijo `#grupoalfa`, mínimo 2 de nicho y como mucho 1 amplio;
+       **rota** el conjunto, no repitas el de otro clip. Los **fijos** los añade
+       el script: no los escribas.
      - `titulo`: solo si aparece (YouTube), ≤ 100 caracteres, con el gancho.
    - Si `contexto` solo trae `aviso` (clip sin cortes.json): mira
      `copys.py banco` y adapta un copy marcado como `(libre)`, o pide al CEO
      una línea sobre el clip.
    - Todos los copys de una tanda deben ser **distintos entre sí** y de los ya registrados.
-4. **Valida en seco**: `copys.py registrar --entrada <tanda> --simular`.
-   Corrige lo que marque como error (los avisos son orientativos).
+4. **Valida en seco**: `copys.py registrar --entrada <tanda> --simular` (incluye
+   la auditoría de `referencias/auditoria_copy.md`; también suelta con
+   `copys.py auditar --entrada <tanda>`). Los **errores** bloquean (gancho de más
+   de 125 caracteres, cebo de interacción, hashtags fuera de rango…). Los
+   **avisos de estilo** (paralelismo negativo «no es X, es Y», revelaciones,
+   sinceridad impostada, vocabulario de IA, emojis) se corrigen **reescribiendo**
+   antes de registrar; solo se dejan si la frase es literal del clip. Los demás
+   avisos son orientativos.
 5. **Registra**: `copys.py registrar --entrada <tanda>`. Escribe el Excel y el
    `.txt` junto a cada MP4. Si dice que **el Excel está abierto**, no reintentes
    en bucle: díselo al CEO para que Sergio lo cierre.

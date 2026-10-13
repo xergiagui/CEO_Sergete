@@ -43,7 +43,8 @@ Al darles OK pasan a `HISTORIAS/1. Pte publicar` (sin copy).
 
 **TheCopy entra al dar OK:** cuando apruebas clips y pasan a
 `REVISADOS/1. pte Publicar`, se escribe su copy y sus hashtags según las reglas del
-proyecto (hoy MongeMalo: 4 hashtags fijos + 1–2 según el tema). Cada clip queda con su
+proyecto (hoy MongeMalo: 3–5 hashtags por tamaño, con `#grupoalfa` fijo y el resto
+rotando según el tema) y pasa una auditoría antes de registrarse. Cada clip queda con su
 `.txt` al lado y una fila en el Excel del proyecto (ID, enlace al vídeo, copy,
 hashtags, estado). Instagram activo; TikTok y YouTube preparados.
 
