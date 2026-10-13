@@ -6,6 +6,11 @@ Landing de afiliación de Monge Malo (perfil independiente). Next.js + Supabase,
 desplegada en Vercel (the-landing-ten.vercel.app). Lo dirige CEO_Sergete con el
 subagente `landing`.
 
+**Proyecto:** toda la app es del proyecto `mongemalo` (índice en
+`CEO_Sergete/proyectos.json`). Es el destino del enlace de la bio de
+@xergi.ventas y de los CTA de los copys. Si otro proyecto necesita web propia, se
+decide aparte (no mezclar en esta app).
+
 ## Despliegue
 - Vercel despliega **solo** al hacer `git push` a `main`. Confirma con Sergio
   antes de cualquier push o deploy.
