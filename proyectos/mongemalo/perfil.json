@@ -1,0 +1,21 @@
+{
+  "proyecto": "mongemalo",
+  "nombre": "MongeMalo",
+  "plataforma": "instagram",
+  "cuenta": "@xergi.ventas",
+  "objetivo": "llevar tráfico a la landing de afiliación",
+  "enlace_destino": "https://the-landing-ten.vercel.app",
+  "posicionamiento": "Perfil independiente de Sergio que publica clips y carruseles con las ideas de ventas, copywriting y negocio de Luis Monge, con enlaces de afiliado a sus cursos.",
+  "marca": {"fondo": "#14171f", "acento": "#f59e0b", "texto": "#ffffff"},
+  "reglas": {
+    "transparencia_afiliacion": true,
+    "marcas_afiliacion": ["afiliad"],
+    "palabras_prohibidas": ["muy fácil", "garantizado", "garantizo", "hazte rico", "dinero fácil", "trabajando para", "oficial"],
+    "palabras_clave_nombre": ["ventas", "vender", "copywriting", "copy"],
+    "emojis_max_bio": 0,
+    "no_suplantar": "No es la cuenta oficial de Luis Monge: nunca hablar como él ni dar a entender que trabaja para él."
+  },
+  "historial": [
+    {"fecha": "2026-10-13", "captura": "capturas/2026-10-13_cabecera.png", "auditoria": "auditorias/2026-10-13.md"}
+  ]
+}

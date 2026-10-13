@@ -1,0 +1,19 @@
+{
+  "proyecto": "<id>",
+  "nombre": "<Nombre>",
+  "plataforma": "instagram",
+  "cuenta": "@<cuenta>",
+  "objetivo": "<ganar seguidores | vender un producto | captar clientes | autoridad | tráfico a una web>",
+  "enlace_destino": "<url a la que debe ir el enlace de la bio>",
+  "posicionamiento": "<para quién es la cuenta y qué publica, en una frase>",
+  "marca": {"fondo": "", "acento": "", "texto": ""},
+  "reglas": {
+    "transparencia_afiliacion": false,
+    "marcas_afiliacion": ["afiliad"],
+    "palabras_prohibidas": [],
+    "palabras_clave_nombre": [],
+    "emojis_max_bio": 3,
+    "no_suplantar": ""
+  },
+  "historial": []
+}
