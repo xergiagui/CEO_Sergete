@@ -1,6 +1,6 @@
 ---
 name: historia
-description: Departamento de historias de Instagram (TheHistoria). Úsalo cuando el usuario pida generar/crear HISTORIAS de IG, ya sea a partir de las frases virales que TheEditor guarda en Supabase (viral_phrases) o HISTORIAS ESPECIALES (promos/eventos) con un texto que da el usuario. Pone el texto sobre un fondo de vídeo y exporta un MP4 vertical 9:16. Proceso INDEPENDIENTE y a demanda — NO se encadena con descarga/edición.
+description: Departamento de historias y carruseles de Instagram (TheHistoria). Úsalo cuando el usuario pida generar/crear HISTORIAS de IG, ya sea a partir de las frases virales que TheEditor guarda en Supabase (viral_phrases) o HISTORIAS ESPECIALES (promos/eventos) con un texto que da el usuario (MP4 vertical 9:16; proceso INDEPENDIENTE y a demanda, NO se encadena con descarga/edición). También para CARRUSELES de IG (2–10 slides 4:5) a partir de un clip/vídeo, un artículo de TheTextos o un tema, a demanda o cuando el calendario de TheCopy marca huecos.
 tools: Bash, Read, Write, Edit, Glob, Grep
 model: inherit
 ---
@@ -51,9 +51,30 @@ Si el texto lo da Sergio (no sale de la BBDD), usa la vía especial:
 Fondos de `BRells especiales/`; texto en la banda superior, dejando libre la franja
 de abajo para el botón de IG. Salida en `salidas/especiales_<timestamp>/`.
 
+## Carruseles (tercera vía)
+Post de feed de 2–10 imágenes 4:5 (1080×1350). **Tú escribes el plan**
+(`carruseles/planes/<slug>.json`: fórmula, objetivo, pilar, fuente y slides) desde
+un clip/vídeo (`../_Historico/<video>/` o `../TheEditor/transcripciones/<video>/`),
+un artículo de TheTextos (`../TheTextos/textos/<fecha>_<slug>/articulo.md`) o un
+tema, siguiendo las reglas de contenido de `TheHistoria/CLAUDE.md` (slide 1 =
+promesa + bucle abierto, lo más fuerte en la 2–3, una idea por slide, cierre con
+resumen + una sola petición, sin cifras inventadas, de tú, sin emojis, no hablar
+como Luis y `credito` si la fuente es suya). Luego:
+```bash
+"../TheEditor/.venv/Scripts/python.exe" carruseles.py --plan carruseles/planes/<slug>.json
+```
+(`--solo-validar` para comprobar sin escribir). Audita el estilo con TheCopy y
+renderiza en `salidas/carrusel_<AAAAMMDD-HHMM>_<slug>/` (`01.jpg…`,
+`carrusel.json`, `_vista.jpg`). Corrige los errores y los avisos de estilo antes
+de entregar. A diferencia de las historias, **los carruseles SÍ llevan copy**
+(TheCopy, al dar OK) y entran en el calendario. Devuelve la ruta de la carpeta y
+del `_vista.jpg`, la fórmula, el objetivo y el texto slide a slide.
+
 ## Ámbito
-- Es un **proceso independiente**: NO lo lances tú solo tras descargar/editar.
-  Solo cuando el CEO/usuario pida **explícitamente** historias.
+- Las **historias** son un **proceso independiente**: NO las lances tú solo tras
+  descargar/editar. Solo cuando el CEO/usuario las pida **explícitamente**. Los
+  **carruseles** se hacen a demanda o cuando el CEO te los pide por huecos del
+  calendario.
 - **Al dar OK** a unas historias (si el CEO te lo encarga): mover los MP4 a
   `CEO_Sergete/HISTORIAS/1. Pte publicar/` y borrar sus carpetas de `salidas/`
   (conservar `.gitkeep`). Detalle en `TheHistoria/CLAUDE.md`.

@@ -59,8 +59,8 @@
       "ruta_relativa": "../TheHistoria",
       "repo": "https://github.com/xergiagui/TheHistoria.git",
       "subagente": "historia",
-      "que_hace": "Genera historias de Instagram (MP4 vertical 9:16). Vía normal: frases virales de Supabase (viral_phrases, used_in_story=false) sobre un fondo de b-roll; marca la frase como usada. Vía especial (promos/eventos): texto que da Sergio sobre fondos de 'BRells especiales/', con la franja inferior libre para el botón de IG.",
-      "disparadores": ["historia", "historias", "stories", "story de instagram", "genera historias", "monta historias", "frase con fondo", "historia especial", "promo", "evento"],
+      "que_hace": "Genera historias de Instagram (MP4 vertical 9:16). Vía normal: frases virales de Supabase (viral_phrases, used_in_story=false) sobre un fondo de b-roll; marca la frase como usada. Vía especial (promos/eventos): texto que da Sergio sobre fondos de 'BRells especiales/', con la franja inferior libre para el botón de IG. Tercera vía: CARRUSELES de IG (2–10 slides 4:5) desde un clip/vídeo, un artículo de TheTextos o un tema; a diferencia de las historias, SÍ llevan copy (TheCopy) y entran en el calendario.",
+      "disparadores": ["historia", "historias", "stories", "story de instagram", "genera historias", "monta historias", "frase con fondo", "historia especial", "promo", "evento", "carrusel", "carruseles", "slides", "pasa a carrusel"],
       "entrypoint": "..\\TheEditor\\.venv\\Scripts\\python.exe historias.py [--n N|--categoria X|--min-virality N|--phrase \"...\"|--duracion S|--no-marcar]  ·  historias_especiales.py --texto \"...\" [--variaciones N|--duracion S|--reserva-inferior F]",
       "reglas": "TheHistoria/CLAUDE.md",
       "al_dar_ok": "Mover los MP4 de salidas/<tanda>/ a CEO_Sergete/HISTORIAS/1. Pte publicar/ y borrar las carpetas de tanda (conservar salidas/.gitkeep). Sin copy.",
@@ -68,7 +68,8 @@
       "banco_fondos": "El MISMO b-roll que TheEditor: ../TheEditor/superposiciones/ catalogado en broll_assets. Match semantico via RPC match_broll o azar. No duplica assets.",
       "salida": "TheHistoria\\salidas\\<timestamp>\\NN_slug.mp4 + manifest.json  (especiales: salidas\\especiales_<timestamp>\\)",
       "entorno": "Reutiliza el .venv de TheEditor (httpx, Pillow, imageio-ffmpeg, fastembed) — no instala nada.",
-      "nota": "PROCESO INDEPENDIENTE y a demanda: NO se encadena con descarga/edicion. Solo se lanza cuando el usuario pide historias explicitamente.",
+      "carruseles": "..\\TheEditor\\.venv\\Scripts\\python.exe carruseles.py --plan <plan.json> (el subagente escribe el plan: formula, objetivo, pilar, slides) -> salidas\\carrusel_<AAAAMMDD-HHMM>_<slug>\\ (01.jpg…NN.jpg 1080x1350 + carrusel.json + _vista.jpg). Al dar OK: mover la carpeta entera a REVISADOS/1. pte Publicar/ y lanzar copy.",
+      "nota": "Historias: PROCESO INDEPENDIENTE y a demanda (NO se encadenan con descarga/edicion; solo cuando el usuario pide historias). Carruseles: a demanda o cuando el calendario de TheCopy marca huecos (max. 2/semana, siempre con OK de Sergio).",
       "autonomo": true
     },
     {
@@ -78,8 +79,8 @@
       "ruta_relativa": "../TheCopy",
       "repo": "https://github.com/xergiagui/TheCopy.git",
       "subagente": "copy",
-      "que_hace": "Escribe el copy y los hashtags de cada clip terminado y registra la relación clip ↔ copy ↔ hashtags: Excel por proyecto (una fila por clip y plataforma, con enlace al MP4 y estado) + <clip>.txt junto a cada MP4 con el texto listo para pegar.",
-      "disparadores": ["copy", "copys", "caption", "hashtags", "hasktags", "texto del post", "descripción del reel", "ponle copy", "cámbiame el copy", "qué copy lleva"],
+      "que_hace": "Escribe el copy y los hashtags de cada clip terminado y registra la relación clip ↔ copy ↔ hashtags: Excel por proyecto (una fila por clip y plataforma, con enlace al MP4 y estado) + <clip>.txt junto a cada MP4 con el texto listo para pegar. También carruseles (.txt dentro de su carpeta) y el CALENDARIO DE PUBLICACIÓN (fecha y hora de cada pieza pendiente + historias del día).",
+      "disparadores": ["copy", "copys", "caption", "hashtags", "hasktags", "texto del post", "descripción del reel", "ponle copy", "cámbiame el copy", "qué copy lleva", "calendario", "planifica la semana", "qué publico hoy", "que publico hoy", "cuándo publico", "atrasados"],
       "entrypoint": ".venv\\Scripts\\python.exe copys.py pendientes|registrar|sincronizar|ver|banco|nuevo-proyecto  (el script es copys.py, NO copy.py)",
       "proyectos": "proyectos/<id>/ autocontenidos (proyecto.json, ofertas.json, hashtags.json, banco_copys.json, fuentes/). Hoy: mongemalo. Nuevo: copys.py nuevo-proyecto <id> --nombre \"...\".",
       "plataformas": "Por proyecto. MongeMalo: Instagram activa; TikTok y YouTube (Shorts) preparadas sin activar.",
@@ -87,7 +88,8 @@
       "salida": "TheCopy\\proyectos\\<id>\\registro_<id>.xlsx  +  <clip>.txt junto al MP4 (REVISADOS\\1. pte Publicar)",
       "entorno": "Entorno propio TheCopy/.venv (solo openpyxl).",
       "reglas": "TheCopy/CLAUDE.md + proyectos/<id>/*.json",
-      "nota": "Se lanza AL DAR OK a unos clips (tras moverlos a REVISADOS/1. pte Publicar) o a demanda. Las historias de IG no llevan copy.",
+      "calendario": ".venv\\Scripts\\python.exe copys.py calendario planificar|hoy|ver -> Fecha/Hora prevista en el Excel + proyectos\\<id>\\calendario\\<AAAA>-W<ss>.md. Tras cada registro y a demanda. Config provisional en proyecto.json -> calendario; reglas en referencias\\calendario.md.",
+      "nota": "Se lanza AL DAR OK a unos clips o carruseles (tras moverlos a REVISADOS/1. pte Publicar) o a demanda. Las historias de IG no llevan copy (pero el calendario las reparte).",
       "autonomo": true
     },
     {

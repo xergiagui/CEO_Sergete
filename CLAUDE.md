@@ -28,8 +28,8 @@ solo en la memoria.
 | **Descarga** | `../TheDescarga` | `descarga` | Bajar vídeos/audio (YouTube, IG, TikTok…) con yt-dlp local |
 | **Editor** | `../TheEditor` | `editor` | Pipeline viral: link → avatar IA → b-roll + subs + música → vídeo final |
 | **Landing** | `../TheLanding` | `landing` | Web de afiliación (Next.js + Supabase + Vercel) |
-| **Historia** | `../TheHistoria` | `historia` | Historias de IG (9:16): frase de `viral_phrases` + fondo de b-roll |
-| **Copy** | `../TheCopy` | `copy` | Copy + hashtags de cada clip, por proyecto; registro clip ↔ copy ↔ hashtags (Excel + `.txt` junto al MP4) |
+| **Historia** | `../TheHistoria` | `historia` | Historias de IG (9:16): frase de `viral_phrases` + fondo de b-roll · **Carruseles** de IG (4:5, 2–10 slides) |
+| **Copy** | `../TheCopy` | `copy` | Copy + hashtags de cada pieza (Reel o carrusel), por proyecto; registro pieza ↔ copy ↔ hashtags (Excel + `.txt`) · **Calendario de publicación** |
 | **Textos** | `../TheTextos` | `textos` | Textos largos para blog (>500 palabras) optimizados para SEO y para buscadores de IA (GEO/AEO) |
 
 ---
@@ -77,8 +77,11 @@ solo en la memoria.
     ejecuta con el `.venv` de TheEditor.
   - **Clips ya cortados → reels** (carpetas tipo `Desktop/Clip/Largo N
     Extractos`): subagente `editor` con `procesar_batch_clip.py` y el modo de
-    encuadre de cada carpeta. Nunca dos batch a la vez (comparten carpeta de
-    trabajo). Las ediciones normales (`editar_clips.py`) sí pueden ir en paralelo.
+    encuadre de cada carpeta, en tres pasos (`--solo-transcribir` → el editor
+    escribe `ganchos.json` → render). Nunca dos batch a la vez (comparten carpeta
+    de trabajo). Las ediciones normales (`editar_clips.py`) sí pueden ir en paralelo.
+  - **Gancho de texto en pantalla** (vías 1 y 2): los primeros 2,5 s llevan el
+    `gancho_texto` del corte. La vía 3 (avatar) no lo lleva.
 - **Historia — proceso independiente:** TheHistoria genera historias de IG.
   **NO se encadena** con descarga/edición: se lanza **solo cuando el usuario pide
   historias**. Delega en el subagente `historia` (usa el `.venv` de TheEditor; no
@@ -87,14 +90,27 @@ solo en la memoria.
   - **Especiales** (promos/eventos): texto que da Sergio + fondos de
     `TheHistoria/BRells especiales/`, con la franja inferior libre para el botón
     de IG.
+- **Carruseles — tercera vía de TheHistoria, con reglas propias:** post de feed
+  de 2–10 imágenes 4:5 (el formato que más guardados genera). A diferencia de las
+  historias, **SÍ llevan copy** y **SÍ entran en el calendario**. Subagente
+  `historia`: escribe el plan (fórmula lista/antes-después/mitos/método, objetivo,
+  pilar) desde un **clip/vídeo** (`_Historico/` o `TheEditor/transcripciones/`),
+  un **artículo de TheTextos** o un **tema** de Sergio, y renderiza con
+  `carruseles.py` → `TheHistoria/salidas/carrusel_<fecha>_<slug>/`. Se lanzan:
+  - **a demanda** («hazme un carrusel de…», «pasa este artículo a carrusel»);
+  - **cuando el calendario marca huecos de carruseles** (ver «Calendario»).
+  Sergio los revisa siempre antes del OK (enséñale el `_vista.jpg`).
 - **Copy — al dar OK y a demanda:** TheCopy escribe el copy y los hashtags de
-  los clips y los registra (Excel por proyecto en
-  `TheCopy/proyectos/<id>/registro_<id>.xlsx` + `<clip>.txt` junto a cada MP4).
-  Se lanza **automáticamente al dar OK** a unos clips (ver «Al dar OK») y cuando
-  Sergio pida copys o cambios de copy. Delega en el subagente `copy`. Cada
-  **proyecto** (hoy solo MongeMalo) tiene sus reglas en `TheCopy/proyectos/<id>/`;
-  si hay varios y no está claro de cuál es el clip, pregunta. Las **historias de
-  IG no llevan copy**.
+  cada pieza (Reel o carrusel) y los registra (Excel por proyecto en
+  `TheCopy/proyectos/<id>/registro_<id>.xlsx` + `.txt` junto al MP4 o dentro de
+  la carpeta del carrusel), con su **objetivo** y **pilar**. Se lanza
+  **automáticamente al dar OK** (ver «Al dar OK») y cuando Sergio pida copys o
+  cambios de copy. Delega en el subagente `copy`. Cada **proyecto** (hoy solo
+  MongeMalo) tiene sus reglas en `TheCopy/proyectos/<id>/`; si hay varios y no
+  está claro de cuál es la pieza, pregunta. Las **historias de IG no llevan copy**.
+- **Calendario — después de cada registro y a demanda:** TheCopy
+  (`copys.py calendario`) da fecha y hora a todo lo pendiente (ver «Calendario
+  de publicación»).
 - **Textos — a demanda, con revisión independiente:** TheTextos escribe textos
   largos de blog (>500 palabras) optimizados para SEO y GEO/AEO. Copys, captions
   y textos cortos **no** van aquí (eso es `copy`). Flujo:
@@ -174,22 +190,62 @@ del tirón.
 Cuando Sergio aprueba clips:
 1. **Mueve** (no copies) los MP4 aprobados a `REVISADOS/1. pte Publicar/`.
 2. **`copy`** (subagente): copy + hashtags de esos clips → fila en el Excel del
-   proyecto + `<clip>.txt` al lado de cada MP4. Pásale los nombres de los clips
-   (y el proyecto si hay más de uno).
+   proyecto + `<clip>.txt` al lado de cada MP4, y a continuación
+   **`copys.py calendario planificar`**. Pásale los nombres de los clips (y el
+   proyecto si hay más de uno).
 3. **Archiva** sus carpetas de transcripción en `PruebasIA/_Historico/` (TheCopy
    también busca el contexto allí, así que el orden 2↔3 no rompe nada).
-4. Reporta por clip: **ID** (`MM-0001`…), oferta y el texto final, para que
-   Sergio pueda pedir cambios («cámbiame el copy del 03» → `copy`, solo ese clip).
+4. Reporta por clip: **ID** (`MM-0001`…), oferta, el texto final y la **fecha y
+   hora previstas**, para que Sergio pueda pedir cambios («cámbiame el copy del
+   03» → `copy`, solo ese clip).
+5. Si el calendario marca **huecos de carruseles** en las semanas planificadas,
+   aplica «Huecos del calendario» (abajo).
 
-Cuando Sergio pase vídeos a `REVISADOS/2. Publicados`, `copy` con
-`copys.py sincronizar` los marca como *Publicado* (con fecha) en el Excel.
+Cuando Sergio pase piezas a `REVISADOS/2. Publicados`, `copy` con
+`copys.py sincronizar` las marca como *Publicado* (con fecha) en el Excel.
+
+### Al dar OK a unos carruseles
+
+1. **Mueve** (no copies) la carpeta **entera** de cada carrusel aprobado de
+   `TheHistoria/salidas/carrusel_…/` a `REVISADOS/1. pte Publicar/`.
+2. **`copy`** (subagente): caption + hashtags (fila *Carrusel* en el Excel +
+   `<carpeta>.txt` dentro de la carpeta) y después `calendario planificar`.
+3. Reporta por carrusel: ID, texto final y fecha y hora previstas. Para
+   publicarlo, Sergio sube las imágenes `01.jpg…NN.jpg` en orden y pega el `.txt`.
 
 ### Al dar OK a unas historias
 
 1. **Mueve** (no copies) todos los MP4 de las tandas aprobadas de
    `TheHistoria/salidas/<tanda>/` a `HISTORIAS/1. Pte publicar/` (aplanados).
 2. **Borra** esas carpetas de tanda en `salidas/` (conserva `salidas/.gitkeep`).
-3. Las historias **no llevan copy**: no lances `copy`.
+3. Las historias **no llevan copy**: no lances `copy`. El calendario las reparte
+   solo (2–4 al día) la próxima vez que se planifique.
+
+---
+
+## Calendario de publicación
+
+Lo lleva TheCopy (`copys.py calendario`, reglas en
+`TheCopy/referencias/calendario.md` y `proyectos/<id>/proyecto.json` →
+`calendario`). Sergio publica a mano; el calendario le dice **qué y cuándo**.
+
+- **Planificar:** tras cada registro (ver «Al dar OK») o cuando Sergio diga
+  «planifica la semana»: `copy` con `calendario planificar` → fechas en el Excel +
+  `TheCopy/proyectos/<id>/calendario/<AAAA>-W<ss>.md`. Es estable: no recoloca lo
+  ya planificado ni lo que Sergio haya fechado a mano.
+- **«¿Qué publico hoy?»:** `copy` con `calendario hoy` → pieza, hora, ruta, texto
+  listo para pegar e historias del día. Respóndele con eso, sin logs.
+- **Huecos del calendario:** si una semana planificada tiene menos carruseles del
+  mínimo, lanza `historia` para hacer los que falten (máx. 2 por semana) a partir
+  del material de los clips aprobados más recientes (`_Historico/`), con temas
+  distintos a los ya publicados. Se los enseñas a Sergio para el OK; no entran en
+  el calendario hasta que los aprueba. Si faltan **Reels** o **historias**, solo
+  avísale (salen de vídeos o frases nuevas).
+- **Atrasados:** si `calendario ver` marca piezas ATRASADAS (fecha pasada y sin
+  publicar), avísale y ofrécele replanificarlas (`--replanificar-atrasados`).
+- Los valores por defecto (5 posts/semana, días y franjas horarias) son
+  **provisionales**: se ajustan con las estadísticas de la cuenta cuando Sergio
+  las pase.
 
 ---
 

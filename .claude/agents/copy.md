@@ -40,6 +40,13 @@ cd "/c/Users/ico858/Desktop/PruebasIA/TheCopy"
    - `tema`: resumen corto del clip (5–10 palabras).
    - `extra.oferta`: id de `ofertas.json` que mejor encaje con el tema
      (`cuando_usarla`), o `generico` si no encaja ninguna.
+   - `extra.objetivo` (guardados/compartidos/comentarios/seguidores) y
+     `extra.pilar` (educativo/historia/interaccion/promocion): los elige el
+     subagente en los Reels; en los **carruseles** vienen ya de `carrusel.json`.
+     `promocion` solo si la pieza va sobre todo de vender.
+   - **Carrusel** (`formato: "carrusel"`): el caption **repite el gancho de la
+     slide 1** (`contexto.gancho_slide1`) en sus primeros 125 caracteres, corto,
+     con CTA a la bio.
    - Por cada plataforma del bloque `plataformas`:
      - `copy`: **a medida del clip**. La primera frase es el gancho y sale de lo
        que se dice en el clip (`contexto.transcripcion` / `frase_viral`). Sigue el
@@ -65,8 +72,20 @@ cd "/c/Users/ico858/Desktop/PruebasIA/TheCopy"
    antes de registrar; solo se dejan si la frase es literal del clip. Los demás
    avisos son orientativos.
 5. **Registra**: `copys.py registrar --entrada <tanda>`. Escribe el Excel y el
-   `.txt` junto a cada MP4. Si dice que **el Excel está abierto**, no reintentes
-   en bucle: díselo al CEO para que Sergio lo cierre.
+   `.txt` junto a cada MP4 (o dentro de la carpeta del carrusel). Si dice que
+   **el Excel está abierto**, no reintentes en bucle: díselo al CEO para que
+   Sergio lo cierre.
+6. **Calendario**: `copys.py calendario planificar`. Devuelve al CEO la fecha y
+   hora de cada pieza nueva y la **última línea `FALTAN …`** (huecos de Reels y
+   carruseles por semana) tal cual.
+
+## Calendario
+- «¿Qué publico hoy?» → `copys.py calendario hoy` (pieza, hora, ruta, texto
+  listo para pegar e historias del día).
+- «Planifica la semana» → `calendario planificar` · resumen → `calendario ver`
+  (marca ATRASADOS; `planificar --replanificar-atrasados` para recolocarlos).
+- Reglas y valores (provisionales) en `referencias/calendario.md` y
+  `proyecto.json` → `calendario`.
 
 ## Otras órdenes
 - **Cambiar un copy** («cámbiame el del 03»):
