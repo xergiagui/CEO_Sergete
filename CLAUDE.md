@@ -24,9 +24,22 @@ Plantillas disponibles en `~/.claude/skills/blog/templates/` (how-to-guide,
 pillar-page, listicle, comparison, faq-knowledge, product-review, case-study,
 tutorial, roundup, data-research, news-analysis, thought-leadership).
 
-**También pendiente:** blog/plataforma de destino, nicho y marca, voz
-(`marca/BRAND.md`, `marca/VOICE.md`), autor que firma (E-E-A-T), formato de
-entrega final (Markdown por defecto) y enlaces internos disponibles.
+**También pendiente:** formato de entrega final (Markdown por defecto).
+
+---
+
+## Por proyecto
+
+Cada proyecto (cuenta/cliente; índice en `CEO_Sergete/proyectos.json`) tiene
+`proyectos/<id>/`:
+- `proyecto.json`: blog de destino, nicho, autor que firma (E-E-A-T), idioma,
+  enlaces internos y reglas del proyecto;
+- `marca/BRAND.md` y `marca/VOICE.md` (voz).
+
+Lee **solo** el del proyecto del texto. Si un campo dice `PENDIENTE`,
+pregúntalo en vez de inventarlo. El proyecto se indica siempre; si no se dice y
+solo hay uno, es ese; si hay varios, pregunta. Proyecto nuevo: copia
+`proyectos/_plantilla/`.
 
 ---
 
@@ -66,7 +79,7 @@ referencias, en `…\<skill>\references\` y, las comunes, en
 
 ## Flujo por texto
 
-Carpeta de trabajo: `textos/<AAAA-MM-DD>_<slug>/`.
+Carpeta de trabajo: `textos/<proyecto>/<AAAA-MM-DD>_<slug>/`.
 
 1. **Brief** (`blog-brief`) → `brief.md`: keyword principal + secundarias,
    intención de búsqueda, tipo de texto, plantilla, H2/H3 previstos, preguntas

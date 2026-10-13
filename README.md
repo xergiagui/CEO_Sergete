@@ -11,8 +11,8 @@ IA** (GEO/AEO: ChatGPT, Perplexity, Claude, Gemini, AI Overviews).
 
 | Carpeta / archivo | Qué lleva |
 |---|---|
-| `textos/<AAAA-MM-DD>_<slug>/` | un texto: `brief.md`, `articulo.md` (final), `schema.json`, `informe.md` |
-| `marca/` | `BRAND.md` / `VOICE.md` (marca y voz), **pendiente** |
+| `textos/<proyecto>/<AAAA-MM-DD>_<slug>/` | un texto: `brief.md`, `articulo.md` (final), `schema.json`, `informe.md` |
+| `proyectos/<id>/` | `proyecto.json` (blog, nicho, autor, enlaces internos) + `marca/BRAND.md`·`VOICE.md`; `_plantilla/` para proyectos nuevos |
 | `.venv/` | Python propio (`textstat`, `beautifulsoup4`) para los scripts de las skills |
 | `requirements.txt` | dependencias del `.venv` |
 
