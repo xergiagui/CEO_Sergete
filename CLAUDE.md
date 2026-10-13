@@ -22,6 +22,7 @@ fuente de verdad: rutas, repos, disparadores y cómo se ejecuta cada uno.
 | **Editor** | `../TheEditor` | `editor` | Pipeline viral: link → avatar IA → b-roll + subs + música → vídeo final |
 | **Landing** | `../TheLanding` | `landing` | Web de afiliación (Next.js + Supabase + Vercel) |
 | **Historia** | `../TheHistoria` | `historia` | Historias de IG (9:16): frase de `viral_phrases` + fondo de b-roll |
+| **Copy** | `../TheCopy` | `copy` | Copy + hashtags de cada clip, por proyecto; registro clip ↔ copy ↔ hashtags (Excel + `.txt` junto al MP4) |
 
 ---
 
@@ -65,6 +66,14 @@ fuente de verdad: rutas, repos, disparadores y cómo se ejecuta cada uno.
   con descarga/edición: se lanza **solo cuando el usuario pide historias**. Delega
   en el subagente `historia` (usa el `.venv` de TheEditor y `superposiciones/`
   como banco de fondos; no instala nada).
+- **Copy — al dar OK y a demanda:** TheCopy escribe el copy y los hashtags de
+  los clips y los registra (Excel por proyecto en
+  `TheCopy/proyectos/<id>/registro_<id>.xlsx` + `<clip>.txt` junto a cada MP4).
+  Se lanza **automáticamente al dar OK** a unos clips (ver «Al dar OK») y cuando
+  Sergio pida copys o cambios de copy. Delega en el subagente `copy`. Cada
+  **proyecto** (hoy solo MongeMalo) tiene sus reglas en `TheCopy/proyectos/<id>/`;
+  si hay varios y no está claro de cuál es el clip, pregunta. Las **historias de
+  IG no llevan copy**.
 
 ---
 
@@ -126,6 +135,21 @@ usuario da un número, respétalo.
 usuario parece querer control, ofrécele ver el `cortes.json` propuesto antes de
 lanzar `editar_clips.py` (que es lo más costoso). Si pidió que sea directo, tira
 del tirón.
+
+### Al dar OK a unos clips (→ publicación con copy)
+
+Cuando Sergio aprueba clips:
+1. **Mueve** (no copies) los MP4 aprobados a `REVISADOS/1. pte Publicar/`.
+2. **`copy`** (subagente): copy + hashtags de esos clips → fila en el Excel del
+   proyecto + `<clip>.txt` al lado de cada MP4. Pásale los nombres de los clips
+   (y el proyecto si hay más de uno).
+3. **Archiva** sus carpetas de transcripción en `PruebasIA/_Historico/` (TheCopy
+   también busca el contexto allí, así que el orden 2↔3 no rompe nada).
+4. Reporta por clip: **ID** (`MM-0001`…), oferta y el texto final, para que
+   Sergio pueda pedir cambios («cámbiame el copy del 03» → `copy`, solo ese clip).
+
+Cuando Sergio pase vídeos a `REVISADOS/2. Publicados`, `copy` con
+`copys.py sincronizar` los marca como *Publicado* (con fecha) en el Excel.
 
 ---
 

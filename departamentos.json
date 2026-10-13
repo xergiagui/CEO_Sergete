@@ -63,6 +63,24 @@
       "entorno": "Reutiliza el .venv de TheEditor (httpx, Pillow, imageio-ffmpeg, fastembed) — no instala nada.",
       "nota": "PROCESO INDEPENDIENTE y a demanda: NO se encadena con descarga/edicion. Solo se lanza cuando el usuario pide historias explicitamente.",
       "autonomo": true
+    },
+    {
+      "id": "copy",
+      "nombre": "TheCopy",
+      "ruta": "C:\\Users\\ico858\\Desktop\\PruebasIA\\TheCopy",
+      "ruta_relativa": "../TheCopy",
+      "repo": "(repo git local, aún sin GitHub)",
+      "subagente": "copy",
+      "que_hace": "Escribe el copy y los hashtags de cada clip terminado y registra la relación clip ↔ copy ↔ hashtags: Excel por proyecto (una fila por clip y plataforma, con enlace al MP4 y estado) + <clip>.txt junto a cada MP4 con el texto listo para pegar.",
+      "disparadores": ["copy", "copys", "caption", "hashtags", "hasktags", "texto del post", "descripción del reel", "ponle copy", "cámbiame el copy", "qué copy lleva"],
+      "entrypoint": ".venv\\Scripts\\python.exe copys.py pendientes|registrar|sincronizar|ver|banco|nuevo-proyecto  (el script es copys.py, NO copy.py)",
+      "proyectos": "proyectos/<id>/ autocontenidos (proyecto.json, ofertas.json, hashtags.json, banco_copys.json, fuentes/). Hoy: mongemalo. Nuevo: copys.py nuevo-proyecto <id> --nombre \"...\".",
+      "plataformas": "Por proyecto. MongeMalo: Instagram activa; TikTok y YouTube (Shorts) preparadas sin activar.",
+      "fuente_contexto": "cortes.json + .srt de TheEditor/transcripciones/<video>/ o _Historico/<video>/ (el clip finales/<nombre>.mp4 = entrada 'nombre' de cortes.json).",
+      "salida": "TheCopy\\proyectos\\<id>\\registro_<id>.xlsx  +  <clip>.txt junto al MP4 (REVISADOS\\1. pte Publicar)",
+      "entorno": "Entorno propio TheCopy/.venv (solo openpyxl).",
+      "nota": "Se lanza AL DAR OK a unos clips (tras moverlos a REVISADOS/1. pte Publicar) o a demanda. Las historias de IG no llevan copy.",
+      "autonomo": true
     }
   ],
   "supabase_compartido": {
