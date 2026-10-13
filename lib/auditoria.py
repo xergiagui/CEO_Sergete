@@ -19,6 +19,11 @@ Niveles de cada hallazgo:
 Configuración por plataforma (proyecto.json → plataformas.<p>):
   gancho_max   máx. de caracteres de la primera frase/línea (Instagram = 125).
   emojis_max   máx. de emojis en el copy (sin clave = no se comprueba).
+
+Modo `solo_estilo` (lo usa TheHistoria para el texto de las slides de los
+carruseles: `copys.py auditar --solo-estilo --json --texto "..."`): solo estilo y
+emojis, más los cebos de interacción y los cierres vacíos (errores). Nada de
+gancho de 125 (ni CTA, hashtags o longitud, que se miran en lib/tanda.py).
 """
 from __future__ import annotations
 
@@ -163,7 +168,8 @@ def contar_emojis(texto: str) -> int:
 def _fuente_literal(contexto: dict | None) -> str:
     if not contexto:
         return ""
-    return normalizar(" ".join(str(contexto.get(k) or "") for k in ("frase_viral", "transcripcion")))
+    # Reel: lo que se dice en el clip. Carrusel: el texto de sus slides (el caption repite el gancho).
+    return normalizar(" ".join(str(contexto.get(k) or "") for k in ("frase_viral", "transcripcion", "texto_slides")))
 
 
 def es_literal(fragmento: str, fuente_norm: str) -> bool:
@@ -196,8 +202,12 @@ def _corto(t: str, n: int = 70) -> str:
 
 # ------------------------------------------------------------------ auditoría
 def auditar(texto: str, conf_plat: dict | None = None, contexto: dict | None = None,
-            plataforma: str = "") -> list[Hallazgo]:
-    """Audita un copy (sin hashtags). Devuelve los hallazgos (error / aviso / literal)."""
+            plataforma: str = "", solo_estilo: bool = False) -> list[Hallazgo]:
+    """Audita un copy (sin hashtags). Devuelve los hallazgos (error / aviso / literal).
+
+    solo_estilo: sin la comprobación del gancho (para textos que no son un caption,
+    como las slides de un carrusel). Cebos, cierres vacíos, estilo y emojis, sí.
+    """
     conf = conf_plat or {}
     texto = (texto or "").strip()
     out: list[Hallazgo] = []
@@ -206,7 +216,7 @@ def auditar(texto: str, conf_plat: dict | None = None, contexto: dict | None = N
     fuente = _fuente_literal(contexto)
 
     # ERROR · gancho
-    mx = conf.get("gancho_max")
+    mx = None if solo_estilo else conf.get("gancho_max")
     if mx:
         g = gancho(texto)
         if len(g) > mx:
@@ -249,8 +259,8 @@ def auditar(texto: str, conf_plat: dict | None = None, contexto: dict | None = N
     # AVISO · emojis
     emax = conf.get("emojis_max")
     if emax is not None:
-        n = contar_emojis(texto)
-        if n > emax:
+        emos = RE_EMOJI.findall(texto)
+        if len(emos) > emax:
             donde = f" en {plataforma}" if plataforma else ""
-            out.append(Hallazgo("aviso", "emojis", f"{n} emoji(s){donde} (máx. {emax}).", ""))
+            out.append(Hallazgo("aviso", "emojis", f"{len(emos)} emoji(s){donde} (máx. {emax}).", " ".join(emos)))
     return out

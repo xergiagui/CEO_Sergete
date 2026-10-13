@@ -1,7 +1,7 @@
 {
   "id": "mongemalo",
   "nombre": "MongeMalo",
-  "descripcion": "Clips de Luis Monge (MongeMalo) para captar tráfico hacia sus productos con el link de afiliado de Sergio.",
+  "descripcion": "Clips (Reels) y carruseles de Luis Monge (MongeMalo) para captar tráfico hacia sus productos con el link de afiliado de Sergio.",
   "prefijo_id": "MM",
   "idioma": "es-ES",
   "como_reconocerlo": [
@@ -28,18 +28,61 @@
     "Sin paralelismos negativos ('No necesitas X. Necesitas Y.', 'no es X, es Y', 'no va de X, va de Y', 'El problema no es X, es Y', 'Sin X. Sin Y. Solo Z.'): dilo en positivo. Tampoco revelaciones ('¿El resultado?', '¿Por qué? Porque…'), anuncios de sinceridad ('te voy a ser sincero', 'la verdad es que…') ni vocabulario de IA (potenciar, transformar, llevar al siguiente nivel…).",
     "Nada de cebos de interacción ('comenta SÍ', 'etiqueta a…', 'dale like', 'comparte si…') ni cierres vacíos ('¿qué opinas?', '¿estás de acuerdo?'): el cierre es el CTA a la bio. Sin emojis.",
     "Antes de registrar: copys.py auditar --entrada <tanda> (checklist en referencias/auditoria_copy.md). Los errores bloquean; los avisos de estilo se corrigen reescribiendo y solo se dejan si la frase es literal del clip.",
-    "Hashtags (Instagram): 3–5 en total contando el fijo #grupoalfa, que pone el script (escribe solo 2–4 temáticos): 2–3 de nicho (#grupoalfa ya cuenta como uno), 1–2 medios y como mucho 1 amplio. Del banco por tamaño de hashtags.json y acordes al tema del clip. Rota: no repitas el conjunto de temáticos de otro clip de la tanda ni de los 5 últimos registrados (copys.py hashtags)."
+    "Hashtags (Instagram): 3–5 en total contando el fijo #grupoalfa, que pone el script (escribe solo 2–4 temáticos): 2–3 de nicho (#grupoalfa ya cuenta como uno), 1–2 medios y como mucho 1 amplio. Del banco por tamaño de hashtags.json y acordes al tema del clip. Rota: no repitas el conjunto de temáticos de otro clip de la tanda ni de los 5 últimos registrados (copys.py hashtags).",
+    "CARRUSELES (formato carrusel, solo Instagram): el caption repite el gancho de la slide 1 (contexto.gancho_slide1, sin el marcado **) dentro de los primeros 125 caracteres, va corto (1–2 frases: las slides ya cuentan el resto) y termina con el CTA a la bio, que manda siempre. Si el objetivo es guardados, puede invitar a guardarlo antes del CTA ('Guárdalo para tu próxima venta. Link en bio.'). Mismas reglas de hashtags y auditoría que los Reels.",
+    "OBJETIVO y PILAR (obligatorios en cada pieza; en los carruseles vienen de carrusel.json, en los Reels los eliges tú): objetivo = la señal que busca la pieza: guardados (lista, método, pasos, algo para volver a consultar), compartidos (verdad incómoda, mito, algo que se manda a alguien), comentarios, seguidores (historia personal, antes/después). Pilar: educativo (enseña), historia (experiencia en primera persona), interaccion (situación con la que se identifica la audiencia), promocion (SOLO si la pieza va sobre todo de vender un producto; mencionar la oferta en el caption no la convierte en promoción)."
   ],
 
   "campos_extra": [
-    {"id": "oferta", "columna": "Oferta", "obligatorio": true, "valores": "ofertas"}
+    {"id": "oferta", "columna": "Oferta", "obligatorio": true, "valores": "ofertas"},
+    {"id": "objetivo", "columna": "Objetivo", "obligatorio": true,
+     "valores": ["guardados", "compartidos", "comentarios", "seguidores"],
+     "ayuda": "señal que busca la pieza: guardados = lista/método/pasos; compartidos = verdad incómoda, mito, algo que se manda a alguien; comentarios; seguidores = historia personal, antes/después"},
+    {"id": "pilar", "columna": "Pilar", "obligatorio": true,
+     "valores": ["educativo", "historia", "interaccion", "promocion"],
+     "ayuda": "promocion solo si la pieza va sobre todo de vender un producto; mencionar la oferta en el caption no la convierte en promoción"}
   ],
+
+  "calendario": {
+    "activo": true,
+    "_nota": "Valores PROVISIONALES (adaptados de sergebulaev/instagram-skills, MIT): ajustar con las estadísticas de la cuenta (Insights de IG: horas con la audiencia conectada y qué formatos se guardan y comparten más). Explicación en referencias/calendario.md.",
+    "zona_horaria": "Europe/Madrid",
+    "publicaciones_semana": 5,
+    "dias": ["lun", "mar", "jue", "vie", "dom"],
+    "franjas": {"lun": "13:30", "mar": "13:30", "mie": "13:30", "jue": "13:30", "vie": "13:30", "dom": "20:30"},
+    "segunda_franja": "20:30",
+    "_segunda_franja": "Se usa si hace falta: fecha puesta a mano sin hora en un día que ya tiene post, o si publicaciones_semana pasa del nº de días.",
+    "semanas_por_defecto": 2,
+    "reserva_formatos_dias": 7,
+    "prioridad_tras_dias": 14,
+    "balance": {
+      "_nota": "Recomendaciones (no bloquean). formato_min se cumple 'si hay': en los primeros reserva_formatos_dias días se llena con lo que haya; después el hueco se guarda para el formato que falta y sale en FALTAN.",
+      "formato_min": {"reel": 2, "carrusel": 2},
+      "objetivo_min": {"guardados": 3, "compartidos": 2},
+      "pilar_max": {"promocion": 2},
+      "formula_max": 2,
+      "evitar_seguidas": ["origen", "oferta"]
+    },
+    "historias": {
+      "carpeta": "CEO_Sergete/HISTORIAS/1. Pte publicar",
+      "por_dia_min": 2,
+      "por_dia_max": 4,
+      "recordatorio": "Comparte en historias el post del día cuando lo publiques.",
+      "recordatorio_sin_post": "Hoy no hay post: vuelve a compartir en historias el último."
+    }
+  },
 
   "plataformas": {
     "instagram": {
       "activa": true,
       "nombre": "Instagram",
-      "formato": "Reel",
+      "formatos": {
+        "reel": {"_nota": "Hereda todo lo de la plataforma (guia, copy_recomendado, gancho, hashtags)."},
+        "carrusel": {
+          "copy_recomendado": [60, 250],
+          "guia": "Caption de carrusel: repite el gancho de la slide 1 (contexto.gancho_slide1) dentro de los primeros 125 caracteres, lo que se lee antes del «más». Corto: 1–2 frases, porque las slides ya cuentan el resto. Termina con el CTA a la bio, que manda siempre. Si el objetivo es guardados, puede invitar a guardarlo antes del CTA. Mismas reglas de hashtags (3–5 contando #grupoalfa) y de auditoría que los Reels."
+        }
+      },
       "max_caracteres": 2200,
       "copy_recomendado": [80, 400],
       "requiere_titulo": false,
@@ -56,6 +99,7 @@
       "activa": false,
       "_nota": "PREPARADA, sin activar. Antes de activarla, Sergio confirma fijos/nº de hashtags y CTA.",
       "nombre": "TikTok",
+      "formatos": {"reel": {}},
       "max_caracteres": 4000,
       "copy_recomendado": [40, 220],
       "requiere_titulo": false,
@@ -72,6 +116,7 @@
       "_nota": "PREPARADA, sin activar (YouTube Shorts). Antes de activarla, Sergio confirma fijos y CTA.",
       "nombre": "YouTube",
       "formato": "Short",
+      "formatos": {"reel": {}},
       "requiere_titulo": true,
       "titulo_max": 100,
       "max_caracteres": 5000,

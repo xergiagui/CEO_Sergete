@@ -16,7 +16,7 @@ import shutil
 from pathlib import Path
 
 import config
-from lib.util import leer_json, escribir_json, normalizar_hashtag
+from lib.util import leer_json, escribir_json, normalizar, normalizar_hashtag
 
 ARCHIVOS = ("proyecto.json", "ofertas.json", "hashtags.json", "banco_copys.json")
 
@@ -72,6 +72,12 @@ class Proyecto:
         for campo in self.campos_extra():
             if "id" not in campo or "columna" not in campo:
                 errores.append(f"campos_extra mal definido: {campo}")
+        for pid in plats:
+            for fmt in self.formatos(pid):
+                if fmt not in config.FORMATOS:
+                    errores.append(f"plataformas.{pid}.formatos: formato desconocido '{fmt}' "
+                                   f"(usa {', '.join(config.FORMATOS)}).")
+        errores += self._comprobar_calendario()
         # banco temático: formato antiguo (tema → lista) o nuevo (tema → {nicho/medio/amplio: lista})
         for tema, val in (self.hashtags.get("tematicos") or {}).items():
             if tema.startswith("_"):
@@ -107,6 +113,20 @@ class Proyecto:
 
     def nombre_plataforma(self, pid: str) -> str:
         return self.plataforma(pid).get("nombre") or pid.capitalize()
+
+    # ---------- formatos (Reel / carrusel) ----------
+    def formatos(self, pid: str) -> dict[str, dict]:
+        """{formato: conf propia} que admite la plataforma. Sin `formatos` → solo Reel."""
+        f = self.plataforma(pid).get("formatos")
+        return {k: (v or {}) for k, v in f.items() if not k.startswith("_")} if isinstance(f, dict) else {"reel": {}}
+
+    def admite(self, pid: str, formato: str) -> bool:
+        return formato in self.formatos(pid)
+
+    def conf_formato(self, pid: str, formato: str = "reel") -> dict:
+        """Configuración de la plataforma con lo propio del formato encima (guia, copy_recomendado…)."""
+        base = {k: v for k, v in self.plataforma(pid).items() if k != "formatos"}
+        return {**base, **{k: v for k, v in self.formatos(pid).get(formato, {}).items() if not k.startswith("_")}}
 
     # ---------- hashtags ----------
     def fijos(self, pid: str) -> list[str]:
@@ -164,6 +184,23 @@ class Proyecto:
     def campos_extra(self) -> list[dict]:
         return self.conf.get("campos_extra") or []
 
+    def campo(self, cid: str) -> dict | None:
+        return next((c for c in self.campos_extra() if c.get("id") == cid), None)
+
+    def canon_valor(self, campo: dict, valor) -> str | None:
+        """Valor canónico de un campo con lista de valores ('Interacción ' → 'interaccion').
+
+        Acepta el id o el nombre visible, sin importar mayúsculas ni tildes. None si no encaja.
+        """
+        vals = self.valores_campo(campo)
+        if vals is None:
+            return str(valor).strip() if valor not in (None, "") else None
+        n = normalizar(str(valor or ""))
+        for k, nombre in vals.items():
+            if n and n in (normalizar(k), normalizar(nombre)):
+                return k
+        return None
+
     def valores_campo(self, campo: dict) -> dict[str, str] | None:
         """{valor_id: nombre_legible} o None si el campo es texto libre."""
         if campo.get("valores") == "ofertas":
@@ -190,6 +227,54 @@ class Proyecto:
     @property
     def registro_path(self) -> Path:
         return self.dir / (self.conf.get("registro") or f"registro_{self.id}.xlsx")
+
+    # ---------- calendario de publicación ----------
+    @property
+    def calendario(self) -> dict:
+        return self.conf.get("calendario") or {}
+
+    @property
+    def calendario_activo(self) -> bool:
+        return bool(self.calendario.get("activo"))
+
+    @property
+    def carpeta_historias(self) -> Path | None:
+        p = (self.calendario.get("historias") or {}).get("carpeta")
+        return _ruta(p) if p else None
+
+    def _comprobar_calendario(self) -> list[str]:
+        cal = self.calendario
+        if not cal:
+            return []
+        err = []
+        dias = cal.get("dias") or []
+        malos = [d for d in dias if d not in config.DIAS]
+        if malos:
+            err.append(f"calendario.dias: {malos} no valen (usa {', '.join(config.DIAS)}).")
+        franjas = cal.get("franjas") or {}
+        for d, h in franjas.items():
+            if d.startswith("_"):
+                continue
+            if d not in config.DIAS:
+                err.append(f"calendario.franjas: día '{d}' desconocido.")
+            if not re.fullmatch(r"\d{1,2}:\d{2}", str(h)):
+                err.append(f"calendario.franjas.{d} = '{h}' (formato HH:MM).")
+        if cal.get("segunda_franja") and not re.fullmatch(r"\d{1,2}:\d{2}", str(cal["segunda_franja"])):
+            err.append(f"calendario.segunda_franja = '{cal['segunda_franja']}' (formato HH:MM).")
+        for d in dias:
+            if d in config.DIAS and d not in franjas and not cal.get("segunda_franja"):
+                err.append(f"calendario: el día '{d}' no tiene franja (calendario.franjas).")
+        bal = cal.get("balance") or {}
+        for fmt in (bal.get("formato_min") or {}):
+            if fmt not in config.FORMATOS:
+                err.append(f"calendario.balance.formato_min: formato '{fmt}' desconocido.")
+        for clave, cid in (("objetivo_min", "objetivo"), ("pilar_max", "pilar")):
+            campo = self.campo(cid)
+            vals = self.valores_campo(campo) if campo else None
+            for k in (bal.get(clave) or {}):
+                if vals is not None and k not in vals:
+                    err.append(f"calendario.balance.{clave}: '{k}' no es un valor de '{cid}' ({', '.join(vals)}).")
+        return err
 
 
 def listar() -> list[str]:

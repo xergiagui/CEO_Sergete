@@ -9,3 +9,6 @@ tandas/*
 
 # Bloqueos de Office (Excel abierto)
 ~$*
+
+# Plan semanal del calendario (se rehace desde el Excel con `copys.py calendario planificar`)
+proyectos/*/calendario/

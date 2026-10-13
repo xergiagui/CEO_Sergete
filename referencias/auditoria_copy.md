@@ -15,6 +15,20 @@
 
 `auditar` solo informa: no reescribe nada. `registrar` pasa la misma auditoría.
 
+**Solo estilo (texto de las slides de un carrusel, lo usa TheHistoria):**
+
+```powershell
+.venv\Scripts\python.exe copys.py auditar --solo-estilo --json --texto "<texto de la slide>"
+```
+
+`--solo-estilo` aplica solo los puntos 2–8 (cebos y cierres vacíos como error; estilo y
+emojis como aviso): ni gancho de 125, ni CTA, ni hashtags, ni longitud de plataforma.
+`--json` saca por stdout una lista `[{"nivel", "regla", "fragmento", "mensaje"}]` en ASCII
+(los acentos van como `á`); sale con código 0 si no hay errores y 1 si los hay.
+
+En un **carrusel**, el caption repite el gancho de la slide 1: lo que sale tal cual en las
+slides cuenta como literal (igual que lo que se dice en un clip).
+
 - **Error**: bloquea el registro.
 - **Aviso de estilo**: no bloquea, pero **se corrige reescribiendo antes de
   registrar**. Solo se deja si la frase es **literal del clip** (sale en

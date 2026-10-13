@@ -1,10 +1,19 @@
 """
-Registro Excel de un proyecto: UNA FILA por clip y plataforma.
+Registro Excel de un proyecto: UNA FILA por pieza (Reel o carrusel) y plataforma.
 
 El Excel es la fuente de verdad: el script lo lee, añade/actualiza filas y lo
-guarda, respetando lo que Sergio haya tocado a mano (Estado, Fecha
-publicación, Notas, columnas propias). Las columnas se localizan por su
-CABECERA, así que reordenarlas o añadir columnas propias no rompe nada.
+guarda, respetando lo que Sergio haya tocado a mano (Estado, Fecha prevista,
+Hora prevista, Fecha publicación, Notas, columnas propias). Las columnas se
+localizan por su CABECERA, así que reordenarlas o añadir columnas propias no
+rompe nada; a un Excel antiguo se le AÑADEN al final las columnas que le falten,
+sin tocar lo escrito.
+
+Hojas:
+  Registro      una fila por pieza y plataforma (la que se edita a mano).
+  Historias     plan de historias de IG por día (lo rehace `calendario planificar`;
+                las fechas que cambies a mano se respetan).
+  _calendario   (oculta) fechas que puso el planificador. Sirve para distinguir las
+                fechas MANUALES (las que no coinciden con esta hoja), que nunca se mueven.
 """
 from __future__ import annotations
 
@@ -16,16 +25,24 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.worksheet.datavalidation import DataValidation
 
 import config
+from lib.util import normalizar
 
 HOJA = "Registro"
-COLS_ANTES = ["ID", "Clip", "Plataforma", "Estado", "Tema"]
+HOJA_HISTORIAS = "Historias"
+HOJA_PLAN = "_calendario"
+COLS_ANTES = ["ID", "Clip", "Formato", "Plataforma", "Estado", "Fecha prevista", "Hora prevista", "Tema"]
 COLS_DESPUES = ["Título", "Copy", "Hashtags", "Texto para pegar", "Nº caracteres",
                 "Fecha alta", "Fecha publicación", "Notas", "Ruta"]
-ANCHOS = {"ID": 10, "Clip": 34, "Plataforma": 14, "Estado": 14, "Tema": 32, "Título": 32,
+ANCHOS = {"ID": 10, "Clip": 34, "Formato": 11, "Plataforma": 14, "Estado": 14, "Fecha prevista": 13,
+          "Hora prevista": 9, "Tema": 32, "Objetivo": 13, "Pilar": 13, "Título": 32,
           "Copy": 60, "Hashtags": 42, "Texto para pegar": 60, "Nº caracteres": 10,
           "Fecha alta": 12, "Fecha publicación": 13, "Notas": 30, "Ruta": 60}
 COLS_TEXTO_LARGO = {"Tema", "Título", "Copy", "Hashtags", "Texto para pegar", "Notas"}
-COLS_FECHA = {"Fecha alta", "Fecha publicación"}
+COLS_FECHA = {"Fecha alta", "Fecha publicación", "Fecha prevista"}
+COLS_HORA = {"Hora prevista"}
+COLS_HISTORIAS = ["Fecha prevista", "Archivo", "Carpeta"]
+COLS_PLAN = ["ID", "Fecha", "Hora", "Asignado"]
+_CABECERA_FONDO = "1F2937"
 
 
 class RegistroBloqueado(Exception):
@@ -34,6 +51,24 @@ class RegistroBloqueado(Exception):
 
 def columnas(proyecto) -> list[str]:
     return COLS_ANTES + [c["columna"] for c in proyecto.campos_extra()] + COLS_DESPUES
+
+
+def listas(proyecto) -> dict[str, list[str]]:
+    """Columnas con desplegable: Estado, Formato y los campos propios con lista de valores."""
+    out = {"Estado": list(config.ESTADOS), "Formato": list(config.FORMATOS.values())}
+    for campo in proyecto.campos_extra():
+        if isinstance(campo.get("valores"), list):
+            out[campo["columna"]] = [str(v) for v in campo["valores"]]
+    return out
+
+
+def formato_de_fila(d: dict) -> str:
+    """'reel' | 'carrusel' de una fila (columna Formato; si está vacía, se deduce del Clip)."""
+    v = normalizar(str(d.get("Formato") or ""))
+    for k, nombre in config.FORMATOS.items():
+        if v and v in (k, normalizar(nombre)):
+            return k
+    return "reel" if Path(str(d.get("Clip") or "")).suffix.lower() in config.EXT_VIDEO else "carrusel"
 
 
 def esta_bloqueado(path: Path) -> bool:
@@ -45,6 +80,12 @@ def esta_bloqueado(path: Path) -> bool:
             return False
     except PermissionError:
         return True
+
+
+def _estilo_cabecera(c) -> None:
+    c.font = Font(bold=True, color="FFFFFF")
+    c.fill = PatternFill("solid", fgColor=_CABECERA_FONDO)
+    c.alignment = Alignment(vertical="center", wrap_text=True)
 
 
 class Registro:
@@ -68,35 +109,43 @@ class Registro:
     # ---------- estructura ----------
     def _crear_cabecera(self) -> None:
         ws = self.ws
-        cols = columnas(self.proyecto)
-        relleno = PatternFill("solid", fgColor="1F2937")
-        for i, nombre in enumerate(cols, start=1):
+        for i, nombre in enumerate(columnas(self.proyecto), start=1):
             c = ws.cell(row=1, column=i, value=nombre)
-            c.font = Font(bold=True, color="FFFFFF")
-            c.fill = relleno
-            c.alignment = Alignment(vertical="center", wrap_text=True)
+            _estilo_cabecera(c)
             ws.column_dimensions[c.column_letter].width = ANCHOS.get(nombre, 22)
         ws.freeze_panes = "C2"
         ws.row_dimensions[1].height = 22
-        estado_col = ws.cell(row=1, column=cols.index("Estado") + 1).column_letter
-        dv = DataValidation(type="list", formula1='"' + ",".join(config.ESTADOS) + '"', allow_blank=True)
-        dv.add(f"{estado_col}2:{estado_col}5000")
-        ws.add_data_validation(dv)
+        for nombre, valores in listas(self.proyecto).items():
+            self._desplegable(columnas(self.proyecto).index(nombre) + 1, valores)
+
+    def _desplegable(self, col: int, valores: list[str]) -> None:
+        formula = '"' + ",".join(valores) + '"'
+        if "," in "".join(valores) or len(formula) > 255:
+            return  # Excel no admite comas dentro de los valores ni listas tan largas
+        letra = self.ws.cell(row=1, column=col).column_letter
+        dv = DataValidation(type="list", formula1=formula, allow_blank=True)
+        dv.add(f"{letra}2:{letra}5000")
+        self.ws.add_data_validation(dv)
 
     def _mapear_columnas(self) -> None:
         self.col = {}
         for c in self.ws[1]:
             if c.value:
                 self.col[str(c.value).strip()] = c.column
-        # Columnas que falten (p. ej. un campo propio añadido después) → al final.
+        # Columnas que falten (Excel antiguo o campo propio añadido después) → al final,
+        # sin tocar las que ya hay ni lo escrito en ellas.
+        desplegables = listas(self.proyecto)
+        self.columnas_nuevas: list[str] = []
         for nombre in columnas(self.proyecto):
             if nombre not in self.col:
                 idx = self.ws.max_column + 1
                 c = self.ws.cell(row=1, column=idx, value=nombre)
-                c.font = Font(bold=True, color="FFFFFF")
-                c.fill = PatternFill("solid", fgColor="1F2937")
+                _estilo_cabecera(c)
                 self.ws.column_dimensions[c.column_letter].width = ANCHOS.get(nombre, 22)
                 self.col[nombre] = idx
+                self.columnas_nuevas.append(nombre)
+                if nombre in desplegables:
+                    self._desplegable(idx, desplegables[nombre])
 
     # ---------- lectura ----------
     def filas(self):
@@ -123,6 +172,7 @@ class Registro:
         return None
 
     def siguiente_id(self) -> str:
+        """Mismo contador para Reels y carruseles (MM-0001, MM-0002…)."""
         pref = self.proyecto.prefijo_id + "-"
         nums = []
         for _, d in self.filas():
@@ -146,10 +196,12 @@ class Registro:
                 c.alignment = Alignment(vertical="top")
             if nombre in COLS_FECHA and isinstance(valor, (dt.date, dt.datetime)):
                 c.number_format = "dd/mm/yyyy"
+            if nombre in COLS_HORA and isinstance(valor, dt.time):
+                c.number_format = "hh:mm"
         return fila
 
     def enlazar(self, fila: int, ruta: Path | None) -> None:
-        """Clip con hipervínculo al MP4 (clic = se abre) + ruta en texto."""
+        """Clip con hipervínculo al MP4 o a la carpeta del carrusel (clic = se abre) + ruta en texto."""
         c = self.ws.cell(row=fila, column=self.col["Clip"])
         r = self.ws.cell(row=fila, column=self.col["Ruta"])
         if ruta and Path(ruta).exists():
@@ -163,6 +215,67 @@ class Registro:
                 r.value = str(ruta)
         c.alignment = Alignment(vertical="top")
         r.alignment = Alignment(vertical="top")
+
+    # ---------- hojas del calendario ----------
+    def _hoja(self, nombre: str, cabecera: list[str], oculta: bool = False):
+        if nombre in self.wb.sheetnames:
+            return self.wb[nombre]
+        ws = self.wb.create_sheet(nombre)
+        for i, n in enumerate(cabecera, start=1):
+            c = ws.cell(row=1, column=i, value=n)
+            _estilo_cabecera(c)
+            ws.column_dimensions[c.column_letter].width = {"Archivo": 48, "Carpeta": 60, "Asignado": 20}.get(n, 14)
+        ws.freeze_panes = "A2"
+        if oculta:
+            ws.sheet_state = "hidden"
+        return ws
+
+    @staticmethod
+    def _leer_hoja(ws) -> list[dict]:
+        cab = {str(c.value).strip(): c.column for c in ws[1] if c.value}
+        out = []
+        for r in range(2, ws.max_row + 1):
+            d = {n: ws.cell(row=r, column=i).value for n, i in cab.items()}
+            if any(v not in (None, "") for v in d.values()):
+                out.append(d)
+        return out
+
+    def historias(self) -> list[dict]:
+        """[{'Fecha prevista', 'Archivo', 'Carpeta'}] tal cual (fechas sin interpretar)."""
+        if HOJA_HISTORIAS not in self.wb.sheetnames:
+            return []
+        return [d for d in self._leer_hoja(self.wb[HOJA_HISTORIAS]) if d.get("Archivo")]
+
+    def escribir_historias(self, filas: list[tuple[dt.date, str, str]]) -> None:
+        """Rehace la hoja Historias: [(fecha, archivo, carpeta)]."""
+        ws = self._hoja(HOJA_HISTORIAS, COLS_HISTORIAS)
+        if ws.max_row > 1:
+            ws.delete_rows(2, ws.max_row - 1)
+        for i, (fecha, archivo, carpeta) in enumerate(sorted(filas, key=lambda f: (f[0], f[1].lower())), start=2):
+            c = ws.cell(row=i, column=1, value=fecha)
+            c.number_format = "dd/mm/yyyy"
+            ws.cell(row=i, column=2, value=archivo)
+            ws.cell(row=i, column=3, value=carpeta)
+
+    def plan_auto(self) -> dict[str, tuple[str, str]]:
+        """{ID: ('AAAA-MM-DD', 'HH:MM')} de las fechas que puso el planificador."""
+        if HOJA_PLAN not in self.wb.sheetnames:
+            return {}
+        return {str(d["ID"]): (str(d.get("Fecha") or ""), str(d.get("Hora") or ""))
+                for d in self._leer_hoja(self.wb[HOJA_PLAN]) if d.get("ID")}
+
+    def escribir_plan_auto(self, plan: dict[str, tuple[str, str]]) -> None:
+        ws = self._hoja(HOJA_PLAN, COLS_PLAN, oculta=True)
+        antes = {str(d["ID"]): d for d in self._leer_hoja(ws) if d.get("ID")}
+        if ws.max_row > 1:
+            ws.delete_rows(2, ws.max_row - 1)
+        ahora = dt.datetime.now().isoformat(timespec="seconds")
+        for i, (pid, (fecha, hora)) in enumerate(sorted(plan.items()), start=2):
+            previo = antes.get(pid) or {}
+            igual = (str(previo.get("Fecha") or ""), str(previo.get("Hora") or "")) == (fecha, hora)
+            asignado = previo.get("Asignado") if igual and previo.get("Asignado") else ahora
+            for j, v in enumerate((pid, fecha, hora, asignado), start=1):
+                ws.cell(row=i, column=j, value=v)
 
     def guardar(self) -> None:
         if esta_bloqueado(self.path):

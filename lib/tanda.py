@@ -1,23 +1,26 @@
 """
 TANDA = el JSON de trabajo de una orden de copys.
 
-1) `copys.py pendientes` crea el esqueleto: un bloque por clip con su contexto
-   (cortes.json + transcripción) y huecos vacíos por cada plataforma activa.
+1) `copys.py pendientes` crea el esqueleto: un bloque por pieza (Reel = MP4 o
+   carrusel = carpeta con carrusel.json) con su contexto y huecos vacíos por cada
+   plataforma activa que admita ese formato.
 2) El subagente `copy` (LLM) rellena los huecos: tema, campos propios
-   (p. ej. oferta), y por plataforma copy (+ título si aplica) y hashtags
-   TEMÁTICOS. Los fijos los añade el script: no hay que escribirlos.
+   (oferta, objetivo, pilar), y por plataforma copy (+ título si aplica) y
+   hashtags TEMÁTICOS. Los fijos los añade el script: no hay que escribirlos.
+   En los carruseles, tema/objetivo/pilar vienen ya de carrusel.json.
    `copys.py auditar --entrada <tanda>` revisa el estilo antes de registrar.
 3) `copys.py registrar` valida todo (incluida la auditoría) y, si está bien,
-   escribe Excel + .txt.
+   escribe Excel + .txt. Después: `copys.py calendario planificar`.
 
-Esquema de cada clip:
+Esquema de cada pieza:
 {
-  "clip": "01_nombre.mp4",
-  "ruta": "C:\\...\\01_nombre.mp4",
+  "clip": "01_nombre.mp4",           # Reel: nombre del MP4 · carrusel: nombre de la carpeta
+  "formato": "reel",                 # "reel" | "carrusel" (sin clave = reel, tandas antiguas)
+  "ruta": "C:\\...\\01_nombre.mp4",    # MP4 o carpeta del carrusel
   "contexto": {...},                 # solo lectura, lo pone el script
-  "tema": "",                        # resumen corto del clip (columna Tema)
-  "extra": {"oferta": ""},           # campos_extra del proyecto
-  "plataformas": {                   # solo las que le faltan a ese clip
+  "tema": "",                        # resumen corto (columna Tema)
+  "extra": {"oferta": "", "objetivo": "", "pilar": ""},   # campos_extra del proyecto
+  "plataformas": {                   # solo las que le faltan y admiten el formato
     "instagram": {"copy": "", "hashtags": []},
     "youtube":   {"titulo": "", "copy": "", "hashtags": []}
   }
@@ -45,8 +48,18 @@ def hueco_plataforma(conf_plat: dict) -> dict:
     return h
 
 
-def esqueleto(proyecto, clips: list[tuple[Path, dict, list[str]]]) -> dict:
-    """clips: [(ruta_mp4, contexto, plataformas_que_faltan)]"""
+def esqueleto(proyecto, piezas: list[dict]) -> dict:
+    """piezas: [{"ruta": Path, "contexto": dict, "plataformas": [pid], "formato": "reel"|"carrusel",
+                 "tema": str (opcional), "extra": {campo: valor} (opcional)}]"""
+    formatos = sorted({pz.get("formato") or "reel" for pz in piezas})
+    guias = {}
+    for pz in piezas:
+        fmt = pz.get("formato") or "reel"
+        for pid in pz["plataformas"]:
+            guia = proyecto.conf_formato(pid, fmt).get("guia")
+            if guia:
+                guias[f"{pid}/{fmt}"] = guia
+    campos = [c for c in proyecto.campos_extra() if isinstance(c.get("valores"), list)]
     return {
         "proyecto": proyecto.id,
         "creada": dt.datetime.now().isoformat(timespec="seconds"),
@@ -54,22 +67,54 @@ def esqueleto(proyecto, clips: list[tuple[Path, dict, list[str]]]) -> dict:
             "Rellena tema, extra y, por plataforma, copy (+titulo si aparece) y hashtags TEMÁTICOS "
             "(solo los temáticos: los fijos los añade el script; nº y tamaños en proyecto.json → "
             "plataformas.<p>.hashtags, banco por tamaño en hashtags.json, últimos usados con "
-            f"copys.py hashtags). Reglas del copy en proyectos/{proyecto.id}/proyecto.json. "
-            "Antes de registrar: copys.py auditar --entrada <este archivo> y corrige los avisos de "
-            "estilo reescribiendo (solo se dejan si la frase es literal del clip). "
-            "Luego: copys.py registrar --entrada <este archivo> --simular, y sin --simular."),
+            f"copys.py hashtags). Reglas del copy en proyectos/{proyecto.id}/proyecto.json y guía de "
+            "cada plataforma/formato en 'guias'. "
+            + "".join(f"extra.{c['id']}: {' / '.join(c['valores'])}"
+                      + (f" ({c['ayuda']})" if c.get("ayuda") else "") + ". " for c in campos)
+            + ("Carruseles: tema, objetivo y pilar vienen de carrusel.json (revísalos); el caption repite "
+               "el gancho de la slide 1 (contexto.gancho_slide1) en los primeros 125 caracteres, va corto "
+               "y termina con el CTA a la bio. " if "carrusel" in formatos else "")
+            + "Antes de registrar: copys.py auditar --entrada <este archivo> y corrige los avisos de "
+            "estilo reescribiendo (solo se dejan si la frase es literal del clip o de las slides). "
+            "Luego: copys.py registrar --entrada <este archivo> --simular, sin --simular y "
+            "copys.py calendario planificar."),
+        "guias": guias,
         "clips": [
             {
-                "clip": ruta.name,
-                "ruta": str(ruta),
-                "contexto": ctx,
-                "tema": "",
-                "extra": {c["id"]: "" for c in proyecto.campos_extra()},
-                "plataformas": {p: hueco_plataforma(proyecto.plataforma(p)) for p in plats},
+                "clip": Path(pz["ruta"]).name,
+                "formato": pz.get("formato") or "reel",
+                "ruta": str(pz["ruta"]),
+                "contexto": pz.get("contexto") or {},
+                "tema": pz.get("tema") or "",
+                "extra": {c["id"]: (pz.get("extra") or {}).get(c["id"]) or "" for c in proyecto.campos_extra()},
+                "plataformas": {p: hueco_plataforma(proyecto.conf_formato(p, pz.get("formato") or "reel"))
+                                for p in pz["plataformas"]},
             }
-            for ruta, ctx, plats in clips
+            for pz in piezas
         ],
     }
+
+
+_VACIAS = {"para", "porque", "como", "cuando", "donde", "pero", "esto", "esta", "este", "estos", "estas",
+           "tiene", "tienes", "hace", "hacer", "sobre", "entre", "desde", "hasta", "todo", "toda", "todos",
+           "nada", "algo", "solo", "cada", "mucho", "menos", "eres"}
+
+
+def repite_gancho(copy: str, gancho: str, n: int = 125) -> bool:
+    """True si los primeros `n` caracteres del caption recogen el gancho de la slide 1.
+
+    Se comparan las palabras con contenido (≥ 4 letras) del gancho: tiene que salir al
+    menos la mitad (vale la misma raíz: «objeción»/«objeciones»).
+    """
+    clave = [w for w in normalizar(gancho).split() if len(w) >= 4 and w not in _VACIAS]
+    if not clave:
+        return True
+    inicio = normalizar((copy or "")[:n]).split()
+
+    def sale(w: str) -> bool:
+        raiz = w[:5] if len(w) >= 6 else w
+        return any(x == w or (len(x) >= 4 and x.startswith(raiz)) for x in inicio)
+    return sum(sale(w) for w in clave) * 2 >= len(clave)
 
 
 def hashtags_finales(proyecto, pid: str, tematicos: list[str]) -> list[str]:
@@ -89,8 +134,8 @@ def tematicos_de(proyecto, pid: str, hashtags) -> frozenset[str]:
     return frozenset(t for t in (normalizar_hashtag(str(x)) for x in hashtags or []) if t and t not in fijos)
 
 
-def texto_para_pegar(proyecto, pid: str, bloque: dict) -> str:
-    conf = proyecto.plataforma(pid)
+def texto_para_pegar(proyecto, pid: str, bloque: dict, formato: str = "reel") -> str:
+    conf = proyecto.conf_formato(pid, formato) if proyecto.admite(pid, formato) else proyecto.plataforma(pid)
     tags = " ".join(hashtags_finales(proyecto, pid, bloque.get("hashtags") or []))
     plantilla = conf.get("formato_texto") or "{copy}\n\n{hashtags}"
     return plantilla.format(copy=(bloque.get("copy") or "").strip(), hashtags=tags,
@@ -120,20 +165,30 @@ def validar(proyecto, tanda: dict, copys_existentes: dict[str, dict[str, str]],
         et = c.get("clip") or "(sin nombre)"
         if not c.get("clip"):
             errores.append("Hay un clip sin nombre.")
+        formato = c.get("formato") or "reel"
+        if formato not in config.FORMATOS:
+            errores.append(f"[{et}] formato '{formato}' desconocido (usa {', '.join(config.FORMATOS)}).")
+            continue
         if not (c.get("tema") or "").strip():
             errores.append(f"[{et}] falta 'tema'.")
         ruta = c.get("ruta")
         if not ruta or not Path(ruta).exists():
-            avisos.append(f"[{et}] el MP4 no está en '{ruta}': se registra igual pero sin .txt ni enlace.")
+            que = "la carpeta del carrusel" if formato == "carrusel" else "el MP4"
+            avisos.append(f"[{et}] {que} no está en '{ruta}': se registra igual pero sin .txt ni enlace.")
 
         for campo in proyecto.campos_extra():
-            val = ((c.get("extra") or {}).get(campo["id"]) or "").strip()
+            extra = c.setdefault("extra", {})
+            val = str(extra.get(campo["id"]) or "").strip()
             permitidos = proyecto.valores_campo(campo)
             if campo.get("obligatorio") and not val:
                 errores.append(f"[{et}] falta '{campo['id']}'"
                                + (f" (valores: {', '.join(permitidos)})" if permitidos else "") + ".")
             elif val and permitidos and val not in permitidos:
-                errores.append(f"[{et}] '{campo['id']}' = '{val}' no es válido. Usa: {', '.join(permitidos)}.")
+                canon = proyecto.canon_valor(campo, val) if isinstance(campo.get("valores"), list) else None
+                if canon:
+                    extra[campo["id"]] = canon  # 'Interacción' → 'interaccion'
+                else:
+                    errores.append(f"[{et}] '{campo['id']}' = '{val}' no es válido. Usa: {', '.join(permitidos)}.")
 
         plats = c.get("plataformas") or {}
         if not plats:
@@ -143,9 +198,13 @@ def validar(proyecto, tanda: dict, copys_existentes: dict[str, dict[str, str]],
             if pid not in (proyecto.conf.get("plataformas") or {}):
                 errores.append(f"{ep} plataforma no definida en el proyecto.")
                 continue
+            if not proyecto.admite(pid, formato):
+                errores.append(f"{ep} {proyecto.nombre_plataforma(pid)} no admite {config.FORMATOS[formato].lower()} "
+                               f"(proyecto.json → plataformas.{pid}.formatos).")
+                continue
             if not proyecto.plataforma(pid).get("activa"):
                 avisos.append(f"{ep} la plataforma no está activa en el proyecto (se registra igual).")
-            conf = proyecto.plataforma(pid)
+            conf = proyecto.conf_formato(pid, formato)
             copy = (b.get("copy") or "").strip()
 
             # --- título (YouTube) ---
@@ -169,7 +228,14 @@ def validar(proyecto, tanda: dict, copys_existentes: dict[str, dict[str, str]],
                     errores.append(f"{ep} el copy no lleva CTA (p. ej. «{ej}»).")
             rec = conf.get("copy_recomendado")
             if rec and not (rec[0] <= len(copy) <= rec[1]):
-                avisos.append(f"{ep} copy de {len(copy)} caracteres (recomendado {rec[0]}–{rec[1]}).")
+                avisos.append(f"{ep} copy de {len(copy)} caracteres (recomendado {rec[0]}–{rec[1]}"
+                              + (" en un carrusel" if formato == "carrusel" else "") + ").")
+            if formato == "carrusel":
+                g1 = (c.get("contexto") or {}).get("gancho_slide1") or ""
+                n125 = int(conf.get("gancho_max") or 125)
+                if g1 and not repite_gancho(copy, g1, n125):
+                    avisos.append(f"{ep} el caption no repite el gancho de la slide 1 («{g1[:80]}») "
+                                  f"en sus primeros {n125} caracteres.")
 
             # --- auditoría (lib/auditoria.py · referencias/auditoria_copy.md) ---
             for h in auditoria.auditar(copy, conf, c.get("contexto"), proyecto.nombre_plataforma(pid)):
@@ -186,7 +252,7 @@ def validar(proyecto, tanda: dict, copys_existentes: dict[str, dict[str, str]],
             b["hashtags"] = tem  # normalizados
 
             # --- longitud total ---
-            texto = texto_para_pegar(proyecto, pid, b)
+            texto = texto_para_pegar(proyecto, pid, b, formato)
             if conf.get("max_caracteres") and len(texto) > conf["max_caracteres"]:
                 errores.append(f"{ep} texto de {len(texto)} caracteres (máx. {conf['max_caracteres']}).")
 
