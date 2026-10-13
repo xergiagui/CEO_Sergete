@@ -1,0 +1,8 @@
+# Entorno propio
+.venv/
+__pycache__/
+*.pyc
+
+# Restos de la pasada de limpieza (clean-user-facing-text)
+*.bak
+*.tmp
