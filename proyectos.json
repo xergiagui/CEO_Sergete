@@ -1,5 +1,5 @@
 {
-  "descripcion": "Registro de PROYECTOS (cuentas/clientes de contenido). Cada departamento guarda la configuración de cada proyecto en su propia carpeta proyectos/<id>/ (fuente de verdad); este archivo es solo el índice común. Proyecto nuevo: ver «Añadir un proyecto» en CLAUDE.md (script nuevo_proyecto.py).",
+  "descripcion": "Registro de PROYECTOS (cuentas/clientes de contenido). Cada departamento guarda la configuración de cada proyecto en su propia carpeta proyectos/<id>/ (fuente de verdad de lo suyo). Este archivo es el índice común y la FUENTE ÚNICA de la «identidad» de cada proyecto (cuenta, landing, voz, palabras prohibidas, marca), que leen TheCopy, TheHistoria y ThePerfil: no la copies en sus JSON. Proyecto nuevo: ver «Añadir un proyecto» en CLAUDE.md (script nuevo_proyecto.py).",
   "tipos": {
     "largos": "Vídeos largos (YouTube…) que se descargan y se cortan en clips: TheDescarga → TheEditor vía 1 (o vía 2 si ya vienen en extractos).",
     "clipping": "Vídeos YA CORTADOS que entrega el proyecto: TheEditor vía 2 (batch), solo con los recursos propios del proyecto (sin b-roll ni imágenes de internet)."
@@ -23,7 +23,23 @@
       "recursos": "Banco común de TheEditor (superposiciones/ + catálogo broll_assets + Pexels) y musicas/. Detalle en TheEditor/proyectos/mongemalo/proyecto.json → recursos.",
       "formatos": ["reels", "carruseles", "historias"],
       "landing": "TheLanding (toda la app es de MongeMalo)",
-      "alta": "2026-08"
+      "alta": "2026-08",
+      "identidad": {
+        "cuenta_ig": "@xergi.ventas",
+        "landing": "https://the-landing-ten.vercel.app",
+        "afiliado": "?via=sergio-aguilar",
+        "posicionamiento": "Perfil independiente de Sergio que publica clips y carruseles con las ideas de ventas, copywriting y negocio de Luis Monge, con enlaces de afiliado a sus cursos.",
+        "voz": {
+          "persona": "Segunda persona (tú) al lector. Luis Monge, siempre en tercera persona: nunca hablar como él ni en su nombre.",
+          "tono": "Directo, contundente, frases cortas, español de España. Puede provocar, nunca suena a gurú vacío.",
+          "idioma": "es-ES",
+          "emojis_max": 0
+        },
+        "transparencia_afiliacion": true,
+        "no_suplantar": "No es la cuenta oficial de Luis Monge: nunca dar a entender que trabaja para él ni hablar en su nombre.",
+        "palabras_prohibidas": ["muy fácil", "garantizado", "garantizo", "hazte rico", "dinero fácil", "trabajando para", "cuenta oficial"],
+        "marca": {"fondo": "#14171f", "texto": "#ffffff", "acento": "#f59e0b"}
+      }
     }
   ]
 }

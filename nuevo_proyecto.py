@@ -41,17 +41,17 @@ def carpetas_datos(pid: str) -> list[Path]:
         CEO / "HISTORIAS" / pid / "2. Publicadas",
         RAIZ / "_Historico" / pid,
         RAIZ / "TheDescarga" / "descargas" / pid,
-        RAIZ / "TheEditor" / "proyectos" / pid / "input",
-        RAIZ / "TheEditor" / "proyectos" / pid / "recursos" / "broll",
-        RAIZ / "TheEditor" / "proyectos" / pid / "recursos" / "musica",
     ]
+    # (las carpetas de TheEditor —input, recursos…— las crea su propia orden de alta)
 
 
-def sustituir(carpeta: Path, pid: str, nombre: str) -> None:
+def sustituir(carpeta: Path, pid: str, nombre: str, cuenta: str) -> None:
     for f in carpeta.rglob("*"):
         if f.is_file() and f.suffix.lower() in TEXTO:
             t = f.read_text(encoding="utf-8")
             n = t.replace("<id>", pid).replace("<Nombre>", nombre)
+            if cuenta:
+                n = n.replace("@<cuenta>", cuenta)
             if n != t:
                 f.write_text(n, encoding="utf-8")
 
@@ -65,6 +65,9 @@ def main() -> int:
     ap.add_argument("--tipo", required=True, choices=["clipping", "largos"])
     ap.add_argument("--cuenta", default="")
     ap.add_argument("--prefijo", default="")
+    ap.add_argument("--descripcion", default="PENDIENTE")
+    ap.add_argument("--plataformas", default="instagram", help="separadas por comas")
+    ap.add_argument("--formatos", default="reels", help="reels,carruseles,historias")
     ap.add_argument("--simular", action="store_true", help="enseña lo que haría sin tocar nada")
     a = ap.parse_args()
 
@@ -72,18 +75,27 @@ def main() -> int:
     if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", pid):
         sys.exit("El id va en minúsculas, sin espacios ni tildes (p. ej. «clientex»).")
     hacer = not a.simular
-    hechos, saltados = [], []
+    hechos, saltados, fallos = [], [], []
 
     # 1) registro (antes que las plantillas: copys.py nuevo-proyecto lee de aquí nombre, tipo y prefijo)
     reg = json.loads(REGISTRO.read_text(encoding="utf-8"))
     if any(p["id"] == pid for p in reg["proyectos"]):
         saltados.append("proyectos.json: ya estaba")
     else:
+        lista = lambda t: [x.strip() for x in t.split(",") if x.strip()]
         reg["proyectos"].append({
             "id": pid, "nombre": a.nombre, "tipo": a.tipo, "estado": "alta",
-            "descripcion": "PENDIENTE", "cuenta_ig": a.cuenta, "plataformas": ["instagram"],
+            "descripcion": a.descripcion, "cuenta_ig": a.cuenta, "plataformas": lista(a.plataformas),
             "prefijo_id": a.prefijo, "recursos": "PENDIENTE (TheEditor/proyectos/%s/proyecto.json → recursos)" % pid,
-            "formatos": ["reels"], "alta": dt.date.today().isoformat(),
+            "formatos": lista(a.formatos), "alta": dt.date.today().isoformat(),
+            # Fuente única de la identidad (la leen TheCopy, TheHistoria y ThePerfil).
+            "identidad": {
+                "cuenta_ig": a.cuenta, "landing": "PENDIENTE", "afiliado": "",
+                "posicionamiento": "PENDIENTE",
+                "voz": {"persona": "PENDIENTE", "tono": "PENDIENTE", "idioma": "es-ES", "emojis_max": 3},
+                "transparencia_afiliacion": False, "no_suplantar": "", "palabras_prohibidas": [],
+                "marca": {"fondo": "PENDIENTE", "texto": "PENDIENTE", "acento": "PENDIENTE"},
+            },
         })
         if hacer:
             REGISTRO.write_text(json.dumps(reg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -108,7 +120,7 @@ def main() -> int:
             if hacer:
                 r = subprocess.run(cmd, cwd=raiz_dep, capture_output=True, text=True, encoding="utf-8")
                 if r.returncode != 0:
-                    print(f"[AVISO] {d['nombre']}: «{' '.join(ordenes_propias[d['id']][:2])}» falló:\n{r.stdout}{r.stderr}")
+                    fallos.append(f"{d['nombre']}: «{' '.join(ordenes_propias[d['id']][:2])}» falló:\n{r.stdout}{r.stderr}")
                     continue
             hechos.append(f"{d['nombre']}: {' '.join(ordenes_propias[d['id']][:2])}")
             continue
@@ -121,7 +133,7 @@ def main() -> int:
             continue
         if hacer:
             shutil.copytree(plantilla, destino)
-            sustituir(destino, pid, a.nombre)
+            sustituir(destino, pid, a.nombre, a.cuenta)
         hechos.append(f"{d['nombre']}: proyectos/{pid}/ (desde _plantilla)")
 
     # 3) carpetas de datos comunes
@@ -143,7 +155,10 @@ def main() -> int:
     print(f"  historia TheHistoria/proyectos/{pid}/ (estilo de carruseles, historias sí/no)")
     print(f"  perfil   captura del perfil → ThePerfil/proyectos/{pid}/")
     print(f"  textos   TheTextos/proyectos/{pid}/ (solo si habrá blog)")
-    return 0
+    print(f"  CEO      proyectos.json → «identidad» (cuenta, landing, voz, palabras prohibidas, marca) y estado → activo")
+    for f in fallos:
+        print(f"\n[ERROR] {f}")
+    return 1 if fallos else 0
 
 
 if __name__ == "__main__":

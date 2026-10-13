@@ -12,6 +12,8 @@ PruebasIA/
 │   ├── departamentos.json     registro de departamentos (rutas, disparadores, flujos)
 │   ├── proyectos.json         registro de proyectos (MongeMalo…)
 │   ├── nuevo_proyecto.py      alta de un proyecto en todos los departamentos
+│   ├── ceo.py                 órdenes diarias sin subagente (hoy, semana, huecos, aprobar, estado)
+│   ├── docs/alta_proyecto.md  pasos para dar de alta un proyecto
 │   ├── .claude/agents/        un subagente por departamento
 │   ├── REVISADOS/<proyecto>/  1. pte Publicar · 2. Publicados   (fuera de git)
 │   ├── HISTORIAS/<proyecto>/  1. Pte publicar · 2. Publicadas   (fuera de git)
@@ -57,10 +59,11 @@ parte. Detalle en [`CLAUDE.md`](CLAUDE.md) → «Añadir un proyecto».
 
 ## Flujo de publicación
 
-1. Apruebas clips o carruseles → pasan a `REVISADOS/<proyecto>/1. pte Publicar`.
+1. Apruebas clips o carruseles (`py ceo.py aprobar …`) → pasan a `REVISADOS/<proyecto>/1. pte Publicar`.
 2. TheCopy escribe copy y hashtags (con auditoría) y el calendario les pone fecha y hora.
-3. Cada día: «¿qué publico hoy?» → pieza, hora y texto listo para pegar.
-4. Al publicar, mueves la pieza a `2. Publicados` y el registro se actualiza.
+3. Cada día: «¿qué publico hoy?» (`py ceo.py hoy`) → pieza, hora y texto listo para pegar.
+4. Al publicar, mueves la pieza a `2. Publicados`: el calendario lo detecta solo la próxima
+   vez que se consulta (no vuelve a programarla).
 
 Las historias van a `HISTORIAS/<proyecto>/1. Pte publicar` (sin copy).
 
@@ -77,7 +80,20 @@ Proyecto único reutilizado (`akuykrrqmivrcjzcsksj.supabase.co`) para TheLanding
 el catálogo de b-roll común y las frases virales (`viral_phrases`, etiquetadas por
 proyecto). Credenciales en `.env` (copia de `.env.example`).
 
+## Añadir un departamento
+
+1. Carpeta hermana en `PruebasIA/` con su repo git (`main`, `github.com/xergiagui/<Nombre>`)
+   y, si usa Python, `.venv` + `requirements.txt`.
+2. Su `CLAUDE.md` (qué hace, entorno, reglas, flujo, salida) y `README.md`, **por proyecto**
+   desde el principio (`proyectos/<id>/` + `proyectos/_plantilla/`).
+3. Entrada en `departamentos.json` y subagente en `.claude/agents/<id>.md`: puntero fino
+   (dónde vive, «lee primero su CLAUDE.md y la carpeta del proyecto», límites, qué devuelve),
+   descripción **entre comillas** (YAML) y `model:` explícito.
+4. Ruta en `additionalDirectories` de `.claude/settings.local.json` y fila en la tabla del
+   `CLAUDE.md`.
+
 ## Repos
 
 Bajo `xergiagui` en GitHub: CEO_Sergete y uno por departamento (TheDescarga,
-TheEditor, TheLanding, TheHistoria, TheCopy, TheTextos, ThePerfil).
+TheEditor, TheLanding, TheHistoria, TheCopy, TheTextos, ThePerfil). La fusión de todos en
+el repo CEO_Sergete está preparada pero pendiente de permiso.
