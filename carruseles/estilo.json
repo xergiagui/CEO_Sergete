@@ -1,0 +1,64 @@
+{
+  "_nota": "Diseño de los carruseles (marca MongeMalo). Tamaños en px sobre el lienzo 1080x1350. Los pares [max, min] son el rango del ajuste automático: si el texto no cabe ni al mínimo, la slide da ERROR.",
+  "proyecto": "mongemalo",
+  "handle": "",
+  "emojis_max": 0,
+
+  "colores": {
+    "fondo": "#14171f",
+    "texto": "#ffffff",
+    "texto_suave": "#d3d7df",
+    "detalle": "#8b91a1",
+    "acento": "#f59e0b"
+  },
+  "fuentes": {
+    "titulo": "Montserrat-Bold.ttf",
+    "texto": "Montserrat-SemiBold.ttf",
+    "detalle": "Montserrat-SemiBold.ttf"
+  },
+
+  "margen_lateral": 110,
+  "margen_superior": 190,
+  "margen_inferior": 180,
+  "pie_y": 110,
+  "recorte_perfil": 45,
+
+  "tamanos": {
+    "gancho_titulo": [112, 60],
+    "gancho_texto": [50, 32],
+    "numero": [190, 120],
+    "titulo": [76, 46],
+    "texto": [46, 30],
+    "cierre_titulo": [64, 42],
+    "punto": [40, 26],
+    "cierre_texto": [40, 28],
+    "peticion": [46, 30],
+    "contador": 30,
+    "desliza": 34,
+    "credito": 28,
+    "handle": 28
+  },
+  "interlineado": {
+    "titulo": 1.12,
+    "texto": 1.38,
+    "punto": 1.25
+  },
+  "barra_acento": [96, 8],
+  "numero_formato": "{n:02d}",
+
+  "portada_oscurecer": 0.6,
+  "portada_foco_y": 0.5,
+
+  "jpeg_calidad": 92,
+  "textos": {
+    "desliza": "desliza"
+  },
+
+  "longitudes": {
+    "gancho_palabras": 12,
+    "titulo_palabras": 8,
+    "texto_palabras": 25,
+    "punto_palabras": 7,
+    "peticion_palabras": 12
+  }
+}

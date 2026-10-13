@@ -56,3 +56,22 @@ VIDEO_EXTS = {".mp4", ".mov", ".webm", ".mkv", ".m4v", ".avi"}
 
 # Umbral mínimo de similitud para aceptar un fondo semántico (si no, azar).
 FONDO_SIMILARITY_THRESHOLD = 0.28
+
+# --- CARRUSELES de Instagram (tercera vía) ---
+# Post del feed de 2-10 imágenes 4:5. El plan (plan.json) lo escribe el subagente
+# y `carruseles.py` lo valida, lo renderiza y deja la carpeta de salida que lee
+# TheCopy (contrato en CLAUDE.md). El diseño se configura en carruseles/estilo.json.
+CARRUSEL_W = 1080
+CARRUSEL_H = 1350
+CARRUSEL_MIN_SLIDES = 2
+CARRUSEL_MAX_SLIDES = 10
+CARRUSEL_MAX_BYTES = 8 * 1024 * 1024     # límite de Instagram por imagen
+CARRUSELES_DIR = PROJECT_ROOT / "carruseles"
+CARRUSEL_ESTILO = CARRUSELES_DIR / "estilo.json"
+CARRUSEL_PLANES_DIR = CARRUSELES_DIR / "planes"
+
+# Auditor de estilo de TheCopy (paso opcional antes de renderizar). Se invoca
+# como proceso aparte con su propio .venv: no se importa ni se copia su código.
+THECOPY_ROOT = PRUEBAS_IA / "TheCopy"
+THECOPY_PY = THECOPY_ROOT / ".venv" / "Scripts" / "python.exe"
+THECOPY_CLI = THECOPY_ROOT / "copys.py"
