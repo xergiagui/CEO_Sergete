@@ -22,3 +22,6 @@ Thumbs.db
 # Skills enlazadas por junction desde su proyecto de origen (fuente de verdad
 # en TheEditor, etc.). No se versionan aquí para no duplicar.
 .claude/skills/
+
+# Excel de trabajo (no se versiona)
+mongemalo_videos_largos.xlsx
