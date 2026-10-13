@@ -17,17 +17,20 @@ Sin dependencias: `py validar_perfil.py ...` (librería estándar). Nunca `pytho
 ## Estructura (un proyecto = una carpeta)
 ```
 proyectos/<id>/
-  perfil.json        cuenta, objetivo, enlace de destino, posicionamiento, marca, reglas, historial
+  perfil.json        objetivo del perfil, palabras clave del nombre, historial
   capturas/          AAAA-MM-DD_<qué>.png  (cabecera, cuadricula, destacadas…)
-  auditorias/        AAAA-MM-DD.md         una por revisión
+  auditorias/        AAAA-MM-DD.md         una por revisión (otra el mismo día: AAAA-MM-DD_2.md)
 proyectos/_plantilla/   se copia para un proyecto nuevo
 referencias/checklist_perfil.md            las 9 partes y cómo se puntúan
 ```
+La **identidad** del proyecto (cuenta, enlace/landing, posicionamiento, voz, palabras
+prohibidas, afiliación y marca) no está aquí: es fuente única en
+`CEO_Sergete/proyectos.json → identidad`, y `validar_perfil.py` la lee de ahí.
 
 ## Flujo de una revisión
-1. Lee `referencias/checklist_perfil.md` y `proyectos/<id>/perfil.json`. Si el
-   proyecto no existe, copia `proyectos/_plantilla/` y pregunta al CEO lo que
-   falte (cuenta, objetivo, enlace, posicionamiento, reglas); no lo inventes.
+1. Lee `referencias/checklist_perfil.md`, `proyectos/<id>/perfil.json` y la
+   `identidad` del proyecto en `CEO_Sergete/proyectos.json`. Lo que falte o diga
+   PENDIENTE, pregúntaselo al CEO; no lo inventes.
 2. Guarda la captura en `capturas/AAAA-MM-DD_<qué>.png`.
 3. Puntúa las 9 partes (Bien / Mejorable / Suspenso / **Sin datos** si la
    captura no la muestra; nunca supongas).
@@ -41,9 +44,9 @@ referencias/checklist_perfil.md            las 9 partes y cómo se puntúan
 ## Reglas
 - Coherencia con el resto del sistema: el **enlace** debe ser el destino de los
   CTA de los copys (TheCopy) y la **marca** la de carruseles e historias.
-- Respeta las `reglas` del proyecto (afiliación visible, palabras prohibidas,
-  emojis, no suplantar). En MongeMalo: perfil independiente, nunca «trabajando
-  para» ni promesas de resultados.
+- Respeta la identidad del proyecto (afiliación visible, palabras prohibidas,
+  emojis, no suplantar). Estados de cada parte: Bien / Mejorable / Suspenso /
+  Sin datos (solo esos).
 - No inventes cifras, resultados ni testimonios. Los cambios los aplica Sergio en
   la app: tú solo propones.
 

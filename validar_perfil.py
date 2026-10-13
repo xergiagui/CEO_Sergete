@@ -34,13 +34,33 @@ RE_EMOJI = re.compile(
 )
 
 
+INDICE_CEO = RAIZ.parent / "CEO_Sergete" / "proyectos.json"
+
+
 def cargar_perfil(pid: str) -> dict:
+    """perfil.json del proyecto + su «identidad» (fuente única en CEO_Sergete/proyectos.json).
+
+    Devuelve {"reglas": {...}} con las reglas que usa validar(): las palabras clave del
+    nombre salen del perfil; afiliación, palabras prohibidas y emojis, de la identidad.
+    """
     ruta = RAIZ / "proyectos" / pid / "perfil.json"
     if not ruta.exists():
         sys.exit(f"No existe {ruta}. Proyectos: "
                  + ", ".join(p.name for p in (RAIZ / "proyectos").iterdir()
                              if p.is_dir() and not p.name.startswith("_")))
-    return json.loads(ruta.read_text(encoding="utf-8"))
+    perfil = json.loads(ruta.read_text(encoding="utf-8"))
+    identidad = {}
+    if INDICE_CEO.exists():
+        for p in json.loads(INDICE_CEO.read_text(encoding="utf-8")).get("proyectos", []):
+            if p.get("id") == pid:
+                identidad = p.get("identidad") or {}
+    if not identidad:
+        print(f"AVISO  {pid} no tiene «identidad» en {INDICE_CEO}: sin reglas de afiliación ni palabras prohibidas.")
+    reglas = dict(perfil.get("reglas") or {})
+    reglas.setdefault("transparencia_afiliacion", bool(identidad.get("transparencia_afiliacion")))
+    reglas.setdefault("palabras_prohibidas", identidad.get("palabras_prohibidas") or [])
+    reglas.setdefault("emojis_max_bio", (identidad.get("voz") or {}).get("emojis_max", 3))
+    return {**perfil, "reglas": reglas}
 
 
 def normalizar(t: str) -> str:

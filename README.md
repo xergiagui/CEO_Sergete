@@ -4,7 +4,8 @@ Departamento de **CEO_Sergete** que revisa el perfil de Instagram de cada
 proyecto (foto, nombre, @, bio, enlace, categoría, destacadas, primeras 9 y
 fijados) a partir de una captura, y propone cambios concretos antes → después.
 
-- **Por proyecto:** `proyectos/<id>/` con `perfil.json`, `capturas/` y `auditorias/`.
+- **Por proyecto:** `proyectos/<id>/` con `perfil.json`, `capturas/` y `auditorias/`. La identidad
+  (cuenta, enlace, voz, palabras prohibidas, marca) se lee de `CEO_Sergete/proyectos.json`.
 - **Checklist:** [`referencias/checklist_perfil.md`](referencias/checklist_perfil.md).
 - **Validador** (sin dependencias): comprueba nombre ≤ 30, bio ≤ 150, destacadas
   ≤ 15 y las reglas del proyecto (afiliación, palabras prohibidas, emojis).
