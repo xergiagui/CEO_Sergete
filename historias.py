@@ -4,8 +4,12 @@ TheHistoria — generador de historias de Instagram (9:16), por PROYECTO.
 Toma las FRASES virales del proyecto que TheEditor guarda en Supabase
 (`viral_phrases` con `proyecto:<id>` en `tags` y used_in_story = false), les pone
 un FONDO según la política de b-roll del proyecto (banco común, b-roll propio o
-fondo liso), renderiza un MP4 vertical por frase y marca la frase como usada.
-Proceso INDEPENDIENTE: se lanza a demanda, no forma parte de la descarga/edición.
+fondo liso) y renderiza un MP4 vertical por frase, con la fuente y los colores
+del proyecto. Proceso INDEPENDIENTE: se lanza a demanda.
+
+Las frases NO se marcan al generar (una tanda rechazada no gasta frases); se
+marcan como usadas al APROBAR la tanda. Mientras una tanda está pendiente en
+salidas/<id>/, sus frases no se repiten en otra.
 
 Uso:
   python historias.py [--proyecto ID]          # N historias desde la BBDD
@@ -13,8 +17,11 @@ Uso:
   python historias.py --categoria dinero       # solo esa categoría
   python historias.py --min-virality 70        # solo frases con virality >= 70
   python historias.py --phrase "Tu texto"      # historia suelta (no toca la BBDD)
-  python historias.py --no-marcar              # no marca used_in_story
   python historias.py --duracion 7             # segundos por historia
+  python historias.py --aprobar <tanda…> | --todas [--no-marcar] [--destino DIR]
+      # OK: mueve los MP4 a CEO_Sergete/HISTORIAS/<id>/1. Pte publicar/ (nombre
+      # único), marca sus frases como usadas, apunta el manifest en
+      # salidas/<id>/_aprobadas.log y borra la tanda. --destino: solo pruebas.
 
 `--proyecto` se puede omitir si solo hay un proyecto; con varios es obligatorio.
 Salida en salidas/<id>/<AAAAMMDD_HHMMSS>/. Ejecuta con el .venv de TheEditor.
@@ -24,10 +31,12 @@ import argparse
 import datetime as dt
 import json
 import re
+import shutil
 import sys
 from pathlib import Path
 
 import config
+from lib.aprobar import nombre_unico, registrar
 from lib.env import load_env, has_supabase
 from lib.fondos import elegir_fondo, hay_fondos, origen_fondos
 from lib.proyectos import Proyecto, ProyectoError, resolver
@@ -53,7 +62,15 @@ def _parse_args(argv=None):
                    help="segundos por historia (def. el del proyecto, o 6)")
     p.add_argument("--orientation", default=None, choices=["vertical", "horizontal"],
                    help="fondo con esa orientación (si el catálogo lo tiene)")
-    p.add_argument("--no-marcar", action="store_true", help="no marcar used_in_story")
+    p.add_argument("--no-marcar", action="store_true",
+                   help="con --aprobar: no marca used_in_story (al generar nunca se marca)")
+    p.add_argument("--aprobar", nargs="+", metavar="TANDA",
+                   help="OK a estas tandas (nombre en salidas/<id>/ o ruta): mueve los MP4 "
+                        "a HISTORIAS/<id>/1. Pte publicar/, marca sus frases y borra la tanda")
+    p.add_argument("--todas", action="store_true",
+                   help="OK a todas las tandas de historias pendientes del proyecto")
+    p.add_argument("--destino", default=None,
+                   help="PRUEBAS: carpeta destino alternativa para --aprobar")
     p.add_argument("--max-len", type=int, default=None,
                    help="OPCIONAL: descarta frases más largas que N caracteres. "
                         "Por defecto NO filtra: las frases largas se ajustan solas.")
@@ -65,6 +82,103 @@ def _tanda_dir(proyecto: Proyecto) -> Path:
     d = proyecto.salidas_dir / ts
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+
+def _tandas_pendientes(proyecto: Proyecto) -> list[Path]:
+    """Tandas de historias (normales y especiales) en salidas/<id>/."""
+    d = proyecto.salidas_dir
+    if not d.is_dir():
+        return []
+    return sorted(t for t in d.iterdir()
+                  if t.is_dir() and not t.name.startswith(("carrusel_", "_", "."))
+                  and ((t / "manifest.json").exists() or any(t.glob("*.mp4"))))
+
+
+def _manifest(tanda: Path) -> list[dict]:
+    try:
+        datos = json.loads((tanda / "manifest.json").read_text(encoding="utf-8"))
+        return [m for m in datos if isinstance(m, dict)] if isinstance(datos, list) else []
+    except Exception:
+        return []
+
+
+def _ids_pendientes(proyecto: Proyecto) -> set:
+    """Frases ya puestas en tandas sin aprobar (para no repetirlas en otra)."""
+    return {m["phrase_id"] for t in _tandas_pendientes(proyecto) for m in _manifest(t)
+            if m.get("phrase_id")}
+
+
+def _resolver_tanda(nombre: str, proyecto: Proyecto) -> Path | None:
+    t = Path(nombre)
+    for cand in ([t] if t.is_absolute() else [proyecto.salidas_dir / t.name, Path.cwd() / t]):
+        if cand.is_dir():
+            return cand.resolve()
+    return None
+
+
+def _aprobar(args, proyecto: Proyecto) -> int:
+    """OK a tandas: mover MP4 (nombre único), marcar frases, log y borrar la tanda."""
+    if args.todas:
+        tandas = _tandas_pendientes(proyecto)
+        if not tandas:
+            print(f"[i] No hay tandas de historias pendientes en {proyecto.salidas_dir}.")
+            return 0
+    else:
+        tandas = []
+        for nombre in args.aprobar:
+            t = _resolver_tanda(nombre, proyecto)
+            if t is None:
+                print(f"[!] No existe la tanda «{nombre}» en {proyecto.salidas_dir}.")
+                return 2
+            if t.parent != proyecto.salidas_dir.resolve() or t.name.startswith("carrusel_"):
+                print(f"[!] «{nombre}» no es una tanda de historias de salidas/{proyecto.id}/ "
+                      f"(los carruseles se aprueban con carruseles.py --aprobar).")
+                return 2
+            tandas.append(t)
+    for t in tandas:
+        ajenas = {m.get("proyecto") for m in _manifest(t)} - {proyecto.id, None}
+        if ajenas:
+            print(f"[!] La tanda {t.name} trae historias de otro proyecto ({', '.join(ajenas)}).")
+            return 2
+
+    a_marcar = [m["phrase_id"] for t in tandas for m in _manifest(t)
+                if m.get("phrase_id") and not m.get("marcada_usada")]
+    env = {}
+    if a_marcar and not args.no_marcar:
+        env = load_env()
+        if not has_supabase(env):
+            print(f"[!] Hay {len(a_marcar)} frase(s) que marcar y no hay credenciales de "
+                  f"Supabase: no apruebo nada (o usa --no-marcar).")
+            return 2
+
+    destino = Path(args.destino).resolve() if args.destino else proyecto.historias_pte
+    destino.mkdir(parents=True, exist_ok=True)
+    log = proyecto.salidas_dir / config.APROBADAS_LOG
+    total = 0
+    for t in tandas:
+        manifest = _manifest(t)
+        movidos = []
+        for mp4 in sorted(t.glob("*.mp4")):
+            dst = nombre_unico(destino, mp4.name, sufijo=t.name)
+            shutil.move(str(mp4), str(dst))
+            movidos.append({"origen": mp4.name, "destino": dst.name})
+        marcadas, fallidas = [], []
+        for m in manifest:
+            pid = m.get("phrase_id")
+            if not pid or m.get("marcada_usada") or args.no_marcar:
+                continue
+            (marcadas if mark_used(env, pid) else fallidas).append(pid)
+        registrar(log, {"proyecto": proyecto.id, "tanda": t.name, "destino": str(destino),
+                        "archivos": movidos, "frases_marcadas": marcadas,
+                        "frases_sin_marcar": fallidas, "no_marcar": bool(args.no_marcar),
+                        "manifest": manifest})
+        shutil.rmtree(t)
+        total += len(movidos)
+        print(f"  [OK] {t.name}: {len(movidos)} MP4 → {destino}"
+              + (f" · {len(marcadas)} frase(s) marcada(s)" if marcadas else "")
+              + (f" · [!] {len(fallidas)} sin marcar (ver log)" if fallidas else ""))
+    print(f"[✓] {total} historia(s) aprobada(s) de {len(tandas)} tanda(s). Log: {log}")
+    return 0
 
 
 def main(argv=None) -> int:
@@ -87,7 +201,15 @@ def main(argv=None) -> int:
         print(f"[!] El proyecto «{proyecto.id}» no tiene las historias activas "
               f"(proyectos/{proyecto.id}/proyecto.json → historias.activas).")
         return 2
+    if args.aprobar or args.todas:
+        return _aprobar(args, proyecto)
     print(f"[i] {proyecto.resumen()}")
+    for a in proyecto.avisos():
+        print(f"[aviso] {a}")
+    if proyecto.estilo_por_rellenar():
+        print(f"[aviso] proyectos/{proyecto.id}/estilo.json sigue con `_rellenar`: revisa "
+              f"las fuentes del proyecto.")
+    estilo = proyecto.estilo_historia()
     filtro = cfg.get("frases") if isinstance(cfg.get("frases"), dict) else {}
     duracion = args.duracion or cfg.get("duracion") or config.STORY_DURATION
     orientation = args.orientation or cfg.get("orientacion")
@@ -104,18 +226,23 @@ def main(argv=None) -> int:
             print("[!] Sin credenciales de Supabase (revisa .env). No hay frases que leer.")
             print("    Puedes probar una frase suelta con:  --phrase \"tu texto\"")
             return 2
+        n = args.n or cfg.get("n_por_defecto") or 5
+        pendientes = _ids_pendientes(proyecto)
         items = fetch_unused_phrases(
             env, proyecto.etiqueta_frases,
-            limit=args.n or cfg.get("n_por_defecto") or 5,
+            limit=n + len(pendientes),
             categoria=args.categoria,
             categorias=filtro.get("categorias"),
             min_virality=(args.min_virality if args.min_virality is not None
                           else filtro.get("min_virality")),
             lang=filtro.get("lang"),
         )
+        items = [it for it in items if it.get("id") not in pendientes][:n]
         if not items:
             print(f"[i] No hay frases sin usar del proyecto (etiqueta «{proyecto.etiqueta_frases}») "
-                  f"que cumplan el filtro. Nada que generar.")
+                  f"que cumplan el filtro"
+                  + (f" ni estén ya en una tanda pendiente ({len(pendientes)})" if pendientes else "")
+                  + ". Nada que generar.")
             return 0
 
     if not hay_fondos(proyecto):
@@ -151,19 +278,13 @@ def main(argv=None) -> int:
 
         out_mp4 = out_dir / f"{idx:02d}_{_slug(phrase)}.mp4"
         try:
-            render_historia(fondo, phrase, out_mp4, duration=duracion,
-                            color=proyecto.color_liso if fondo is None else None)
+            render_historia(fondo, phrase, out_mp4, duration=duracion, estilo=estilo)
         except Exception as e:
             print(f"  [{idx}] ERROR al renderizar: {e}")
             continue
 
-        marcada = False
-        if it.get("id") and not args.no_marcar:
-            marcada = mark_used(env, it["id"])
-
         nombre_fondo = fondo.name if fondo is not None else proyecto.color_liso
-        print(f"  [{idx}] OK  fondo={nombre_fondo} ({metodo})  ->  {out_mp4.name}"
-              + ("  [marcada]" if marcada else ""))
+        print(f"  [{idx}] OK  fondo={nombre_fondo} ({metodo})  ->  {out_mp4.name}")
         manifest.append({
             "proyecto": proyecto.id,
             "phrase": phrase,
@@ -172,7 +293,7 @@ def main(argv=None) -> int:
             "metodo_fondo": metodo,
             "politica_broll": proyecto.broll,
             "salida": out_mp4.name,
-            "marcada_usada": marcada,
+            "marcada_usada": False,        # se marca al aprobar (--aprobar)
             "virality": it.get("virality"),
             "longitud": len(phrase),
         })
@@ -181,6 +302,9 @@ def main(argv=None) -> int:
         json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"[✓] {len(manifest)} historia(s) generada(s). Manifiesto: {out_dir / 'manifest.json'}"
           + (f"  ({omitidas_largas} omitidas por --max-len)" if omitidas_largas else ""))
+    if manifest:
+        print(f"    Al dar OK: historias.py --proyecto {proyecto.id} --aprobar {out_dir.name} "
+              f"(marca las frases; si se rechaza, borra la carpeta)")
     return 0 if manifest else 1
 
 

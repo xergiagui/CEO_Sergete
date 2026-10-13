@@ -6,7 +6,9 @@ parámetro (NO usa Supabase ni `viral_phrases`), con FONDOS propios del proyecto
 en `proyectos/<id>/especiales/` (NO el banco común), elegidos por rotación/azar
 sin repetir dentro de la tanda. Si esa carpeta está vacía, manda la política de
 b-roll del proyecto (propio → su b-roll; ninguno → fondo liso). Deja una FRANJA
-INFERIOR libre para el botón de IG: el texto se centra en la zona superior.
+INFERIOR libre para el botón de IG: el texto se centra en la zona superior. Fuente
+y colores: los del proyecto (estilo.json + identidad). Se aprueban igual que las
+normales: `historias.py --aprobar especiales_<…>`.
 
 VARIACIONES: se generan N historias del mismo tema, cada una con un FONDO
 distinto. Se pueden pasar VARIOS `--texto` (uno por variación); si hay menos
@@ -85,6 +87,9 @@ def main(argv=None) -> int:
               f"(proyectos/{proyecto.id}/proyecto.json → especiales.activas).")
         return 2
     print(f"[i] {proyecto.resumen()}")
+    for a in proyecto.avisos():
+        print(f"[aviso] {a}")
+    estilo = proyecto.estilo_historia()        # fuente y colores del proyecto
 
     textos = [t.strip() for t in (args.textos or []) if t and t.strip()]
     if not textos:
@@ -126,8 +131,7 @@ def main(argv=None) -> int:
         out_mp4 = out_dir / f"{idx:02d}_{_slug(texto)}.mp4"
         try:
             render_historia(fondo, texto, out_mp4, duration=duracion,
-                            bottom_reserved_frac=reserva,
-                            color=proyecto.color_liso if fondo is None else None)
+                            bottom_reserved_frac=reserva, estilo=estilo)
         except Exception as e:
             print(f"  [{idx}] ERROR al renderizar (fondo={nombre_fondo}): {e}")
             continue
@@ -149,6 +153,8 @@ def main(argv=None) -> int:
         json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"[OK] {ok}/{n} historia(s) especial(es) generada(s). "
           f"Manifiesto: {out_dir / 'manifest.json'}")
+    if ok:
+        print(f"    Al dar OK: historias.py --proyecto {proyecto.id} --aprobar {out_dir.name}")
     return 0 if ok else 1
 
 

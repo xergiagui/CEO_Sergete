@@ -1,6 +1,9 @@
 # <Nombre> — reglas propias en TheHistoria
 
-Qué es el proyecto, qué cuenta publica y qué se busca (rellenar).
+**Identidad** (cuenta, posicionamiento, voz y tono, emojis, no suplantar,
+palabras prohibidas y colores de marca): `CEO_Sergete/proyectos.json` →
+`<id>.identidad`. Es la fuente única: no la copies aquí. Si falta, TheHistoria
+usa valores neutros y avisa.
 
 ## Recursos
 - Política de b-roll: la de `TheEditor/proyectos/<id>/proyecto.json`
@@ -9,17 +12,17 @@ Qué es el proyecto, qué cuenta publica y qué se busca (rellenar).
 - Especiales: vídeos del proyecto en `especiales/` (git-ignored). Si está vacío,
   se usa su b-roll propio (`propio`) o fondo liso (`ninguno`).
 
-## Tono (carruseles)
-- Persona (tú/usted), registro, emojis sí/no (`emojis_max` en estilo.json).
-- Crédito de la fuente (`fuente.credito`) si el contenido es de otra persona.
+## Carruseles
+- Crédito de la fuente: `carruseles.credito` del `proyecto.json` si el contenido
+  es de otra persona (se pone solo en las fuentes de vídeo).
+- Maquetación: `estilo.json` (quita `_rellenar` cuando esté revisado).
 
 ## Fuentes de los carruseles
-- `../_Historico/<id>/<video>/` (solo lectura), `../TheEditor/proyectos/<id>/…`.
+- `../_Historico/<id>/<video>/` (solo lectura), `../TheEditor/proyectos/<id>/transcripciones/<video>/`,
+  `../TheTextos/textos/<id>/<AAAA-MM-DD>_<slug>/articulo.md`.
+- Léelas con `carruseles.py --fuente <video|ruta>`.
 - Portada: solo material del proyecto (ver `carruseles.material_extra`).
 
-## Diseño (estilo.json)
-Base genérica copiada de la plantilla: cambia colores, fuentes y `handle`.
-
-## Publicación
-- Historias OK → `CEO_Sergete/HISTORIAS/<id>/1. Pte publicar/`.
-- Carruseles OK → `CEO_Sergete/REVISADOS/<id>/1. pte Publicar/` (+ `copy`).
+## Publicación (por script)
+- Historias: `historias.py --aprobar <tanda>` → `CEO_Sergete/HISTORIAS/<id>/1. Pte publicar/`.
+- Carruseles: `carruseles.py --aprobar <carpeta>` → `CEO_Sergete/REVISADOS/<id>/1. pte Publicar/` (+ `copy`).

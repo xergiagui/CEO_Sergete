@@ -14,23 +14,23 @@ Roles:
           encima de «desliza») sobre un degradado oscuro que sube desde abajo,
           para que la cara se vea arriba; con
           "centro", texto en el centro óptico y oscurecido plano.
-  valor   número grande en dorado, título, barra de acento y texto; contador
+  valor   número grande en el color de acento, título, barra de acento y texto; contador
           «n/N» arriba a la derecha.
   cierre  título, lista-resumen opcional (`puntos`), texto, la petición en
-          dorado y el crédito de la fuente en pequeño.
+          color de acento y el crédito de la fuente en pequeño.
 
 Posición vertical: los bloques se centran en el CENTRO ÓPTICO (`centro_optico`,
 ~46 % de la altura). Las slides de valor comparten escala y caja: se centra la
 caja de la más alta y el contenido de cada una va alineado arriba dentro de esa
 caja, así el número grande queda a la misma altura en todas.
 
-`**palabra**` pinta ese tramo en el color de acento. La arroba (`handle`) solo
-se pinta si está rellena en estilo.json.
+`**palabra**` pinta ese tramo en el color de acento. El estilo que llega aquí es
+`Proyecto.estilo()`: maquetación de estilo.json + `colores`, `handle` y
+`emojis_max` de la identidad del proyecto. El handle solo se pinta si existe.
 """
 from __future__ import annotations
 
 import io
-import json
 import statistics
 import subprocess
 from dataclasses import dataclass
@@ -51,11 +51,6 @@ class NoCabe(Exception):
 
 
 # ------------------------------------------------------------------ estilo
-def cargar_estilo(path: Path) -> dict:
-    """estilo.json del proyecto (proyectos/<id>/estilo.json)."""
-    return json.loads(Path(path).read_text(encoding="utf-8"))
-
-
 def _rgb(hex_color: str) -> tuple[int, int, int]:
     h = hex_color.lstrip("#")
     return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
@@ -481,7 +476,7 @@ class Maquetador:
         return img
 
     def _desliza(self, d: ImageDraw.ImageDraw, base: int):
-        """«desliza →» en dorado; la flecha se dibuja (Montserrat no trae →)."""
+        """«desliza →» en el color de acento; la flecha se dibuja (Montserrat no trae →)."""
         f = self.f.get("detalle", self.tam.get("desliza", 34))
         txt = (self.e.get("textos") or {}).get("desliza", "desliza")
         s = f.size

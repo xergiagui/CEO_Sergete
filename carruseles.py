@@ -2,25 +2,27 @@
 TheHistoria — CARRUSELES de Instagram (tercera vía).
 
 Valida un plan.json (lo escribe el subagente a partir de un clip/vídeo, un
-artículo de TheTextos o un tema), audita el estilo con TheCopy (opcional),
-renderiza las slides 1080x1350 y deja la carpeta de salida que lee TheCopy:
+artículo de TheTextos o un tema), audita el estilo con TheCopy (una sola
+llamada), renderiza las slides 1080x1350 y deja la carpeta de salida que lee
+TheCopy:
 
   salidas/<id>/carrusel_<AAAAMMDD-HHMM>_<slug>/
     01.jpg … NN.jpg   1080x1350, JPEG ~92, sRGB, < 8 MB, en orden
     carrusel.json     plan + metadatos (`creado`)
     _vista.jpg        hoja de contacto (solo para revisar)
 
-PROYECTO: manda el `proyecto` del plan. `--proyecto` es opcional; si se da,
-debe coincidir (si el plan no lo trae: `--proyecto` o el único que haya). El
-estilo es el del proyecto (proyectos/<id>/estilo.json) y la portada solo puede
-ser material del proyecto.
+Re-render del mismo slug: sustituye la salida no aprobada anterior (no se
+acumulan carpetas). PROYECTO: manda el `proyecto` del plan; `--proyecto` es
+opcional y, si se da, debe coincidir. Maquetación: proyectos/<id>/estilo.json;
+colores, handle y emojis: identidad del proyecto (CEO_Sergete/proyectos.json).
 
 Uso:
-  python carruseles.py --plan proyectos/<id>/planes/<slug>.json
-  python carruseles.py --plan <plan.json> --solo-validar
-  python carruseles.py --plan <plan.json> --no-auditar
+  python carruseles.py --fuente <video|ruta> [--proyecto ID]    material para el plan
+  python carruseles.py --listar [--proyecto ID]                 qué hay hecho y de dónde
+  python carruseles.py --plan proyectos/<id>/planes/<slug>.json [--solo-validar]
+  python carruseles.py --aprobar <carpeta> [--proyecto ID]      → REVISADOS/<id>/1. pte Publicar
   python carruseles.py --candidatos-portada <video.mp4> [--n 8] [--hoja ruta.jpg]
-      (fotogramas más nítidos para `portada_fondo`; tú eliges el gesto)
+  (`--destino DIR` en --plan/--aprobar: otra carpeta base, para pruebas)
 
 Ejecuta con el .venv de TheEditor (Pillow + imageio-ffmpeg). No instala nada.
 Códigos de salida: 0 OK · 1 errores de validación/QC · 2 uso o fichero ilegible.
@@ -30,25 +32,39 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import re
+import shutil
 import sys
 from pathlib import Path
 
 from PIL import Image
 
 import config
-from lib import carrusel_auditoria as auditoria
+from lib import thecopy
+from lib.aprobar import nombre_unico
+from lib.carrusel_fuente import fuente_compacta, listado, resolver_fuente
 from lib.carrusel_plan import Hallazgo, plan_para_json, validar_material, validar_plan
 from lib.proyectos import Proyecto, ProyectoError, proyecto_de_ruta, resolver
-from lib.carrusel_render import (Maquetador, NoCabe, candidatos_portada, cargar_estilo,
-                                 guardar_jpg, hoja_contacto, perfil_srgb,
-                                 preparar_portada)
+from lib.carrusel_render import (Maquetador, NoCabe, candidatos_portada, guardar_jpg,
+                                 hoja_contacto, perfil_srgb, preparar_portada)
+
 
 
 def _args(argv=None):
     p = argparse.ArgumentParser(description="Genera un CARRUSEL de Instagram (4:5) desde un plan.json.")
     p.add_argument("--plan", help="ruta del plan.json")
+    p.add_argument("--fuente", metavar="VIDEO|RUTA",
+                   help="imprime el material para escribir el plan (transcripción sin tiempos, "
+                        "cortes, clips y campos válidos)")
+    p.add_argument("--listar", action="store_true",
+                   help="carruseles del proyecto con su estado y vídeos de _Historico")
+    p.add_argument("--aprobar", metavar="CARPETA",
+                   help="mueve la carpeta del carrusel a REVISADOS/<id>/1. pte Publicar/")
     p.add_argument("--proyecto", default=None,
-                   help="id del proyecto (opcional: manda el del plan y debe coincidir)")
+                   help="id del proyecto (con --plan, opcional: manda el del plan y debe coincidir)")
+    p.add_argument("--destino", default=None,
+                   help="PRUEBAS: carpeta base alternativa de la salida (--plan) o del "
+                        "destino (--aprobar)")
     p.add_argument("--estilo", default=None,
                    help="estilo.json (def. proyectos/<id>/estilo.json)")
     p.add_argument("--auditar", action=argparse.BooleanOptionalAction, default=None,
@@ -61,9 +77,96 @@ def _args(argv=None):
     p.add_argument("--n", type=int, default=8, help="nº de candidatos (def. 8)")
     p.add_argument("--hoja", help="dónde guardar la hoja de candidatos (def. carpeta temporal)")
     a = p.parse_args(argv)
-    if not a.plan and not a.candidatos_portada:
-        p.error("falta --plan (o --candidatos-portada VIDEO)")
+    modos = [m for m in ("plan", "fuente", "listar", "aprobar", "candidatos_portada")
+             if getattr(a, m)]
+    if len(modos) != 1:
+        p.error("usa una (y solo una) de: --plan, --fuente, --listar, --aprobar o "
+                "--candidatos-portada")
     return a
+
+
+def _fuente(args) -> int:
+    try:
+        proyecto = resolver(args.proyecto)
+        ruta = resolver_fuente(args.fuente, proyecto)
+    except ProyectoError as e:
+        print(f"[!] {e}")
+        return 2
+    texto, tipo, rel = fuente_compacta(ruta, proyecto)
+    fuente = {"tipo": tipo, "ruta": rel}
+    print(f"# Fuente · proyecto «{proyecto.id}»\n"
+          f"\"fuente\": {json.dumps(fuente, ensure_ascii=False)}"
+          + (f"   (credito por defecto: «{proyecto.credito_defecto}»)"
+             if tipo == "video" and proyecto.credito_defecto else "") + "\n")
+    print(texto)
+    campos, origen = thecopy.campos(proyecto.id)
+    print(f"\n## Campos del plan (de {origen})\n{thecopy.resumen_campos(campos)}")
+    return 0
+
+
+def _listar(args) -> int:
+    try:
+        proyecto = resolver(args.proyecto)
+    except ProyectoError as e:
+        print(f"[!] {e}")
+        return 2
+    print(listado(proyecto))
+    return 0
+
+
+def _aprobar(args) -> int:
+    """Mueve la carpeta del carrusel a REVISADOS/<id>/1. pte Publicar/ (nombre único)."""
+    arg = Path(args.aprobar)
+    carpeta = None
+    for cand in ([arg] if arg.is_absolute() else [Path.cwd() / arg, config.PROJECT_ROOT / arg]):
+        if (cand / "carrusel.json").exists():
+            carpeta = cand.resolve()
+            break
+    try:
+        if carpeta is None:
+            proyecto = resolver(args.proyecto)
+            cand = proyecto.salidas_dir / arg.name
+            if not (cand / "carrusel.json").exists():
+                print(f"[!] No encuentro el carrusel «{args.aprobar}» (ni como ruta ni en "
+                      f"salidas/{proyecto.id}/).")
+                return 2
+            carpeta = cand.resolve()
+        datos = json.loads((carpeta / "carrusel.json").read_text(encoding="utf-8"))
+        pid_json = str(datos.get("proyecto") or "").strip()
+        try:
+            rel = carpeta.relative_to(config.OUT_DIR.resolve())
+            pid_ruta = rel.parts[0] if len(rel.parts) > 1 else ""
+        except ValueError:
+            pid_ruta = ""
+        pids = {x for x in (pid_json, pid_ruta, (args.proyecto or "").strip()) if x}
+        if len(pids) > 1:
+            print(f"[!] El carrusel no casa con el proyecto (carrusel.json: «{pid_json or '-'}», "
+                  f"carpeta: «{pid_ruta or '-'}», --proyecto: «{args.proyecto or '-'}»): "
+                  f"no se mezclan proyectos.")
+            return 2
+        proyecto = resolver(pids.pop() if pids else None)
+    except ProyectoError as e:
+        print(f"[!] {e}")
+        return 2
+    except json.JSONDecodeError as e:
+        print(f"[!] carrusel.json ilegible ({e.msg}).")
+        return 2
+    fallos = _qc(carpeta, len(datos.get("slides") or []))
+    if fallos:
+        print("[X] La carpeta no pasa el QC; no se mueve:")
+        for f in fallos:
+            print(f"  - {f}")
+        return 1
+    base = Path(args.destino).resolve() if args.destino else proyecto.revisados_pte
+    base.mkdir(parents=True, exist_ok=True)
+    destino = nombre_unico(base, carpeta.name)
+    shutil.move(str(carpeta), str(destino))
+    print(f"[OK] Carrusel aprobado: {destino}")
+    extra = f' --carpeta "{base}"' if args.destino else ""
+    print("Siguiente (TheCopy, copy + hashtags):\n"
+          f"  ..\\TheCopy\\.venv\\Scripts\\python.exe ..\\TheCopy\\copys.py pendientes "
+          f"--proyecto {proyecto.id} --clip \"{destino.name}\"{extra}")
+    return 0
 
 
 def _candidatos(args) -> int:
@@ -130,11 +233,14 @@ def _comprobar_ajuste(plan: dict, maq: Maquetador) -> list[Hallazgo]:
 
 
 def _auditar(plan: dict, activar: bool | None) -> tuple[str, int, int]:
-    """Imprime la auditoría por slide. Devuelve (estado, nº errores, nº avisos)."""
+    """Una sola llamada a TheCopy para todas las slides (con --proyecto).
+    Devuelve (estado, nº errores, nº avisos)."""
     if activar is False:
         print("\nAuditoría de estilo (TheCopy): desactivada (--no-auditar).")
         return "desactivada", 0, 0
-    ok, motivo, res = auditoria.auditar_slides(plan.get("slides") or [], plan.get("proyecto"))
+    ok, motivo, res, aviso = thecopy.auditar_slides(plan.get("slides") or [], plan.get("proyecto"))
+    if aviso:
+        print(f"\n[!] Auditoría: {aviso}.")
     if not ok:
         print(f"\n[!] Auditoría de estilo (TheCopy) NO disponible: {motivo}. "
               f"Sigo sin auditar.")
@@ -180,15 +286,25 @@ def _proyecto_del_plan(plan_raw, pid_arg: str | None, plan_path: Path) -> Proyec
     return proyecto
 
 
-def _carpeta_salida(proyecto: Proyecto, slug: str) -> Path:
+def _carpeta_salida(base: Path, slug: str) -> Path:
     ts = dt.datetime.now().strftime("%Y%m%d-%H%M")
-    d = proyecto.salidas_dir / f"carrusel_{ts}_{slug}"
+    d = base / f"carrusel_{ts}_{slug}"
     if d.exists():                       # re-render en el mismo minuto: se rehace
         for f in list(d.glob("[0-9][0-9].jpg")) + [d / "_vista.jpg", d / "carrusel.json"]:
             if f.exists():
                 f.unlink()
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+
+def _salidas_previas(base: Path, slug: str, nueva: Path) -> list[Path]:
+    """Salidas NO aprobadas del mismo slug en `base` (las aprobadas ya no están
+    aquí: viven en REVISADOS). Se sustituyen tras un render correcto."""
+    patron = re.compile(r"^carrusel_\d{8}-\d{4}_" + re.escape(slug) + r"$")
+    if not base.is_dir():
+        return []
+    return [d for d in base.iterdir()
+            if d.is_dir() and patron.match(d.name) and d.resolve() != nueva.resolve()]
 
 
 def _qc(carpeta: Path, n: int) -> list[str]:
@@ -224,13 +340,19 @@ def main(argv=None) -> int:
     args = _args(argv)
     if args.candidatos_portada:
         return _candidatos(args)
+    if args.fuente:
+        return _fuente(args)
+    if args.listar:
+        return _listar(args)
+    if args.aprobar:
+        return _aprobar(args)
 
     plan_path = Path(args.plan).resolve()
     try:
         plan_raw = json.loads(plan_path.read_text(encoding="utf-8"))
         proyecto = _proyecto_del_plan(plan_raw, args.proyecto, plan_path)
         estilo_path = Path(args.estilo) if args.estilo else proyecto.estilo_path
-        estilo = cargar_estilo(estilo_path)
+        estilo = proyecto.estilo(estilo_path)      # maquetación + identidad
     except ProyectoError as e:
         print(f"[!] {e}")
         return 2
@@ -244,18 +366,31 @@ def main(argv=None) -> int:
         print(f"[!] {estilo_path.name} es del proyecto «{estilo['proyecto']}», no de "
               f"«{proyecto.id}»: no se mezclan proyectos.")
         return 2
+    if estilo.get("_rellenar"):
+        print(f"[!] {estilo_path} sigue siendo la plantilla (`_rellenar: true`): ajusta la "
+              f"maquetación del proyecto y quita `_rellenar` antes de hacer carruseles.")
+        return 2
     if proyecto.seccion("carruseles").get("activos") is False:
         print(f"[!] El proyecto «{proyecto.id}» no tiene los carruseles activos "
               f"(proyectos/{proyecto.id}/proyecto.json → carruseles.activos).")
         return 2
     print(f"[i] {proyecto.resumen()}")
+    for a in proyecto.avisos():
+        print(f"[aviso] {a}")
+    campos, origen_campos = thecopy.campos(proyecto.id)
+    if origen_campos != "TheCopy":
+        print(f"[aviso] Campos del plan: {origen_campos}.")
 
     if int(estilo.get("margen_lateral", 0)) < max(100, int(estilo.get("recorte_perfil", 45))):
         print("[!] estilo.json: `margen_lateral` debe ser ≥ 100 px (la cuadrícula del perfil "
               "recorta ~45 px por lado).")
         return 2
 
-    plan, hallazgos = validar_plan(plan_raw, estilo, plan_path.parent)
+    if isinstance(plan_raw, dict) and not str(plan_raw.get("slug") or "").strip() \
+            and proyecto_de_ruta(plan_path):
+        plan_raw["slug"] = plan_path.stem          # planes/<slug>.json
+    plan, hallazgos = validar_plan(plan_raw, estilo, plan_path.parent, campos,
+                                   proyecto.credito_defecto)
     hallazgos += validar_material(plan, proyecto, plan_path.parent)
     maq = Maquetador(estilo)
     # Con foto, el texto del gancho va abajo (def.) o en el centro; sin foto, centro.
@@ -270,7 +405,7 @@ def main(argv=None) -> int:
 
     activar = args.auditar
     if activar is None:
-        activar = auditoria.disponible()[0] or None
+        activar = thecopy.disponible()[0] or None
     estado_aud, aud_err, aud_av = _auditar(plan, activar)
 
     errores = [h for h in hallazgos if h.nivel == "ERROR"]
@@ -298,7 +433,8 @@ def main(argv=None) -> int:
         imgs.append(maq.render(s, s["n"], n_slides, idx_valor, credito=credito,
                                portada=portada, t_max=t, y_top=y_top))
 
-    carpeta = _carpeta_salida(proyecto, plan["slug"])
+    base = Path(args.destino).resolve() if args.destino else proyecto.salidas_dir
+    carpeta = _carpeta_salida(base, plan["slug"])
     icc = perfil_srgb()
     calidad = int(estilo.get("jpeg_calidad", 92))
     pesos = [guardar_jpg(im, carpeta / f"{i:02d}.jpg", calidad, icc)
@@ -323,6 +459,9 @@ def main(argv=None) -> int:
         for f in fallos:
             print(f"  - {f}")
         return 1
+    for previa in _salidas_previas(base, plan["slug"], carpeta):
+        shutil.rmtree(previa)
+        print(f"    sustituye a la salida anterior sin aprobar: {previa.name}")
     print(f"[OK] QC: {n_slides} JPG 1080x1350 en orden, < 8 MB, sRGB; carrusel.json y _vista.jpg.")
     return 0
 

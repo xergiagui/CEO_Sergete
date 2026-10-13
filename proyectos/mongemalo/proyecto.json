@@ -1,7 +1,7 @@
 {
   "id": "mongemalo",
   "nombre": "MongeMalo",
-  "_nota": "Configuración de TheHistoria para este proyecto. Las reglas de contenido propias están en reglas.md. La política de recursos (b-roll banco_comun | propio | ninguno, internet…) NO se define aquí: se lee de TheEditor/proyectos/mongemalo/proyecto.json → recursos. `recursos_respaldo` solo se usa mientras TheEditor no la tenga.",
+  "_nota": "Configuración de TheHistoria para este proyecto. Reglas propias en reglas.md; identidad (cuenta, voz, marca) en CEO_Sergete/proyectos.json. La política de recursos (b-roll banco_comun | propio | ninguno, internet…) NO se define aquí: se lee de TheEditor/proyectos/mongemalo/proyecto.json → recursos. `recursos_respaldo` solo se usa mientras TheEditor no la tenga.",
 
   "historias": {
     "activas": true,
@@ -26,12 +26,14 @@
   "carruseles": {
     "activos": true,
     "estilo": "estilo.json",
+    "credito": "Ideas de Luis Monge",
+    "_credito": "fuente.credito por defecto de los carruseles de vídeo/clip (se pinta en pequeño en el cierre).",
     "material_extra": [],
     "_material_extra": "Carpetas extra (relativas a PruebasIA) que valen como material del proyecto para la portada, además de las suyas: _Historico/mongemalo, TheEditor/proyectos/mongemalo (input, transcripciones, recursos), TheDescarga/descargas/mongemalo, proyectos/mongemalo y sus carpetas de publicación."
   },
 
   "fondo_liso": null,
-  "_fondo_liso": "Color #rrggbb para la política «ninguno» o especiales sin vídeos; null = colores.fondo de estilo.json.",
+  "_fondo_liso": "Color #rrggbb para la política «ninguno» o especiales sin vídeos; null = identidad.marca.fondo (CEO_Sergete/proyectos.json).",
 
   "recursos_respaldo": {"broll": "banco_comun", "internet": true}
 }

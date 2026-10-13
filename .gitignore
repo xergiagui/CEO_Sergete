@@ -13,3 +13,6 @@ salidas/*
 # Fondos de las historias especiales de cada proyecto (vídeos pesados, no a git)
 proyectos/*/especiales/*
 !proyectos/*/especiales/.gitkeep
+
+# Caché local (última respuesta de TheCopy `campos`)
+.cache/

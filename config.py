@@ -18,7 +18,7 @@ FONTS_DIR = PROJECT_ROOT / "fonts"
 OUT_DIR = PROJECT_ROOT / "salidas"            # salidas/<id>/<tanda | especiales_… | carrusel_…>/
 
 # --- Proyectos (cuentas/clientes). Cada uno en proyectos/<id>/ (fuente de verdad):
-# proyecto.json, estilo.json, especiales/ y planes/. `_plantilla` es la base de
+# proyecto.json, estilo.json (maquetación), reglas.md, especiales/ y planes/. `_plantilla` es la base de
 # los nuevos (la copia CEO_Sergete/nuevo_proyecto.py sustituyendo <id> y <Nombre>).
 PROYECTOS_DIR = PROJECT_ROOT / "proyectos"
 PLANTILLA_ID = "_plantilla"
@@ -30,7 +30,19 @@ CEO_ROOT = PRUEBAS_IA / "CEO_Sergete"
 EDITOR_ROOT = PRUEBAS_IA / "TheEditor"
 DESCARGA_ROOT = PRUEBAS_IA / "TheDescarga"
 HISTORICO_DIR = PRUEBAS_IA / "_Historico"     # _Historico/<id>/<video>/
-CEO_PROYECTOS_JSON = CEO_ROOT / "proyectos.json"   # índice común (solo se lee)
+TEXTOS_DIR = PRUEBAS_IA / "TheTextos" / "textos"   # textos/<id>/<AAAA-MM-DD>_<slug>/articulo.md
+# Índice común de proyectos (solo se lee): nombre, tipo y la IDENTIDAD de cada
+# uno (cuenta_ig, voz, palabras prohibidas, marca…). Fuente única: no se copia.
+CEO_PROYECTOS_JSON = CEO_ROOT / "proyectos.json"
+
+# Carpetas de publicación (al aprobar con `--aprobar`). `{id}` = proyecto.
+HISTORIAS_PTE = CEO_ROOT / "HISTORIAS" / "{id}" / "1. Pte publicar"
+REVISADOS_PTE = CEO_ROOT / "REVISADOS" / "{id}" / "1. pte Publicar"
+REVISADOS_PUBLICADOS = CEO_ROOT / "REVISADOS" / "{id}" / "2. Publicados"
+APROBADAS_LOG = "_aprobadas.log"              # salidas/<id>/_aprobadas.log (jsonl)
+
+# Caché local (git-ignored): última respuesta de `copys.py campos` por proyecto.
+CACHE_DIR = PROJECT_ROOT / ".cache"
 
 # Política de RECURSOS de cada proyecto (fuente de verdad: TheEditor):
 #   TheEditor/proyectos/<id>/proyecto.json → recursos {broll, internet, musica…}
@@ -49,9 +61,17 @@ RECURSOS_RESPALDO = {"broll": "propio", "internet": False}
 FONDOS_DIR = EDITOR_ROOT / "superposiciones"
 PREFIJOS_INTERNET = ("pexels_",)
 
+# Marca NEUTRA: solo si el proyecto no tiene `identidad.marca` en
+# CEO_Sergete/proyectos.json (se avisa). Los colores de cada proyecto salen de ahí.
+MARCA_NEUTRA = {"fondo": "#121212", "texto": "#ffffff", "acento": "#a3a3a3"}
+# Matices derivados de la marca (mezcla del texto hacia el fondo) si la identidad
+# no los trae: texto secundario y detalles (contador, crédito).
+MEZCLA_TEXTO_SUAVE = 0.17
+MEZCLA_DETALLE = 0.47
+
 # Política `ninguno` (o especiales sin vídeos): fondo liso del color de marca
-# (`fondo_liso` del proyecto.json o `colores.fondo` del estilo.json).
-FONDO_LISO_DEFECTO = "#14171f"
+# (`fondo_liso` del proyecto.json o `identidad.marca.fondo`); si no, este neutro.
+FONDO_LISO_DEFECTO = MARCA_NEUTRA["fondo"]
 
 # Python del entorno con las dependencias ya instaladas (fastembed, httpx,
 # Pillow, imageio-ffmpeg). Reutilizamos el .venv de TheEditor para NO instalar
@@ -63,7 +83,8 @@ STORY_W = 1080
 STORY_H = 1920
 STORY_FPS = 30
 STORY_DURATION = 6.0          # segundos por historia (una frase)
-FONDO_OSCURECER = 0.45        # scrim oscuro 0..1 sobre el fondo (legibilidad)
+FONDO_OSCURECER = 0.45        # velo 0..1 del color de fondo de marca (legibilidad)
+FUENTE_HISTORIA = "Montserrat-Bold.ttf"   # si el estilo del proyecto no trae `fuentes.titulo`
 
 # Fracción de la ALTURA reservada ABAJO en las historias especiales para dejar
 # sitio al botón/enlace de Instagram. El texto se centra en la zona superior
@@ -82,16 +103,17 @@ FONDO_SIMILARITY_THRESHOLD = 0.28
 # --- CARRUSELES de Instagram (tercera vía) ---
 # Post del feed de 2-10 imágenes 4:5. El plan (proyectos/<id>/planes/<slug>.json)
 # lo escribe el subagente y `carruseles.py` lo valida, lo renderiza y deja la
-# carpeta de salida que lee TheCopy (contrato en README.md). El diseño de cada
-# proyecto está en proyectos/<id>/estilo.json.
+# carpeta de salida que lee TheCopy (contrato en README.md). La maquetación de
+# cada proyecto está en proyectos/<id>/estilo.json; colores, `handle` y
+# `emojis_max` salen de su identidad (CEO_Sergete/proyectos.json).
 CARRUSEL_W = 1080
 CARRUSEL_H = 1350
 CARRUSEL_MIN_SLIDES = 2
 CARRUSEL_MAX_SLIDES = 10
 CARRUSEL_MAX_BYTES = 8 * 1024 * 1024     # límite de Instagram por imagen
 
-# Auditor de estilo de TheCopy (paso opcional antes de renderizar). Se invoca
-# como proceso aparte con su propio .venv: no se importa ni se copia su código.
+# TheCopy (proceso aparte con su propio .venv: no se importa ni se copia su
+# código): da las listas del plan (`campos`) y audita el estilo (`auditar`).
 THECOPY_ROOT = PRUEBAS_IA / "TheCopy"
 THECOPY_PY = THECOPY_ROOT / ".venv" / "Scripts" / "python.exe"
 THECOPY_CLI = THECOPY_ROOT / "copys.py"

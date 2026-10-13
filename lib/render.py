@@ -2,9 +2,10 @@
 Render de la historia: FONDO (vídeo del proyecto o color liso) + FRASE encima → MP4 9:16.
 
 Estrategia:
-  1. Con Pillow se dibuja una CAPA de texto 1080x1920 transparente: un scrim
-     oscuro a pantalla completa (legibilidad) + la frase centrada, envuelta,
-     con sombra. Se guarda como PNG temporal.
+  1. Con Pillow se dibuja una CAPA de texto 1080x1920 transparente: un velo
+     del color de fondo de marca a pantalla completa (legibilidad) + la frase
+     centrada, envuelta, con sombra, en la fuente y el color de texto del
+     proyecto (`Proyecto.estilo_historia()`). Se guarda como PNG temporal.
   2. Con ffmpeg (el bundled de imageio-ffmpeg, sin depender del sistema) se
      escala/recorta el fondo a 1080x1920 "cover", se superpone el PNG y se
      exporta un MP4 H.264 de STORY_DURATION segundos. Sin vídeo (política de
@@ -71,10 +72,26 @@ def _fit_font(draw, text: str, max_w: int, max_h: int,
     return font, _wrap(draw, text, font, max_w)
 
 
+def _rgb(hex_color: str) -> tuple[int, int, int]:
+    h = (hex_color or "#000000").lstrip("#")
+    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def _estilo(estilo: Optional[dict]) -> dict:
+    """Fuente y colores de la historia; sin estilo, la marca neutra de config."""
+    e = dict(estilo or {})
+    e.setdefault("fuente", config.FONTS_DIR / config.FUENTE_HISTORIA)
+    e.setdefault("fondo", config.FONDO_LISO_DEFECTO)
+    e.setdefault("velo", e["fondo"])
+    e.setdefault("texto", config.MARCA_NEUTRA["texto"])
+    return e
+
+
 def _build_text_png(phrase: str, out_png: Path,
                     bottom_reserved_frac: float = 0.0,
-                    oscurecer: Optional[float] = None) -> None:
-    """Capa 1080x1920 RGBA: scrim + frase centrada con sombra.
+                    oscurecer: Optional[float] = None,
+                    estilo: Optional[dict] = None) -> None:
+    """Capa 1080x1920 RGBA: velo + frase centrada con sombra.
 
     `bottom_reserved_frac` (0..1): fracción de la altura reservada ABAJO (p. ej.
     para el botón de Instagram en las historias especiales). Con 0.0 el texto se
@@ -83,20 +100,22 @@ def _build_text_png(phrase: str, out_png: Path,
     [margen_sup .. H*(1-bottom_reserved_frac)]; el scrim sigue a pantalla completa.
     """
     W, H = config.STORY_W, config.STORY_H
+    est = _estilo(estilo)
+    c_velo, c_texto = _rgb(est["velo"]), _rgb(est["texto"])
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
-    # Scrim oscuro a pantalla completa (legibilidad sobre cualquier fondo).
+    # Velo del color de fondo de marca a pantalla completa (legibilidad).
     osc = config.FONDO_OSCURECER if oscurecer is None else oscurecer
     scrim_alpha = int(max(0.0, min(1.0, osc)) * 255)
     if scrim_alpha:
-        draw.rectangle([0, 0, W, H], fill=(0, 0, 0, scrim_alpha))
+        draw.rectangle([0, 0, W, H], fill=(*c_velo, scrim_alpha))
 
     # Regla de Sergio: minúsculas salvo inicio de oración. Se aplica AQUÍ, justo
     # donde se pinta el texto, para que valga en todo el flujo (BBDD o --phrase).
     texto = capitalizar_frase(phrase.strip())
 
-    font_path = config.FONTS_DIR / "Montserrat-Bold.ttf"
+    font_path = Path(est["fuente"])
     margin_x = 90
     max_w = W - 2 * margin_x
 
@@ -126,8 +145,8 @@ def _build_text_png(phrase: str, out_png: Path,
         tw = draw.textlength(line, font=font)
         x = (W - tw) // 2
         # Sombra + texto.
-        draw.text((x + 3, y + 3), line, font=font, fill=(0, 0, 0, 210))
-        draw.text((x, y), line, font=font, fill=(255, 255, 255, 255))
+        draw.text((x + 3, y + 3), line, font=font, fill=(*c_velo, 210))
+        draw.text((x, y), line, font=font, fill=(*c_texto, 255))
         y += line_h + gap
 
     img.save(out_png)
@@ -137,32 +156,38 @@ def render_historia(
     fondo: Optional[Path], phrase: str, out_mp4: Path,
     duration: Optional[float] = None,
     bottom_reserved_frac: float = 0.0,
-    color: Optional[str] = None,
+    estilo: Optional[dict] = None,
 ) -> Path:
     """Compone el MP4 9:16 (fondo cover + frase). Devuelve la ruta de salida.
 
-    `fondo` = vídeo; si es None, fondo liso de `color` (#rrggbb; def. el de
-    config) sin scrim. `bottom_reserved_frac` (0..1): reserva una franja inferior
-    sin texto (botón de IG). 0.0 = texto centrado en pantalla completa.
+    `estilo` = `Proyecto.estilo_historia()` ({fuente, fondo, velo, texto}; sin
+    él, marca neutra). `fondo` = vídeo; si es None, fondo liso `estilo.fondo`
+    sin velo. `bottom_reserved_frac` (0..1): reserva una franja inferior sin
+    texto (botón de IG). 0.0 = texto centrado en pantalla completa.
     """
+    est = _estilo(estilo)
     duration = duration or config.STORY_DURATION
     out_mp4.parent.mkdir(parents=True, exist_ok=True)
 
     with tempfile.TemporaryDirectory() as tmp:
         png = Path(tmp) / "texto.png"
         _build_text_png(phrase, png, bottom_reserved_frac=bottom_reserved_frac,
-                        oscurecer=0.0 if fondo is None else None)
+                        oscurecer=0.0 if fondo is None else None, estilo=est)
 
         W, H, fps = config.STORY_W, config.STORY_H, config.STORY_FPS
         if fondo is None:
-            hexa = (color or config.FONDO_LISO_DEFECTO).lstrip("#")
+            hexa = est["fondo"].lstrip("#")
             entrada = ["-f", "lavfi", "-i", f"color=c=0x{hexa}:s={W}x{H}:r={fps}"]
             vf_bg = "setsar=1"
         else:
             entrada = ["-stream_loop", "-1", "-i", str(fondo)]   # loop si es corto
+            # ffmpeg ya endereza el fondo (autorotate), pero 7.x copia además su
+            # `displaymatrix` a la salida y el reproductor lo volvería a girar
+            # (historia boca abajo o tumbada): se borra.
             vf_bg = (
                 f"scale={W}:{H}:force_original_aspect_ratio=increase,"
-                f"crop={W}:{H},fps={fps},setsar=1"
+                f"crop={W}:{H},fps={fps},setsar=1,"
+                f"sidedata=mode=delete:type=DISPLAYMATRIX"
             )
         cmd = [
             _ffmpeg_exe(), "-y",

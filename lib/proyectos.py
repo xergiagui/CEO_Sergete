@@ -2,12 +2,16 @@
 PROYECTOS: cada cuenta o cliente de contenido es independiente.
 
 Configuración de cada uno en `proyectos/<id>/` (fuente de verdad):
-  proyecto.json   historias sí/no, filtro de frases, nº de historias, fondo liso…
-  estilo.json     marca de los carruseles
+  proyecto.json   historias sí/no, filtro de frases, nº de historias, crédito…
+  estilo.json     maquetación (fuentes, tamaños, márgenes, posiciones)
   especiales/     fondos de las historias especiales (vídeos propios)
   planes/         planes de carrusel
-  reglas.md       reglas de contenido propias del proyecto (tono, crédito…)
+  reglas.md       reglas propias del proyecto (recursos, fuentes, crédito…)
 `proyectos/_plantilla/` es la base de los nuevos (no cuenta como proyecto).
+
+La IDENTIDAD (cuenta_ig, voz, emojis_max, palabras prohibidas y colores de marca)
+sale de CEO_Sergete/proyectos.json → `identidad` (fuente única; no se copia). Si
+falta, se usan valores neutros con aviso.
 
 Regla común de elección (`--proyecto <id>`): si se omite y solo hay un proyecto
 se usa ese; si hay varios, ERROR con la lista. Nunca se mezclan proyectos.
@@ -120,6 +124,36 @@ class Proyecto:
     def especiales_dir(self) -> Path:
         return self.dir / "especiales"
 
+    # --- publicación (CEO_Sergete) y fuentes del proyecto
+    @property
+    def historias_pte(self) -> Path:
+        return Path(str(config.HISTORIAS_PTE).format(id=self.id))
+
+    @property
+    def revisados_pte(self) -> Path:
+        return Path(str(config.REVISADOS_PTE).format(id=self.id))
+
+    @property
+    def revisados_publicados(self) -> Path:
+        return Path(str(config.REVISADOS_PUBLICADOS).format(id=self.id))
+
+    @property
+    def historico_dir(self) -> Path:
+        return config.HISTORICO_DIR / self.id
+
+    @property
+    def transcripciones_dir(self) -> Path:
+        return config.EDITOR_PROYECTOS_DIR / self.id / "transcripciones"
+
+    @property
+    def textos_dir(self) -> Path:
+        return config.TEXTOS_DIR / self.id
+
+    @property
+    def credito_defecto(self) -> str:
+        """`fuente.credito` por defecto de los carruseles de vídeo (proyecto.json)."""
+        return str(self.seccion("carruseles").get("credito") or "").strip()
+
     # --- frases y recursos
     @property
     def etiqueta_frases(self) -> str:
@@ -137,16 +171,92 @@ class Proyecto:
     def broll_propio_dir(self) -> Path:
         return config.EDITOR_PROYECTOS_DIR / self.id / "recursos" / "broll"
 
+    # --- identidad (CEO_Sergete/proyectos.json → identidad; fuente única)
+    @property
+    def identidad(self) -> dict:
+        v = self.ceo.get("identidad")
+        return v if isinstance(v, dict) else {}
+
+    @property
+    def marca(self) -> dict:
+        """Colores {fondo, texto, acento, texto_suave, detalle} de `identidad.marca`
+        (neutros si faltan). Los matices se derivan si la identidad no los trae."""
+        m = self.identidad.get("marca")
+        m = m if isinstance(m, dict) else {}
+        out = {k: _hex(m.get(k)) or config.MARCA_NEUTRA[k] for k in ("fondo", "texto", "acento")}
+        out["texto_suave"] = _hex(m.get("texto_suave")) or _mezcla(
+            out["texto"], out["fondo"], config.MEZCLA_TEXTO_SUAVE)
+        out["detalle"] = _hex(m.get("detalle")) or _mezcla(
+            out["texto"], out["fondo"], config.MEZCLA_DETALLE)
+        return out
+
+    @property
+    def handle(self) -> str:
+        h = str(self.identidad.get("cuenta_ig") or "").strip()
+        return ("@" + h.lstrip("@")) if h else ""
+
+    @property
+    def emojis_max(self) -> int:
+        voz = self.identidad.get("voz") if isinstance(self.identidad.get("voz"), dict) else {}
+        try:
+            return max(0, int(voz.get("emojis_max", 0) or 0))
+        except (TypeError, ValueError):
+            return 0
+
+    def avisos(self) -> list[str]:
+        """Avisos de configuración (identidad incompleta)."""
+        out = []
+        if not self.identidad:
+            out.append(f"«{self.id}» no tiene `identidad` en CEO_Sergete/proyectos.json: "
+                       f"uso valores neutros (colores grises, sin handle, 0 emojis).")
+        else:
+            if not isinstance(self.identidad.get("marca"), dict):
+                out.append("la identidad no trae `marca`: uso colores neutros.")
+            if not self.handle:
+                out.append("la identidad no trae `cuenta_ig`: no se pinta el handle.")
+        return out
+
     @property
     def color_liso(self) -> str:
-        """Fondo liso de marca: `fondo_liso` del proyecto.json o el del estilo."""
-        c = self.cfg.get("fondo_liso")
-        if not c and self.estilo_path.exists():
-            try:
-                c = (_leer_json(self.estilo_path).get("colores") or {}).get("fondo")
-            except ProyectoError:
-                c = None
-        return c or config.FONDO_LISO_DEFECTO
+        """Fondo liso: `fondo_liso` del proyecto.json o `identidad.marca.fondo`."""
+        return _hex(self.cfg.get("fondo_liso")) or self.marca["fondo"]
+
+    # --- estilo (maquetación del proyecto + identidad)
+    def estilo_crudo(self, path: Path | None = None) -> dict:
+        """estilo.json tal cual ({} si no existe)."""
+        path = Path(path) if path else self.estilo_path
+        return _leer_json(path) if path.exists() else {}
+
+    def estilo(self, path: Path | None = None) -> dict:
+        """Maquetación de estilo.json + `colores`, `handle` y `emojis_max` de la
+        identidad (si el estilo aún los trae, manda la identidad)."""
+        path = Path(path) if path else self.estilo_path
+        if not path.exists():
+            raise FileNotFoundError(2, "no existe", str(path))
+        e = _leer_json(path)
+        e["colores"] = self.marca
+        e["handle"] = self.handle
+        e["emojis_max"] = self.emojis_max
+        return e
+
+    def estilo_historia(self) -> dict:
+        """Fuente y colores de las historias (normales y especiales)."""
+        try:
+            fuentes = self.estilo_crudo().get("fuentes") or {}
+        except ProyectoError:
+            fuentes = {}
+        fuente = config.FONTS_DIR / (fuentes.get("titulo") or config.FUENTE_HISTORIA)
+        if not fuente.exists():
+            fuente = config.FONTS_DIR / config.FUENTE_HISTORIA
+        m = self.marca
+        return {"fuente": fuente, "fondo": self.color_liso, "velo": m["fondo"],
+                "texto": m["texto"]}
+
+    def estilo_por_rellenar(self) -> bool:
+        try:
+            return bool(self.estilo_crudo().get("_rellenar"))
+        except ProyectoError:
+            return False
 
     def raices_propias(self) -> list[Path]:
         """Carpetas con material del proyecto (portadas de carrusel, fondos)."""
@@ -172,12 +282,32 @@ class Proyecto:
         out = []
         for o in sorted(otros):
             out += [config.PROYECTOS_DIR / o, config.HISTORICO_DIR / o,
-                    config.EDITOR_PROYECTOS_DIR / o, config.DESCARGA_ROOT / "descargas" / o]
+                    config.EDITOR_PROYECTOS_DIR / o, config.DESCARGA_ROOT / "descargas" / o,
+                    config.TEXTOS_DIR / o, config.OUT_DIR / o]
         return out
 
     def resumen(self) -> str:
         return (f"proyecto «{self.id}» ({self.tipo}) · b-roll {self.broll} · "
                 f"internet {'sí' if self.internet else 'no'} · política: {self.origen_recursos}")
+
+
+def _hex(c) -> str:
+    """'#rrggbb' válido o ''."""
+    c = str(c or "").strip()
+    if len(c) == 7 and c.startswith("#"):
+        try:
+            int(c[1:], 16)
+            return c.lower()
+        except ValueError:
+            pass
+    return ""
+
+
+def _mezcla(c1: str, c2: str, t: float) -> str:
+    """Color de `c1` desplazado una fracción `t` hacia `c2`."""
+    a = [int(c1[i:i + 2], 16) for i in (1, 3, 5)]
+    b = [int(c2[i:i + 2], 16) for i in (1, 3, 5)]
+    return "#" + "".join(f"{round(x + (y - x) * t):02x}" for x, y in zip(a, b))
 
 
 def _dentro(path: Path, raiz: Path) -> bool:

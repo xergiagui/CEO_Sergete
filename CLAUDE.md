@@ -1,108 +1,98 @@
-# TheHistoria — Departamento de historias y carruseles de Instagram
+# TheHistoria — historias y carruseles de Instagram
 
-Genera **historias de IG (MP4 1080×1920)** —un texto sobre un fondo— y
-**carruseles del feed (2–10 JPG 4:5, 1080×1350)** para **varios proyectos
-independientes**. Lo dirige CEO_Sergete con el subagente `historia`. Opciones,
-esquemas y diseño en [`README.md`](README.md). **Este archivo manda** sobre las
-reglas de trabajo.
+**Historias de IG** (MP4 1080×1920: un texto sobre un fondo) y **carruseles del
+feed** (2–10 JPG 4:5, 1080×1350) para varios proyectos. Lo dirige CEO_Sergete con
+el subagente `historia`. **Este archivo manda.** El `README.md` es referencia:
+no lo leas salvo para diseño o un esquema poco habitual.
 
-## Cuándo se usa
-**A demanda**: solo cuando Sergio pide historias o carruseles, o cuando el CEO
-detecta huecos de carruseles en el calendario. Nunca se lanza solo tras
-descargar o editar vídeos.
+## Cuándo y cómo
+- **A demanda**: cuando Sergio pide historias o carruseles, o el CEO tiene huecos de
+  carrusel en el calendario. Nunca se lanza solo tras descargar o editar.
+- `..\TheEditor\.venv\Scripts\python.exe <script> --proyecto <id> …` (no instales
+  nada; nunca `python3`). Credenciales: `.env` o `..\CEO_Sergete\.env`.
 
-## Entorno
-- `..\TheEditor\.venv\Scripts\python.exe` (no instales nada; nunca `python3`).
-- Credenciales: `.env` o, si no existe, `..\CEO_Sergete\.env`.
+## Proyecto (siempre `--proyecto <id>`)
+- `proyectos/<id>/`: `proyecto.json` (historias, especiales, `carruseles.credito`),
+  `estilo.json` (solo maquetación), **`reglas.md` (recursos y fuentes: léelo)**,
+  `especiales/` y `planes/`.
+- **Identidad** (cuenta_ig, voz, emojis, no suplantar, palabras prohibidas y colores
+  de marca): `..\CEO_Sergete\proyectos.json` → `identidad`. Fuente única: no la
+  copies. Si falta, valores neutros con aviso.
+- **Recursos**: los de `..\TheEditor\proyectos\<id>\proyecto.json` → `recursos`
+  (`banco_comun` | `propio` | `ninguno`, `internet`). Nunca material de otro proyecto
+  ni de internet si no está permitido. **Nunca mezcles proyectos.**
 
-## Proyectos (lo primero en cada orden)
-- Cada proyecto (cuenta o cliente) vive en `proyectos/<id>/`: `proyecto.json`
-  (historias sí/no, filtro de frases, nº de historias…), `estilo.json` (marca de
-  los carruseles), `especiales/` (fondos de las especiales), `planes/` (planes de
-  carrusel) y **`reglas.md` (tono, crédito, fuentes y publicación del proyecto:
-  léelo antes de escribir nada)**. `proyectos/_plantilla/` es la base de los nuevos.
-- Todos los scripts aceptan **`--proyecto <id>`**. Si se omite y solo hay un
-  proyecto, se usa ese; si hay varios, error con la lista. **Nunca mezcles
-  proyectos** (frases, fondos, portadas, planes ni salidas).
-- **Recursos**: la política es la de `..\TheEditor\proyectos\<id>\proyecto.json`
-  → `recursos` (se lee, no se copia):
+## Historias
+| Vía | Orden | Texto · fondo |
+|---|---|---|
+| Normal | `historias.py [--n N] [--categoria X] [--min-virality N]` | frases del proyecto en `viral_phrases` · según la política de b-roll |
+| Especial | `historias_especiales.py --texto "…" [--texto "…"] [--variaciones N]` | lo da Sergio · `proyectos/<id>/especiales/`; franja inferior libre (`--reserva-inferior`, def. 0,25) |
 
-  | `broll` | Fondos de las historias normales |
-  |---|---|
-  | `banco_comun` | `..\TheEditor\superposiciones\` + `match_broll` (semántica) o azar |
-  | `propio` | solo `..\TheEditor\proyectos\<id>\recursos\broll\` (semántica local con `_indice.json`; si no, azar) |
-  | `ninguno` | fondo liso del color de marca |
+- Minúsculas con mayúscula al inicio y tras `.` `?` `!` (lo hace el render). Fondo a
+  pantalla completa. Sin copy ni hashtags; no entran en el calendario.
+- **Al generar no se marcan las frases.** Sin frases o sin Supabase: dilo (para
+  probar: `--phrase "…"`).
+- **OK**: `historias.py --aprobar <tanda…>` (o `--todas`): mueve los MP4 a
+  `..\CEO_Sergete\HISTORIAS\<id>\1. Pte publicar\` (nombre único), marca las frases,
+  apunta el manifest en `salidas/<id>/_aprobadas.log` y borra la tanda.
+  **Rechazo**: borra la carpeta de la tanda (sus frases quedan libres).
 
-  Con `internet: false` nunca se usa nada de fuera (ni los `pexels_*` del banco
-  común). Proyectos de **clipping**: solo sus propios recursos.
-- **Frases**: `viral_phrases` con la etiqueta `proyecto:<id>` en `tags` y
-  `used_in_story = false`.
-- Salidas siempre en `salidas/<id>/…`.
+## Carruseles (sí llevan copy y entran en el calendario)
+1. **Material**: `carruseles.py --listar` (lo hecho y de dónde, para no repetir
+   temas) y `carruseles.py --fuente <video|ruta>` (transcripción sin tiempos,
+   cortes, clips y campos válidos; también un `articulo.md`). **Nunca leas el
+   `.json` ni el `.srt` de Whisper.**
+2. **Plan** en `proyectos/<id>/planes/<slug>.json` (esqueleto abajo).
+3. **`carruseles.py --plan <plan>`**: valida, audita con TheCopy y renderiza; con
+   errores no escribe nada, así que no hace falta `--solo-validar` antes. Corrige
+   errores y avisos (también los de la auditoría) y repite: el re-render sustituye
+   la salida anterior del mismo slug. Mira `_vista.jpg`.
+4. **OK**: `carruseles.py --aprobar <carpeta>` la mueve a
+   `..\CEO_Sergete\REVISADOS\<id>\1. pte Publicar\` e imprime la orden de TheCopy.
 
-## Tres vías
+```json
+{
+  "proyecto": "<id>",
+  "tema": "Qué aprende quien lo lee",
+  "formula": "IG5_lista",
+  "pilar": "educativo",
+  "fuente": {"tipo": "video", "ruta": "_Historico/<id>/<video>"},
+  "portada_fondo": {"ruta": "_Historico/<id>/<video>/clips/<clip>.mp4", "segundo": 6.5, "foco_y": 0.0},
+  "slides": [
+    {"titulo": "Promesa con **bucle abierto**", "texto": "Línea que obliga a deslizar"},
+    {"titulo": "La idea más fuerte", "texto": "Explicación en ~25 palabras"},
+    {"titulo": "Otra idea", "texto": "…"},
+    {"titulo": "Resumen", "puntos": ["…", "…"], "texto": "…", "peticion": "Guárdalo para …"}
+  ]
+}
+```
+- Se deducen: `slug` (nombre del archivo), `n` y `rol` (1.ª gancho, última cierre,
+  resto valor), `objetivo` (si la fórmula solo admite uno) y `fuente.credito`
+  (vídeo: `carruseles.credito` del proyecto). `formula`, `objetivo` y `pilar`: los
+  que imprime `--fuente`. `fuente.tipo`: `clip | video | articulo | tema`.
+- Portada opcional, solo material del proyecto; el segundo se elige con
+  `--candidatos-portada <clip>`, nunca a ojo.
 
-| Vía | Script | Texto | Fondos | Salida |
-|---|---|---|---|---|
-| **Normal** | `historias.py` | Frases del proyecto (por viralidad); se marcan como usadas | Según la política de b-roll | `salidas/<id>/<AAAAMMDD_HHMMSS>/` + `manifest.json` |
-| **Especiales** (promos, eventos) | `historias_especiales.py` | Lo da Sergio (`--texto`, repetible) | `proyectos/<id>/especiales/`; si está vacío: b-roll propio (`propio`) o liso (`ninguno`) | `salidas/<id>/especiales_<…>/` |
-| **Carruseles** (feed) | `carruseles.py --plan <plan.json>` | Plan que escribes tú | Fondo liso de marca; portada opcional | `salidas/<id>/carrusel_<AAAAMMDD-HHMM>_<slug>/` |
-
-- Si no quedan frases del proyecto o falta Supabase, dilo; para probar sin BBDD,
-  `--phrase "…"` (y `--no-marcar` en pruebas).
-- Especiales: el texto va en la banda superior y deja libre la franja de abajo
-  (`--reserva-inferior`, def. 0,25) para el botón de IG.
-
-## Reglas (historias)
-- Minúsculas, pero **mayúscula en la primera letra y tras `.`, `?` y `!`** (ya lo
-  aplica el render).
-- Fondos siempre a pantalla completa.
-- Las historias **no llevan copy ni hashtags** y no entran en el calendario.
-
-## Carruseles
-**Sí llevan copy y hashtags** (TheCopy, al dar OK) y **sí entran en el calendario**.
-
-1. Escribe el plan en `proyectos/<id>/planes/<slug>.json` (con `"proyecto": "<id>"`)
-   desde un clip o vídeo del proyecto (`..\_Historico\<id>\<video>\` o
-   `..\TheEditor\proyectos\<id>\transcripciones\<video>\`), un artículo de TheTextos
-   o un tema. Lo de `_Historico` solo se lee. Rutas del plan relativas a PruebasIA.
-2. `carruseles.py --plan … --solo-validar` hasta que no haya errores; corrige
-   también los avisos y la auditoría de estilo (TheCopy).
-3. `carruseles.py --plan …` y mira `_vista.jpg` antes de entregar.
-
-**Contenido** (lo propio del proyecto, en su `reglas.md`):
-- Fórmula según el objetivo: `IG5_lista` y `IG8_metodo` → guardados;
-  `IG6_antes_despues` → guardados/seguidores; `IG7_mitos` → compartidos.
-- 6–10 slides es lo típico (2–10). **Nunca rellenes**: si da para 5, son 5.
-- Slide 1 = **promesa + bucle abierto** (≤ 12 palabras), nunca un título a secas.
-  **Lo más fuerte en las slides 2–3.** Una idea por slide (título ~8 palabras,
-  texto ~25). Cierre = resumen que merezca guardarse (`puntos`) + **una sola
-  petición** (`peticion`).
-- Conserva las afirmaciones y cifras de la fuente: **nada inventado**.
-- Sentence case con ortografía correcta (tildes, ¿?, ¡!); nunca TODO MAYÚSCULAS.
-  El texto se pinta tal cual. `**palabra**` = destacada (máx. una por slide).
-- Evita lo que marca el auditor de TheCopy: paralelismos negativos («no es X, es
-  Y»), revelaciones («¿El resultado?»), anuncios de sinceridad, vocabulario de IA y
-  cebos de interacción.
-- **Portada** (`portada_fondo`): solo material del proyecto (sus carpetas en
-  `_Historico`, `TheEditor\proyectos`, `TheDescarga\descargas`, `proyectos\<id>\`
-  y publicación; el banco común solo con `banco_comun`). Nunca de internet ni de
-  otro proyecto: el validador da ERROR. El fotograma, nunca a ojo:
-  `carruseles.py --candidatos-portada <video>` (gesto natural, sin rótulos, cara
-  arriba).
-- No cambies el contrato de la salida (lo lee TheCopy; ver README).
-
-## Al dar OK
-- **Historias**: mover (no copiar) los MP4 de las tandas aprobadas de
-  `salidas\<id>\<tanda>\` a `..\CEO_Sergete\HISTORIAS\<id>\1. Pte publicar\`
-  (aplanados) y borrar esas carpetas de tanda (conserva `salidas\.gitkeep`).
-- **Carruseles**: el CEO mueve la carpeta entera `salidas\<id>\carrusel_<…>\` a
-  `..\CEO_Sergete\REVISADOS\<id>\1. pte Publicar\` y lanza `copy`. El plan se queda
-  en `proyectos\<id>\planes\`.
-
-En `salidas/` solo queda lo que está en curso o pendiente de revisar.
+**Contenido**
+- 2–10 slides (lo típico, 6–10). Nunca rellenes.
+- Slide 1 = promesa + bucle abierto (≤ 12 palabras). Lo más fuerte en la 2–3. Una
+  idea por slide (título ~8 palabras, texto ~25). Cierre = resumen que merezca
+  guardarse + **una sola** petición.
+- Nada inventado: conserva las afirmaciones y cifras de la fuente.
+- Voz de la identidad: de tú y sin hablar como el autor de la fuente; emojis según
+  `emojis_max`.
+- Sentence case con tildes, ¿? y ¡!. `**palabra**` = destacada (máx. una por slide).
+- Evita lo que marca el auditor: «no es X, es Y», «¿El resultado?», anuncios de
+  sinceridad, vocabulario de IA y cebos de interacción.
+- No cambies el contrato de la salida (lo lee TheCopy).
 
 ## Proyecto nuevo
-`..\CEO_Sergete\nuevo_proyecto.py` copia `proyectos/_plantilla/` a
-`proyectos/<id>/` (sustituye `<id>` y `<Nombre>`). Después: rellena `reglas.md`,
-ajusta `estilo.json` (colores, fuentes, `handle`) y `proyecto.json`, y pon sus
-vídeos en `especiales/`. La política de recursos se define en TheEditor.
+`..\CEO_Sergete\nuevo_proyecto.py` copia `proyectos/_plantilla/`. Después: `reglas.md`,
+`proyecto.json` (`carruseles.credito`…) y revisar `estilo.json` quitando
+`_rellenar` (mientras esté, `carruseles.py` da error). Identidad: CEO; recursos:
+TheEditor.
+
+## Pruebas
+`--destino <dir>`: otro destino en `--aprobar` y otra carpeta de salida en `--plan`
+(no toca HISTORIAS, REVISADOS ni las salidas pendientes). `--no-marcar` en
+`--aprobar`: no marca frases.

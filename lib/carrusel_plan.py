@@ -21,6 +21,12 @@ Esquema (resumen; detalle en README.md):
 Extras opcionales por slide: `numero` (valor: número a mostrar o false),
 `puntos` (cierre: lista-resumen) y `peticion` (cierre: la única petición).
 
+Campos que se DEDUCEN si faltan (si vienen, se validan): `n` y `rol` por la
+posición (1.ª gancho, última cierre, resto valor); `objetivo` si la fórmula solo
+admite uno; `fuente.credito` (vídeo/clip) = `carruseles.credito` del proyecto.json.
+Las listas válidas (fórmulas, objetivos, pilares y fórmula → objetivos) las da
+TheCopy (`lib/thecopy.py`); las de aquí son solo el RESPALDO.
+
 Rutas relativas (`fuente.ruta`, `portada_fondo.ruta`): se buscan junto al plan,
 en TheHistoria y en PruebasIA (p. ej. `_Historico/<id>/<video>/...`).
 `validar_material` comprueba que la portada sea material DEL PROYECTO (nada del
@@ -35,6 +41,7 @@ from pathlib import Path
 
 import config
 
+# RESPALDO de las listas de TheCopy (fuente única: `copys.py campos`).
 FORMULAS = ("IG5_lista", "IG6_antes_despues", "IG7_mitos", "IG8_metodo")
 OBJETIVOS = ("guardados", "compartidos", "comentarios", "seguidores")
 PILARES = ("educativo", "historia", "interaccion", "promocion")
@@ -48,6 +55,10 @@ OBJETIVOS_POR_FORMULA = {
     "IG6_antes_despues": ("guardados", "seguidores"),
     "IG7_mitos": ("compartidos",),
     "IG8_metodo": ("guardados",),
+}
+CAMPOS_RESPALDO = {
+    "formulas": list(FORMULAS), "objetivos": list(OBJETIVOS), "pilares": list(PILARES),
+    "formula_objetivos": {f: list(o) for f, o in OBJETIVOS_POR_FORMULA.items()},
 }
 
 IMAGEN_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
@@ -184,10 +195,19 @@ def normalizar_portada(valor, plan_dir: Path | None) -> dict | None:
     return out
 
 
-def validar_plan(plan, estilo: dict, plan_dir: Path | None = None
+def validar_plan(plan, estilo: dict, plan_dir: Path | None = None,
+                 campos: dict | None = None, credito_defecto: str = ""
                  ) -> tuple[dict, list[Hallazgo]]:
-    """Devuelve (plan normalizado, hallazgos). No pinta nada ni toca disco."""
+    """Devuelve (plan normalizado, hallazgos). No pinta nada ni toca disco.
+
+    `campos` = listas de TheCopy ({formulas, objetivos, pilares,
+    formula_objetivos}); sin ellas, el respaldo. `credito_defecto` = crédito de
+    las fuentes de vídeo si el plan no lo trae."""
     H: list[Hallazgo] = []
+    campos = campos or CAMPOS_RESPALDO
+    validos = {"formula": tuple(campos["formulas"]), "objetivo": tuple(campos["objetivos"]),
+               "pilar": tuple(campos["pilares"])}
+    por_formula = {f: tuple(o) for f, o in (campos.get("formula_objetivos") or {}).items()}
 
     def err(msg, slide=None):
         H.append(Hallazgo("ERROR", msg, slide))
@@ -219,15 +239,18 @@ def validar_plan(plan, estilo: dict, plan_dir: Path | None = None
         aviso(f"`slug` normalizado a «{slug_ok}» (solo a-z, 0-9 y guiones).")
     p["slug"] = slug_ok
 
-    for campo, validos in (("formula", FORMULAS), ("objetivo", OBJETIVOS), ("pilar", PILARES)):
-        v = p.get(campo)
+    f = p.get("formula")
+    if _vacio(p.get("objetivo")) and len(por_formula.get(f) or ()) == 1:
+        p["objetivo"] = por_formula[f][0]          # deducido: la fórmula solo admite uno
+    for campo in ("formula", "objetivo", "pilar"):
+        v, ops = p.get(campo), validos[campo]
         if _vacio(v):
-            err(f"falta `{campo}` ({' | '.join(validos)}).")
-        elif v not in validos:
-            err(f"`{campo}` = «{v}» no vale. Opciones: {' | '.join(validos)}.")
-    f, o = p.get("formula"), p.get("objetivo")
-    if f in OBJETIVOS_POR_FORMULA and o in OBJETIVOS and o not in OBJETIVOS_POR_FORMULA[f]:
-        aviso(f"{f} rinde para {' / '.join(OBJETIVOS_POR_FORMULA[f])}, no para «{o}». "
+            err(f"falta `{campo}` ({' | '.join(ops)}).")
+        elif v not in ops:
+            err(f"`{campo}` = «{v}» no vale. Opciones: {' | '.join(ops)}.")
+    o = p.get("objetivo")
+    if f in por_formula and o in validos["objetivo"] and o not in por_formula[f]:
+        aviso(f"{f} rinde para {' / '.join(por_formula[f])}, no para «{o}». "
               f"Revisa la fórmula o el objetivo.")
 
     # --- fuente
@@ -241,14 +264,16 @@ def validar_plan(plan, estilo: dict, plan_dir: Path | None = None
     elif ft not in FUENTE_TIPOS:
         err(f"`fuente.tipo` = «{ft}» no vale. Opciones: {' | '.join(FUENTE_TIPOS)}.")
     fuente.setdefault("ruta", "")
-    fuente.setdefault("credito", "")
+    if fuente.get("credito") is None:              # ausente → el del proyecto (vídeo/clip)
+        fuente["credito"] = credito_defecto if ft in ("clip", "video") else ""
     if ft in ("clip", "video", "articulo"):
         if _vacio(fuente.get("ruta")):
             err("falta `fuente.ruta` (de dónde sale el contenido).")
         elif not resolver_ruta(fuente["ruta"], plan_dir).exists():
             aviso(f"`fuente.ruta` no existe en disco: {fuente['ruta']}")
     if ft in ("clip", "video") and _vacio(fuente.get("credito")):
-        aviso("fuente de vídeo sin `fuente.credito` (p. ej. «Ideas de <autor>»; ver reglas.md del proyecto).")
+        aviso("fuente de vídeo sin `fuente.credito` (p. ej. «Ideas de <autor>»; por defecto, "
+              "`carruseles.credito` del proyecto.json).")
 
     # --- portada opcional
     pt = p.get("portada_texto")
@@ -285,7 +310,7 @@ def validar_plan(plan, estilo: dict, plan_dir: Path | None = None
     elif total < 4:
         aviso(f"solo {total} slides: con menos de 4 suele funcionar mejor una imagen suelta.")
 
-    emojis_max = int(estilo.get("emojis_max", 0))
+    emojis_max = int(estilo.get("emojis_max", 0) or 0)     # identidad.voz.emojis_max
     emojis_total = 0
     for i, s in enumerate(slides, 1):
         if not isinstance(s, dict):
@@ -294,10 +319,12 @@ def validar_plan(plan, estilo: dict, plan_dir: Path | None = None
         if "n" in s and s["n"] != i:
             err(f"`n` = {s['n']}, pero ocupa la posición {i} (las slides van en orden).", i)
         s["n"] = i
+        esperado = "gancho" if i == 1 else "cierre" if i == total else "valor"
+        if _vacio(s.get("rol")):
+            s["rol"] = esperado                     # deducido por la posición
         rol = s.get("rol")
         if rol not in ROLES:
             err(f"`rol` = «{rol}» no vale ({' | '.join(ROLES)}).", i)
-        esperado = "gancho" if i == 1 else "cierre" if i == total else "valor"
         if rol in ROLES and rol != esperado:
             err(f"la slide {i} debe ser «{esperado}» (es «{rol}"
                 f"»): la 1.ª es el gancho, la última el cierre y el resto, valor.", i)
@@ -334,7 +361,8 @@ def validar_plan(plan, estilo: dict, plan_dir: Path | None = None
             destacados += contar_destacados(t)
             emojis_total += (ne := contar_emojis(t))
             if ne and emojis_max == 0:
-                err(f"`{campo}` lleva {ne} emoji(s): este proyecto va sin emojis.", i)
+                err(f"`{campo}` lleva {ne} emoji(s): este proyecto va sin emojis "
+                    f"(identidad.voz.emojis_max = 0).", i)
             for a in _avisos_de_escritura(campo, t):
                 aviso(a, i)
         if destacados > 1:
