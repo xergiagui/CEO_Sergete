@@ -1,0 +1,69 @@
+{
+  "_nota": "Diseño de los carruseles del proyecto <Nombre> (base genérica de la plantilla: ajusta colores, fuentes y handle). Tamaños en px sobre el lienzo 1080x1350. Los pares [max, min] son el rango del ajuste automático: si el texto no cabe ni al mínimo, la slide da ERROR. centro_optico = altura (0-1) a la que se centran los bloques. valor_referencia: caja de valor que se centra ('mas_alta' o 'mediana'); todas empiezan a la misma altura. Portada con foto: portada_texto 'abajo' (texto desde portada_texto_desde·alto, con degradado que sube desde abajo) o 'centro' (oscurecido plano portada_oscurecer); el plan puede cambiarlo con su propio portada_texto.",
+  "proyecto": "<id>",
+  "handle": "",
+  "emojis_max": 0,
+
+  "colores": {
+    "fondo": "#14171f",
+    "texto": "#ffffff",
+    "texto_suave": "#d3d7df",
+    "detalle": "#8b91a1",
+    "acento": "#f59e0b"
+  },
+  "fuentes": {
+    "titulo": "Montserrat-Bold.ttf",
+    "texto": "Montserrat-SemiBold.ttf",
+    "detalle": "Montserrat-SemiBold.ttf"
+  },
+
+  "margen_lateral": 110,
+  "margen_superior": 190,
+  "margen_inferior": 180,
+  "pie_y": 110,
+  "recorte_perfil": 45,
+  "centro_optico": 0.46,
+  "valor_referencia": "mas_alta",
+
+  "tamanos": {
+    "gancho_titulo": [112, 60],
+    "gancho_texto": [50, 32],
+    "numero": [190, 120],
+    "titulo": [76, 46],
+    "texto": [46, 30],
+    "cierre_titulo": [64, 42],
+    "punto": [40, 26],
+    "cierre_texto": [40, 28],
+    "peticion": [46, 30],
+    "contador": 30,
+    "desliza": 34,
+    "credito": 28,
+    "handle": 28
+  },
+  "interlineado": {
+    "titulo": 1.12,
+    "texto": 1.38,
+    "punto": 1.25
+  },
+  "barra_acento": [96, 8],
+  "numero_formato": "{n:02d}",
+
+  "portada_texto": "abajo",
+  "portada_texto_desde": 0.55,
+  "portada_degradado": {"base": 0.12, "desde": 0.35, "hasta": 0.70, "max": 0.93},
+  "portada_oscurecer": 0.6,
+  "portada_foco_y": 0.5,
+
+  "jpeg_calidad": 92,
+  "textos": {
+    "desliza": "desliza"
+  },
+
+  "longitudes": {
+    "gancho_palabras": 12,
+    "titulo_palabras": 8,
+    "texto_palabras": 25,
+    "punto_palabras": 7,
+    "peticion_palabras": 12
+  }
+}

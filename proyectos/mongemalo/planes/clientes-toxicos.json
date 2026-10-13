@@ -8,11 +8,11 @@
   "pilar": "educativo",
   "fuente": {
     "tipo": "video",
-    "ruta": "C:\\Users\\ico858\\Desktop\\PruebasIA\\_Historico\\Cómo Dejar de Atraer a Clientes Tóxicos",
+    "ruta": "_Historico/mongemalo/Cómo Dejar de Atraer a Clientes Tóxicos",
     "credito": "Ideas de Luis Monge"
   },
   "portada_fondo": {
-    "ruta": "C:\\Users\\ico858\\Desktop\\PruebasIA\\_Historico\\Cómo Dejar de Atraer a Clientes Tóxicos\\clips\\03_99_clientes_de_mierda.mp4",
+    "ruta": "_Historico/mongemalo/Cómo Dejar de Atraer a Clientes Tóxicos/clips/03_99_clientes_de_mierda.mp4",
     "segundo": 6.5,
     "foco_y": 0.0
   },

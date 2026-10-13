@@ -20,6 +20,11 @@ Esquema (resumen; detalle en README.md):
   portada_fondo y portada_texto ("abajo" | "centro") (opcionales)
 Extras opcionales por slide: `numero` (valor: número a mostrar o false),
 `puntos` (cierre: lista-resumen) y `peticion` (cierre: la única petición).
+
+Rutas relativas (`fuente.ruta`, `portada_fondo.ruta`): se buscan junto al plan,
+en TheHistoria y en PruebasIA (p. ej. `_Historico/<id>/<video>/...`).
+`validar_material` comprueba que la portada sea material DEL PROYECTO (nada del
+banco común salvo política `banco_comun`, nada de internet ni de otro proyecto).
 """
 from __future__ import annotations
 
@@ -158,7 +163,7 @@ def resolver_ruta(ruta: str, plan_dir: Path | None) -> Path:
     p = Path(ruta)
     if p.is_absolute():
         return p
-    for base in (plan_dir, config.PROJECT_ROOT):
+    for base in (plan_dir, config.PROJECT_ROOT, config.PRUEBAS_IA):
         if base is not None and (base / p).exists():
             return base / p
     return (plan_dir or config.PROJECT_ROOT) / p
@@ -243,7 +248,7 @@ def validar_plan(plan, estilo: dict, plan_dir: Path | None = None
         elif not resolver_ruta(fuente["ruta"], plan_dir).exists():
             aviso(f"`fuente.ruta` no existe en disco: {fuente['ruta']}")
     if ft in ("clip", "video") and _vacio(fuente.get("credito")):
-        aviso("fuente de vídeo sin `fuente.credito` (p. ej. «Ideas de Luis Monge»).")
+        aviso("fuente de vídeo sin `fuente.credito` (p. ej. «Ideas de <autor>»; ver reglas.md del proyecto).")
 
     # --- portada opcional
     pt = p.get("portada_texto")
@@ -360,6 +365,58 @@ def validar_plan(plan, estilo: dict, plan_dir: Path | None = None
     if emojis_max > 0 and emojis_total > emojis_max:
         err(f"{emojis_total} emojis en el carrusel (máximo {emojis_max}).")
     return p, H
+
+
+def _bajo(path: Path, raiz: Path) -> bool:
+    try:
+        path.resolve().relative_to(raiz.resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def _es_url(ruta) -> bool:
+    return isinstance(ruta, str) and ruta.strip().lower().startswith(("http://", "https://", "www."))
+
+
+def validar_material(plan: dict, proyecto, plan_dir: Path | None) -> list[Hallazgo]:
+    """La portada solo puede ser material DEL PROYECTO y la fuente no puede ser
+    de otro proyecto (nunca se mezclan). Devuelve ERRORES."""
+    from lib.proyectos import es_ajeno, es_propio
+    H: list[Hallazgo] = []
+    port = plan.get("portada_fondo")
+    ruta = port.get("ruta") if isinstance(port, dict) else port
+    if _es_url(ruta):
+        H.append(Hallazgo("ERROR", "`portada_fondo` es una URL: la portada sale del material "
+                                   "del proyecto, nunca de internet.", 1))
+    elif not _vacio(ruta) and isinstance(ruta, str):
+        path = resolver_ruta(ruta, plan_dir)
+        if es_ajeno(path, proyecto) and not es_propio(path, proyecto):
+            H.append(Hallazgo("ERROR", f"`portada_fondo` es material de OTRO proyecto: {ruta}", 1))
+        elif _bajo(path, config.FONDOS_DIR) and not es_propio(path, proyecto):
+            H.append(Hallazgo("ERROR", f"`portada_fondo` es del banco común de TheEditor y el "
+                                       f"proyecto «{proyecto.id}» no lo admite (b-roll "
+                                       f"«{proyecto.broll}»): {ruta}", 1))
+        elif not es_propio(path, proyecto):
+            H.append(Hallazgo("ERROR", f"`portada_fondo` no es material del proyecto "
+                                       f"«{proyecto.id}» ({ruta}). Vale lo que esté en "
+                                       f"_Historico/{proyecto.id}/, proyectos/{proyecto.id}/, "
+                                       f"TheEditor/proyectos/{proyecto.id}/, "
+                                       f"TheDescarga/descargas/{proyecto.id}/ o sus carpetas "
+                                       f"de publicación"
+                                       + (" (o el banco común, por su política)"
+                                          if proyecto.broll == "banco_comun" else "") + ".", 1))
+        elif not proyecto.internet and path.name.lower().startswith(config.PREFIJOS_INTERNET):
+            H.append(Hallazgo("ERROR", f"`portada_fondo` es un clip de internet ({path.name}) y "
+                                       f"el proyecto no admite recursos de internet.", 1))
+    fuente = plan.get("fuente") if isinstance(plan.get("fuente"), dict) else {}
+    fr = fuente.get("ruta")
+    if isinstance(fr, str) and fr.strip() and not _es_url(fr):
+        path = resolver_ruta(fr, plan_dir)
+        if es_ajeno(path, proyecto) and not es_propio(path, proyecto):
+            H.append(Hallazgo("ERROR", f"`fuente.ruta` es de OTRO proyecto: {fr} "
+                                       f"(no se mezclan proyectos)."))
+    return H
 
 
 def plan_para_json(p: dict) -> dict:

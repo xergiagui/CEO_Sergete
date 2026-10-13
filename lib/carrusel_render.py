@@ -51,9 +51,9 @@ class NoCabe(Exception):
 
 
 # ------------------------------------------------------------------ estilo
-def cargar_estilo(path: Path | None = None) -> dict:
-    path = Path(path or config.CARRUSEL_ESTILO)
-    return json.loads(path.read_text(encoding="utf-8"))
+def cargar_estilo(path: Path) -> dict:
+    """estilo.json del proyecto (proyectos/<id>/estilo.json)."""
+    return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
 def _rgb(hex_color: str) -> tuple[int, int, int]:

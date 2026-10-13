@@ -1,0 +1,37 @@
+{
+  "id": "mongemalo",
+  "nombre": "MongeMalo",
+  "_nota": "Configuración de TheHistoria para este proyecto. Las reglas de contenido propias están en reglas.md. La política de recursos (b-roll banco_comun | propio | ninguno, internet…) NO se define aquí: se lee de TheEditor/proyectos/mongemalo/proyecto.json → recursos. `recursos_respaldo` solo se usa mientras TheEditor no la tenga.",
+
+  "historias": {
+    "activas": true,
+    "n_por_defecto": 5,
+    "duracion": 6,
+    "orientacion": null,
+    "frases": {
+      "_nota": "Siempre se filtra por la etiqueta proyecto:mongemalo en tags y used_in_story=false. Filtros extra opcionales:",
+      "categorias": [],
+      "min_virality": null,
+      "lang": null
+    }
+  },
+
+  "especiales": {
+    "activas": true,
+    "variaciones": 3,
+    "duracion": 6,
+    "reserva_inferior": 0.25
+  },
+
+  "carruseles": {
+    "activos": true,
+    "estilo": "estilo.json",
+    "material_extra": [],
+    "_material_extra": "Carpetas extra (relativas a PruebasIA) que valen como material del proyecto para la portada, además de las suyas: _Historico/mongemalo, TheEditor/proyectos/mongemalo (input, transcripciones, recursos), TheDescarga/descargas/mongemalo, proyectos/mongemalo y sus carpetas de publicación."
+  },
+
+  "fondo_liso": null,
+  "_fondo_liso": "Color #rrggbb para la política «ninguno» o especiales sin vídeos; null = colores.fondo de estilo.json.",
+
+  "recursos_respaldo": {"broll": "banco_comun", "internet": true}
+}

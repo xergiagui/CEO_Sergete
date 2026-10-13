@@ -5,13 +5,18 @@ Valida un plan.json (lo escribe el subagente a partir de un clip/vídeo, un
 artículo de TheTextos o un tema), audita el estilo con TheCopy (opcional),
 renderiza las slides 1080x1350 y deja la carpeta de salida que lee TheCopy:
 
-  salidas/carrusel_<AAAAMMDD-HHMM>_<slug>/
+  salidas/<id>/carrusel_<AAAAMMDD-HHMM>_<slug>/
     01.jpg … NN.jpg   1080x1350, JPEG ~92, sRGB, < 8 MB, en orden
     carrusel.json     plan + metadatos (`creado`)
     _vista.jpg        hoja de contacto (solo para revisar)
 
+PROYECTO: manda el `proyecto` del plan. `--proyecto` es opcional; si se da,
+debe coincidir (si el plan no lo trae: `--proyecto` o el único que haya). El
+estilo es el del proyecto (proyectos/<id>/estilo.json) y la portada solo puede
+ser material del proyecto.
+
 Uso:
-  python carruseles.py --plan carruseles/planes/<slug>.json
+  python carruseles.py --plan proyectos/<id>/planes/<slug>.json
   python carruseles.py --plan <plan.json> --solo-validar
   python carruseles.py --plan <plan.json> --no-auditar
   python carruseles.py --candidatos-portada <video.mp4> [--n 8] [--hoja ruta.jpg]
@@ -32,7 +37,8 @@ from PIL import Image
 
 import config
 from lib import carrusel_auditoria as auditoria
-from lib.carrusel_plan import Hallazgo, plan_para_json, validar_plan
+from lib.carrusel_plan import Hallazgo, plan_para_json, validar_material, validar_plan
+from lib.proyectos import Proyecto, ProyectoError, proyecto_de_ruta, resolver
 from lib.carrusel_render import (Maquetador, NoCabe, candidatos_portada, cargar_estilo,
                                  guardar_jpg, hoja_contacto, perfil_srgb,
                                  preparar_portada)
@@ -41,8 +47,10 @@ from lib.carrusel_render import (Maquetador, NoCabe, candidatos_portada, cargar_
 def _args(argv=None):
     p = argparse.ArgumentParser(description="Genera un CARRUSEL de Instagram (4:5) desde un plan.json.")
     p.add_argument("--plan", help="ruta del plan.json")
-    p.add_argument("--estilo", default=str(config.CARRUSEL_ESTILO),
-                   help="estilo.json (def. carruseles/estilo.json)")
+    p.add_argument("--proyecto", default=None,
+                   help="id del proyecto (opcional: manda el del plan y debe coincidir)")
+    p.add_argument("--estilo", default=None,
+                   help="estilo.json (def. proyectos/<id>/estilo.json)")
     p.add_argument("--auditar", action=argparse.BooleanOptionalAction, default=None,
                    help="auditar el estilo con TheCopy (def.: sí, si TheCopy está)")
     p.add_argument("--solo-validar", action="store_true",
@@ -153,9 +161,28 @@ def _auditar(plan: dict, activar: bool | None) -> tuple[str, int, int]:
     return "ok", n_err, n_av
 
 
-def _carpeta_salida(slug: str) -> Path:
+def _proyecto_del_plan(plan_raw, pid_arg: str | None, plan_path: Path) -> Proyecto:
+    """El `proyecto` del plan manda; `--proyecto` (si se da) debe coincidir."""
+    pid_plan = ""
+    if isinstance(plan_raw, dict) and isinstance(plan_raw.get("proyecto"), str):
+        pid_plan = plan_raw["proyecto"].strip()
+    pid_arg = (pid_arg or "").strip()
+    if pid_plan and pid_arg and pid_plan != pid_arg:
+        raise ProyectoError(f"el plan es del proyecto «{pid_plan}» y has pedido --proyecto "
+                            f"{pid_arg}: no se mezclan proyectos.")
+    proyecto = resolver(pid_plan or pid_arg or None)
+    carpeta = proyecto_de_ruta(plan_path)
+    if carpeta and carpeta != proyecto.id:
+        raise ProyectoError(f"el plan está en proyectos/{carpeta}/ pero es del proyecto "
+                            f"«{proyecto.id}»: no se mezclan proyectos.")
+    if isinstance(plan_raw, dict) and not pid_plan:
+        plan_raw["proyecto"] = proyecto.id
+    return proyecto
+
+
+def _carpeta_salida(proyecto: Proyecto, slug: str) -> Path:
     ts = dt.datetime.now().strftime("%Y%m%d-%H%M")
-    d = config.OUT_DIR / f"carrusel_{ts}_{slug}"
+    d = proyecto.salidas_dir / f"carrusel_{ts}_{slug}"
     if d.exists():                       # re-render en el mismo minuto: se rehace
         for f in list(d.glob("[0-9][0-9].jpg")) + [d / "_vista.jpg", d / "carrusel.json"]:
             if f.exists():
@@ -201,13 +228,27 @@ def main(argv=None) -> int:
     plan_path = Path(args.plan).resolve()
     try:
         plan_raw = json.loads(plan_path.read_text(encoding="utf-8"))
-        estilo = cargar_estilo(Path(args.estilo))
+        proyecto = _proyecto_del_plan(plan_raw, args.proyecto, plan_path)
+        estilo_path = Path(args.estilo) if args.estilo else proyecto.estilo_path
+        estilo = cargar_estilo(estilo_path)
+    except ProyectoError as e:
+        print(f"[!] {e}")
+        return 2
     except FileNotFoundError as e:
         print(f"[!] No encuentro el fichero: {e.filename}")
         return 2
     except json.JSONDecodeError as e:
         print(f"[!] JSON ilegible ({e.msg}, línea {e.lineno}): revisa el plan o el estilo.")
         return 2
+    if estilo.get("proyecto") and estilo["proyecto"] != proyecto.id:
+        print(f"[!] {estilo_path.name} es del proyecto «{estilo['proyecto']}», no de "
+              f"«{proyecto.id}»: no se mezclan proyectos.")
+        return 2
+    if proyecto.seccion("carruseles").get("activos") is False:
+        print(f"[!] El proyecto «{proyecto.id}» no tiene los carruseles activos "
+              f"(proyectos/{proyecto.id}/proyecto.json → carruseles.activos).")
+        return 2
+    print(f"[i] {proyecto.resumen()}")
 
     if int(estilo.get("margen_lateral", 0)) < max(100, int(estilo.get("recorte_perfil", 45))):
         print("[!] estilo.json: `margen_lateral` debe ser ≥ 100 px (la cuadrícula del perfil "
@@ -215,6 +256,7 @@ def main(argv=None) -> int:
         return 2
 
     plan, hallazgos = validar_plan(plan_raw, estilo, plan_path.parent)
+    hallazgos += validar_material(plan, proyecto, plan_path.parent)
     maq = Maquetador(estilo)
     # Con foto, el texto del gancho va abajo (def.) o en el centro; sin foto, centro.
     maq.configurar_portada(bool(plan.get("portada_fondo")),
@@ -256,7 +298,7 @@ def main(argv=None) -> int:
         imgs.append(maq.render(s, s["n"], n_slides, idx_valor, credito=credito,
                                portada=portada, t_max=t, y_top=y_top))
 
-    carpeta = _carpeta_salida(plan["slug"])
+    carpeta = _carpeta_salida(proyecto, plan["slug"])
     icc = perfil_srgb()
     calidad = int(estilo.get("jpeg_calidad", 92))
     pesos = [guardar_jpg(im, carpeta / f"{i:02d}.jpg", calidad, icc)

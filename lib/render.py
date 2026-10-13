@@ -1,5 +1,5 @@
 """
-Render de la historia: FONDO (vídeo de superposiciones/) + FRASE encima → MP4 9:16.
+Render de la historia: FONDO (vídeo del proyecto o color liso) + FRASE encima → MP4 9:16.
 
 Estrategia:
   1. Con Pillow se dibuja una CAPA de texto 1080x1920 transparente: un scrim
@@ -7,7 +7,8 @@ Estrategia:
      con sombra. Se guarda como PNG temporal.
   2. Con ffmpeg (el bundled de imageio-ffmpeg, sin depender del sistema) se
      escala/recorta el fondo a 1080x1920 "cover", se superpone el PNG y se
-     exporta un MP4 H.264 de STORY_DURATION segundos.
+     exporta un MP4 H.264 de STORY_DURATION segundos. Sin vídeo (política de
+     b-roll `ninguno`), el fondo es un color liso de marca (fuente lavfi `color`).
 
 Silencioso por defecto (una historia de texto no necesita el audio del b-roll).
 """
@@ -71,7 +72,8 @@ def _fit_font(draw, text: str, max_w: int, max_h: int,
 
 
 def _build_text_png(phrase: str, out_png: Path,
-                    bottom_reserved_frac: float = 0.0) -> None:
+                    bottom_reserved_frac: float = 0.0,
+                    oscurecer: Optional[float] = None) -> None:
     """Capa 1080x1920 RGBA: scrim + frase centrada con sombra.
 
     `bottom_reserved_frac` (0..1): fracción de la altura reservada ABAJO (p. ej.
@@ -85,8 +87,10 @@ def _build_text_png(phrase: str, out_png: Path,
     draw = ImageDraw.Draw(img)
 
     # Scrim oscuro a pantalla completa (legibilidad sobre cualquier fondo).
-    scrim_alpha = int(max(0.0, min(1.0, config.FONDO_OSCURECER)) * 255)
-    draw.rectangle([0, 0, W, H], fill=(0, 0, 0, scrim_alpha))
+    osc = config.FONDO_OSCURECER if oscurecer is None else oscurecer
+    scrim_alpha = int(max(0.0, min(1.0, osc)) * 255)
+    if scrim_alpha:
+        draw.rectangle([0, 0, W, H], fill=(0, 0, 0, scrim_alpha))
 
     # Regla de Sergio: minúsculas salvo inicio de oración. Se aplica AQUÍ, justo
     # donde se pinta el texto, para que valga en todo el flujo (BBDD o --phrase).
@@ -130,30 +134,39 @@ def _build_text_png(phrase: str, out_png: Path,
 
 
 def render_historia(
-    fondo: Path, phrase: str, out_mp4: Path,
+    fondo: Optional[Path], phrase: str, out_mp4: Path,
     duration: Optional[float] = None,
     bottom_reserved_frac: float = 0.0,
+    color: Optional[str] = None,
 ) -> Path:
     """Compone el MP4 9:16 (fondo cover + frase). Devuelve la ruta de salida.
 
-    `bottom_reserved_frac` (0..1): reserva una franja inferior sin texto (botón
-    de IG). 0.0 = texto centrado en pantalla completa (comportamiento original).
+    `fondo` = vídeo; si es None, fondo liso de `color` (#rrggbb; def. el de
+    config) sin scrim. `bottom_reserved_frac` (0..1): reserva una franja inferior
+    sin texto (botón de IG). 0.0 = texto centrado en pantalla completa.
     """
     duration = duration or config.STORY_DURATION
     out_mp4.parent.mkdir(parents=True, exist_ok=True)
 
     with tempfile.TemporaryDirectory() as tmp:
         png = Path(tmp) / "texto.png"
-        _build_text_png(phrase, png, bottom_reserved_frac=bottom_reserved_frac)
+        _build_text_png(phrase, png, bottom_reserved_frac=bottom_reserved_frac,
+                        oscurecer=0.0 if fondo is None else None)
 
         W, H, fps = config.STORY_W, config.STORY_H, config.STORY_FPS
-        vf_bg = (
-            f"scale={W}:{H}:force_original_aspect_ratio=increase,"
-            f"crop={W}:{H},fps={fps},setsar=1"
-        )
+        if fondo is None:
+            hexa = (color or config.FONDO_LISO_DEFECTO).lstrip("#")
+            entrada = ["-f", "lavfi", "-i", f"color=c=0x{hexa}:s={W}x{H}:r={fps}"]
+            vf_bg = "setsar=1"
+        else:
+            entrada = ["-stream_loop", "-1", "-i", str(fondo)]   # loop si es corto
+            vf_bg = (
+                f"scale={W}:{H}:force_original_aspect_ratio=increase,"
+                f"crop={W}:{H},fps={fps},setsar=1"
+            )
         cmd = [
             _ffmpeg_exe(), "-y",
-            "-stream_loop", "-1", "-i", str(fondo),   # fondo (loop si es corto)
+            *entrada,                                 # fondo
             "-loop", "1", "-i", str(png),             # capa de texto (imagen fija)
             "-filter_complex",
             f"[0:v]{vf_bg}[bg];[bg][1:v]overlay=0:0:format=auto[v]",

@@ -1,149 +1,154 @@
 # TheHistoria
 
-Departamento de **CEO_Sergete** que genera **historias de Instagram (9:16)** a
-partir de las **frases virales** que **TheEditor** va guardando en Supabase, y
-**carruseles del feed (4:5)** a partir de un plan slide a slide.
+Departamento de **CEO_Sergete** que genera, para **varios proyectos
+independientes** (cuentas o clientes de contenido):
 
-La idea es simple: coger una frase → ponerle un **fondo** → exportar un MP4
-vertical listo para subir como historia. Para los carruseles: plan.json →
-`carruseles.py` → 2–10 JPG 1080×1350 listos para publicar (ver
-[Carruseles](#carruseles-tercera-vía)).
+- **historias de Instagram (9:16)**: una frase viral del proyecto (Supabase
+  `viral_phrases`) o un texto de Sergio sobre un **fondo** → MP4 vertical;
+- **carruseles del feed (4:5)**: plan slide a slide → 2–10 JPG 1080×1350 (ver
+  [Carruseles](#carruseles-tercera-vía)).
 
 > **Proceso independiente.** Descargar y editar vídeos (TheDescarga / TheEditor)
-> **no** dispara la creación de historias ni de carruseles. TheHistoria se
-> ejecuta **a demanda**, cuando se pida expresamente.
+> **no** dispara historias ni carruseles. TheHistoria se ejecuta **a demanda**.
+> Reglas de trabajo en [`CLAUDE.md`](CLAUDE.md).
 
-## De dónde salen las frases y los fondos
+## Proyectos
 
-- **Frases** → tabla `viral_phrases` de Supabase (la puebla TheEditor al analizar
-  cada viral). Se leen las que tienen `used_in_story = false`, ordenadas por
-  viralidad. Tras generar la historia, la frase se marca como usada.
-  Esquema: `TheLanding/supabase/viral_phrases.sql`.
-- **Fondos** → **el mismo banco de b-roll que TheEditor**:
-  `../TheEditor/superposiciones/`, catalogado en Supabase (`broll_assets`, con
-  embeddings). Para cada frase se elige el fondo **más afín semánticamente** con
-  la RPC `match_broll`; si no hay Supabase/embeddings o nada supera el umbral, se
-  coge un fondo **al azar**. No se duplican assets.
+```
+proyectos/<id>/
+  proyecto.json   historias sí/no, filtro de frases, nº de historias, fondo liso…
+  estilo.json     marca de los carruseles
+  reglas.md       tono, crédito, fuentes y publicación del proyecto
+  especiales/     fondos de las historias especiales (vídeos, git-ignored)
+  planes/         planes de carrusel (en git)
+proyectos/_plantilla/   base de los proyectos nuevos (no cuenta como proyecto)
+salidas/<id>/<AAAAMMDD_HHMMSS | especiales_… | carrusel_…>/
+```
+
+- **Elección**: todos los scripts aceptan `--proyecto <id>`. Si se omite y solo hay
+  un proyecto, se usa ese; si hay varios, error con la lista. En los carruseles
+  manda el `proyecto` del plan (`--proyecto`, si se da, debe coincidir).
+- **Índice común**: `../CEO_Sergete/proyectos.json` (solo se lee: nombre y tipo,
+  `largos` o `clipping`).
+- **Política de recursos** (fuente de verdad: TheEditor, no se duplica):
+  `../TheEditor/proyectos/<id>/proyecto.json` → `recursos`:
+
+  | `broll` | Fondos de las historias normales |
+  |---|---|
+  | `banco_comun` | `../TheEditor/superposiciones/` (catálogo `broll_assets`): la RPC `match_broll` elige el más afín a la frase; si no hay Supabase/embeddings o nada supera el umbral, al azar |
+  | `propio` | solo `../TheEditor/proyectos/<id>/recursos/broll/` (incluye subcarpetas). Si hay `_indice.json`, semántica **local** (mismo modelo de embeddings, sin Supabase ni catálogo común); si no, al azar |
+  | `ninguno` | fondo liso del color de marca (`fondo_liso` del `proyecto.json` o `colores.fondo` del estilo) |
+
+  Con `internet: false` no se usa nada de fuera: ni clips `pexels_*` del banco
+  común, ni portadas de internet, y el modelo de embeddings se lee solo de la caché
+  local. Mientras TheEditor no tenga la política de un proyecto se usa
+  `recursos_respaldo` de su `proyecto.json` (y, si falta, `propio` sin internet).
+- **Frases**: `viral_phrases` con `proyecto:<id>` en `tags` y
+  `used_in_story = false`, por viralidad (filtros extra en `proyecto.json` →
+  `historias.frases`). Tras generar la historia se marca como usada.
+
+### `_indice.json` del b-roll propio (opcional)
+
+Lo lee tal cual de `recursos/broll/`. Admite una lista de entradas o
+`{"items": [...]}` (también `assets`, `clips`, `broll`…) o `{archivo: entrada}`.
+Cada entrada: el archivo (`archivo` / `filename` / `ruta`, relativo a `broll/`) y
+un `embedding` de 384 dimensiones o texto descriptivo (`descripcion`, `tags`…)
+que se convierte en embedding al vuelo. Se saltan las que tienen etiquetas
+`aviso*` y, si se pide orientación, las que no coinciden.
 
 ## Cómo se ejecuta
 
 Reutiliza el `.venv` de **TheEditor** (ya trae `httpx`, `Pillow`,
-`imageio-ffmpeg` y `fastembed`), así que **no hay que instalar nada**:
+`imageio-ffmpeg` y `fastembed`): **no hay que instalar nada**.
 
 ```powershell
 cd C:\Users\ico858\Desktop\PruebasIA\TheHistoria
-..\TheEditor\.venv\Scripts\python.exe historias.py
+
+# Historias desde la BBDD (nº por defecto del proyecto)
+..\TheEditor\.venv\Scripts\python.exe historias.py --proyecto mongemalo
+
+# 3 de una categoría, con viralidad mínima
+..\TheEditor\.venv\Scripts\python.exe historias.py --proyecto mongemalo --n 3 --categoria dinero --min-virality 70
+
+# Frase suelta (no toca la BBDD), sin marcar
+..\TheEditor\.venv\Scripts\python.exe historias.py --proyecto mongemalo --phrase "El dinero es una consecuencia" --no-marcar
 ```
-
-Ejemplos:
-
-```powershell
-# 5 historias desde la BBDD (por defecto)
-..\TheEditor\.venv\Scripts\python.exe historias.py
-
-# 3 historias de una categoría, con viralidad mínima
-..\TheEditor\.venv\Scripts\python.exe historias.py --n 3 --categoria dinero --min-virality 70
-
-# Una frase suelta (no toca la BBDD) — útil para probar el render
-..\TheEditor\.venv\Scripts\python.exe historias.py --phrase "El dinero es una consecuencia, no un objetivo"
-
-# Sin marcar como usada / duración distinta
-..\TheEditor\.venv\Scripts\python.exe historias.py --no-marcar --duracion 7
-```
-
-### Opciones
 
 | Flag | Qué hace |
 |---|---|
-| `--n N` | nº de historias desde la BBDD (def. 5) |
+| `--proyecto ID` | proyecto (obligatorio si hay más de uno) |
+| `--n N` | nº de historias desde la BBDD (def. `historias.n_por_defecto`, o 5) |
 | `--categoria X` | filtra por `category` |
 | `--min-virality N` | solo frases con `virality >= N` |
-| `--phrase "..."` | genera una historia con esa frase sin leer/escribir la BBDD |
-| `--duracion S` | segundos por historia (def. 6) |
+| `--phrase "..."` | una historia con esa frase sin leer/escribir la BBDD |
+| `--duracion S` | segundos por historia (def. la del proyecto, o 6) |
 | `--orientation vertical\|horizontal` | prefiere fondos con esa orientación |
 | `--no-marcar` | no marca `used_in_story` |
+| `--max-len N` | descarta frases de más de N caracteres (por defecto no filtra) |
 
-## Salida
-
-`salidas/<AAAAMMDD_HHMMSS>/` con un MP4 por frase (`NN_slug.mp4`, 1080×1920,
-H.264) y un `manifest.json` (frase, fondo usado, método, si se marcó). La carpeta
-`salidas/` está en `.gitignore`.
+Salida: `salidas/<id>/<AAAAMMDD_HHMMSS>/` con un MP4 por frase (`NN_slug.mp4`,
+1080×1920, H.264) y `manifest.json` (proyecto, frase, fondo, método, política, si
+se marcó).
 
 ## Historias especiales (vía aparte)
 
-Además del flujo normal (frases de Supabase), hay una **vía aparte** para
-promos/anuncios donde **tú das el texto** y el fondo sale de un **banco propio**:
+Promos y anuncios donde **Sergio da el texto**:
 
-- **Texto**: lo pasas por `--texto` (soporta acentos/UTF-8). **No** toca Supabase
-  ni `viral_phrases`.
-- **Fondos**: vídeos de **`BRells especiales/`** (NO `superposiciones/`). Se
-  eligen por **rotación/azar sin repetir** dentro de la tanda. Sin semántica.
-- **Espacio para el botón de IG**: el texto **no** se centra en toda la pantalla,
-  sino en la **zona superior**, dejando libre una **franja inferior** (por defecto
-  el **25 %**, `--reserva-inferior`) para el botón/enlace de la historia.
-- **Variaciones**: `--variaciones N` genera N historias del mismo tema, cada una
-  con un **fondo distinto**. Puedes pasar **varios `--texto`** (uno por variación);
-  si hay menos textos que variaciones, los textos **se ciclan** y varía el fondo.
-  Con **1 solo texto y N>1**, todas comparten texto y solo cambia el fondo.
+- **Texto**: `--texto` (repetible, uno por variación). No toca Supabase.
+- **Fondos**: vídeos de `proyectos/<id>/especiales/`, por rotación/azar sin
+  repetir dentro de la tanda. Si la carpeta está vacía: b-roll propio (`propio`),
+  fondo liso (`ninguno`) o error (`banco_comun`: las especiales nunca usan el banco
+  común).
+- **Botón de IG**: el texto se centra en la zona superior y deja libre la franja
+  inferior (`--reserva-inferior`, def. 0,25).
+- **Variaciones**: `--variaciones N` historias, cada una con otro fondo; si hay
+  menos textos que variaciones, los textos se ciclan.
 
 ```powershell
-cd C:\Users\ico858\Desktop\PruebasIA\TheHistoria
-
-# 3 variaciones (mismo texto, 3 fondos distintos)
-..\TheEditor\.venv\Scripts\python.exe historias_especiales.py `
+..\TheEditor\.venv\Scripts\python.exe historias_especiales.py --proyecto mongemalo `
   --texto "descuento exclusivo del 30% solo este fin de semana" --variaciones 3
 
-# Varios textos (uno por variación) + duración y reserva inferior a medida
-..\TheEditor\.venv\Scripts\python.exe historias_especiales.py `
-  --texto "oferta flash" --texto "ultimas horas" --variaciones 4 `
-  --duracion 5 --reserva-inferior 0.30
+..\TheEditor\.venv\Scripts\python.exe historias_especiales.py --proyecto mongemalo `
+  --texto "oferta flash" --texto "ultimas horas" --variaciones 4 --duracion 5 --reserva-inferior 0.30
 ```
-
-### Opciones (especiales)
 
 | Flag | Qué hace |
 |---|---|
-| `--texto "..."` | texto de la historia. **REPETIBLE** (uno por variación). Al menos uno. |
-| `--variaciones N` | nº de historias del mismo tema, cada una con otro fondo (def. 3) |
-| `--duracion S` | segundos por historia (def. 6) |
-| `--reserva-inferior F` | fracción 0..0.6 reservada abajo para el botón de IG (def. 0.25) |
+| `--proyecto ID` | proyecto (obligatorio si hay más de uno) |
+| `--texto "..."` | texto de la historia, repetible (al menos uno) |
+| `--variaciones N` | nº de historias, cada una con otro fondo (def. la del proyecto, o 3) |
+| `--duracion S` | segundos por historia (def. la del proyecto, o 6) |
+| `--reserva-inferior F` | fracción 0–0,6 reservada abajo (def. la del proyecto, o 0,25) |
 
-Salida en `salidas/especiales_<AAAAMMDD_HHMMSS>/` con `NN_slug.mp4` (1080×1920,
-H.264) + `manifest.json` (texto, fondo, variación, reserva inferior, duración).
+Salida: `salidas/<id>/especiales_<AAAAMMDD_HHMMSS>/` con `NN_slug.mp4` +
+`manifest.json`.
 
 ## Carruseles (tercera vía)
 
-Post del feed de **2–10 imágenes 4:5 (1080×1350)**, el formato que más guardados
-genera. A diferencia de las historias, **lleva copy y hashtags** (TheCopy, al
-dar OK) y **entra en el calendario de publicación**. Reglas de contenido y de
-diseño en [`CLAUDE.md`](CLAUDE.md#carruseles-tercera-vía).
-
-1. El subagente escribe un **plan** (`carruseles/planes/<slug>.json`) a partir de
-   un clip/vídeo (`_Historico/` o `TheEditor/transcripciones/`), un artículo de
-   TheTextos o un tema.
-2. `carruseles.py` lo **valida** (estructura, longitudes, emojis, si el texto
-   cabe), lo **audita** con TheCopy (opcional), **renderiza** y hace el **QC**.
+Post del feed de **2–10 imágenes 4:5 (1080×1350)**. **Lleva copy y hashtags**
+(TheCopy, al dar OK) y **entra en el calendario**. Reglas de contenido en
+[`CLAUDE.md`](CLAUDE.md#carruseles) y en `proyectos/<id>/reglas.md`.
 
 ```powershell
-cd C:\Users\ico858\Desktop\PruebasIA\TheHistoria
-
 # Validar sin escribir nada (repite hasta que no haya errores)
-..\TheEditor\.venv\Scripts\python.exe carruseles.py --plan carruseles\planes\clientes-toxicos.json --solo-validar
+..\TheEditor\.venv\Scripts\python.exe carruseles.py --plan proyectos\mongemalo\planes\clientes-toxicos.json --solo-validar
 
 # Generar
-..\TheEditor\.venv\Scripts\python.exe carruseles.py --plan carruseles\planes\clientes-toxicos.json
+..\TheEditor\.venv\Scripts\python.exe carruseles.py --plan proyectos\mongemalo\planes\clientes-toxicos.json
 ```
 
 | Flag | Qué hace |
 |---|---|
 | `--plan RUTA` | plan.json de entrada (obligatorio) |
+| `--proyecto ID` | opcional: manda el `proyecto` del plan y debe coincidir; si el plan no lo trae, se usa este (o el único que haya) |
 | `--solo-validar` | valida, comprueba que el texto cabe y audita; no escribe nada |
 | `--auditar` / `--no-auditar` | auditoría de estilo con TheCopy (def.: sí, si TheCopy existe) |
-| `--estilo RUTA` | otro `estilo.json` (def. `carruseles/estilo.json`) |
-| `--candidatos-portada VIDEO` | sin plan: lista los fotogramas más nítidos del vídeo (varianza del laplaciano en la zona de la cara) y guarda una hoja para elegir `portada_fondo.segundo` |
+| `--estilo RUTA` | otro `estilo.json` (def. `proyectos/<id>/estilo.json`; debe ser del mismo proyecto) |
+| `--candidatos-portada VIDEO` | sin plan: fotogramas más nítidos (varianza del laplaciano en la zona de la cara) y una hoja para elegir `portada_fondo.segundo` |
 | `--n N` / `--hoja RUTA` | nº de candidatos (def. 8) / dónde guardar la hoja (def. carpeta temporal) |
 
-Códigos de salida: `0` OK · `1` errores de validación o QC · `2` fichero ilegible.
+Códigos de salida: `0` OK · `1` errores de validación o QC · `2` uso, proyecto o
+fichero ilegible.
 
 ### Esquema del plan
 
@@ -156,8 +161,8 @@ Códigos de salida: `0` OK · `1` errores de validación o QC · `2` fichero ile
   "formula": "IG5_lista | IG6_antes_despues | IG7_mitos | IG8_metodo",
   "objetivo": "guardados | compartidos | comentarios | seguidores",
   "pilar": "educativo | historia | interaccion | promocion",
-  "fuente": {"tipo": "clip | video | articulo | tema", "ruta": "...", "credito": "Ideas de Luis Monge"},
-  "portada_fondo": {"ruta": "...mp4 o .jpg", "segundo": 6.5, "foco_y": 0.0},
+  "fuente": {"tipo": "clip | video | articulo | tema", "ruta": "_Historico/mongemalo/<video>", "credito": "Ideas de Luis Monge"},
+  "portada_fondo": {"ruta": "_Historico/mongemalo/<video>/clips/<clip>.mp4", "segundo": 6.5, "foco_y": 0.0},
   "portada_texto": "abajo | centro",
   "slides": [
     {"n": 1, "rol": "gancho", "titulo": "8 filtros contra **clientes tóxicos**", "texto": "Casi nadie se atreve con el segundo"},
@@ -170,71 +175,113 @@ Códigos de salida: `0` OK · `1` errores de validación o QC · `2` fichero ile
 
 - Roles: la 1.ª `gancho`, la última `cierre` y el resto `valor`.
 - Obligatorios: `tema`, `formula`, `objetivo`, `pilar`, `fuente.tipo` (y
-  `fuente.ruta` salvo en `tema`), `titulo` de cada slide, `texto` de las de
-  valor, y `texto` o `puntos` en el cierre. `proyecto` y `slug` se completan
-  solos si faltan.
-- Opcionales: `portada_fondo` (ruta a imagen, o vídeo + `segundo`; `foco_y` 0–1
-  elige qué franja vertical se ve), `portada_texto` (`abajo`: texto en la mitad
-  inferior con degradado y la cara arriba, por defecto con foto; `centro`: centro
-  óptico con oscurecido plano), `numero` en una slide de valor (otro número o
-  `false` para ocultarlo), `puntos` y `peticion` en el cierre.
-- `**palabra**` = destacada en dorado (máx. una por slide). `\n` = salto de línea.
+  `fuente.ruta` salvo en `tema`), `titulo` de cada slide, `texto` de las de valor,
+  y `texto` o `puntos` en el cierre. `slug` se completa solo; `proyecto`, con
+  `--proyecto` o el único proyecto.
+- Rutas relativas: junto al plan, en TheHistoria o en PruebasIA.
+- Opcionales: `portada_fondo` (imagen, o vídeo + `segundo`; `foco_y` 0–1 elige la
+  franja vertical), `portada_texto`, `numero` en una slide de valor (otro número o
+  `false`), `puntos` y `peticion` en el cierre.
+- `**palabra**` = destacada en el color de acento (máx. una por slide). `\n` = salto.
 
-### Salida (contrato con TheCopy)
+### Validación
+
+- **ERROR (no renderiza):** menos de 2 o más de 10 slides; roles fuera de orden;
+  texto que no cabe ni al tamaño mínimo; obligatorios vacíos; `formula`,
+  `objetivo`, `pilar`, `fuente.tipo` o `portada_texto` fuera de sus valores; `**`
+  sin cerrar; emojis (si `emojis_max` es 0); `portada_fondo` inexistente, **de
+  internet, del banco común (sin `banco_comun`), de otro proyecto o fuera del
+  material del proyecto**; `fuente.ruta` de otro proyecto. Plan, `--proyecto` o
+  estilo de proyectos distintos → código 2.
+- **AVISO:** menos de 4 slides; longitudes por encima de las orientativas; más de
+  una palabra destacada; minúscula al empezar o tras punto; mayúsculas sostenidas;
+  falta «¿»/«¡»; primera persona; fórmula poco afín al objetivo; vídeo sin
+  `credito`; cierre sin `peticion`.
+- **Material del proyecto** (portada): `proyectos/<id>/`, `_Historico/<id>/`,
+  `TheEditor/proyectos/<id>/`, `TheDescarga/descargas/<id>/`,
+  `CEO_Sergete/{REVISADOS,HISTORIAS}/<id>/`, el banco común si la política es
+  `banco_comun` y las carpetas de `carruseles.material_extra` del `proyecto.json`.
+- **Auditoría de estilo (TheCopy):** por slide,
+  `TheCopy\.venv\Scripts\python.exe TheCopy\copys.py auditar --solo-estilo --json --texto "<texto>" --proyecto <id>`.
+  Solo avisa; si no está disponible, sigue.
+- **QC de la salida:** cada JPG 1080×1350, RGB/sRGB, < 8 MB y numerados en orden;
+  `carrusel.json` y `_vista.jpg` presentes.
+
+### Salida (contrato con TheCopy: no cambiarlo)
 
 ```
-salidas/carrusel_<AAAAMMDD-HHMM>_<slug>/
+salidas/<id>/carrusel_<AAAAMMDD-HHMM>_<slug>/
   01.jpg … NN.jpg     1080×1350, JPEG ~92 (4:4:4), sRGB, < 8 MB, en orden
   carrusel.json       el plan normalizado + "creado"
-  _vista.jpg          hoja de contacto con todas las slides (solo para revisar)
+  _vista.jpg          hoja de contacto (solo para revisar)
 ```
 
+`carrusel.json` = `tipo` («carrusel»), `proyecto`, `slug`, `tema`, `formula`,
+`objetivo`, `pilar`, `fuente {tipo, ruta, credito}`, `slides [{n, rol, titulo,
+texto, …}]`, `creado` y los extras del plan (`portada_fondo`, `portada_texto`;
+en las slides `numero`, `puntos`, `peticion`). Los textos conservan `**…**`.
+
 Al dar OK, el CEO mueve la carpeta entera a
-`CEO_Sergete/REVISADOS/1. pte Publicar/` y lanza `copy`.
+`CEO_Sergete/REVISADOS/<id>/1. pte Publicar/` y lanza `copy`.
 
-### Diseño
+### Diseño (`proyectos/<id>/estilo.json`)
 
-`carruseles/estilo.json`: colores (fondo `#14171f`, blanco, dorado `#f59e0b`),
-fuentes, márgenes (110 px a los lados), rangos de tamaño `[max, min]` del ajuste
-automático, calidad JPEG, longitudes orientativas y `handle` (vacío = no se
-pinta). Posición y portada:
+Colores (fondo, texto, texto suave, detalle, acento), fuentes de `fonts/`,
+márgenes (lateral ≥ 100 px: la cuadrícula del perfil recorta ~45 px por lado),
+rangos de tamaño `[max, min]` del ajuste automático, calidad JPEG, longitudes
+orientativas, `emojis_max` y `handle` (vacío = no se pinta). `proyecto` debe ser
+el id del proyecto.
 
 - `centro_optico` (0,46): altura a la que se centran los bloques. Las slides de
-  valor comparten caja (la de la más alta, o la mediana con
-  `valor_referencia: "mediana"`) y van alineadas arriba dentro de ella, así el
-  número no salta al deslizar.
-- `portada_texto` (`abajo` por defecto con foto), `portada_texto_desde` (0,55),
-  `portada_degradado` (`base`, `desde`, `hasta`, `max`) y `portada_oscurecer`
-  (0,6, solo en modo `centro`).
+  valor comparten escala y caja (la de la más alta, o la mediana con
+  `valor_referencia: "mediana"`) y van alineadas arriba, así el número no salta.
+- Slide 1: título grande centrado y «desliza →» abajo a la derecha. Con foto,
+  `portada_texto` `abajo` (def.: texto desde `portada_texto_desde` sobre un
+  degradado `portada_degradado` que sube desde abajo, cara arriba) o `centro`
+  (oscurecido plano `portada_oscurecer`). Sin foto, centro óptico.
+- Valor: número grande en el color de acento, título, barra y texto; contador
+  «n/N». Cierre: título, `puntos`, texto, petición y crédito en pequeño.
+
+## Proyecto nuevo
+
+1. `..\CEO_Sergete\nuevo_proyecto.py <id> --nombre "…" --tipo clipping|largos`
+   copia `proyectos/_plantilla/` a `proyectos/<id>/` sustituyendo `<id>` y
+   `<Nombre>` (a mano: copia la carpeta y sustituye esos dos marcadores en
+   `proyecto.json`, `estilo.json` y `reglas.md`).
+2. Rellena `reglas.md`; ajusta `estilo.json` (colores, fuentes, `handle`,
+   `emojis_max`) y `proyecto.json` (historias sí/no, nº, filtros de frases).
+3. Pon los vídeos de las especiales en `especiales/`.
+4. La política de recursos y el b-roll propio se definen en TheEditor
+   (`proyectos/<id>/proyecto.json` y `proyectos/<id>/recursos/broll/`).
+5. Prueba: `historias.py --proyecto <id> --phrase "prueba" --no-marcar`.
 
 ## Credenciales
 
 Supabase (anon key) desde `./.env` o, si no existe, `../CEO_Sergete/.env`.
-Copia `.env.example` a `.env` solo si quieres claves propias.
 
 ## Estructura
 
 ```
 TheHistoria/
-  historias.py            # CLI/orquestador (frases de Supabase)
-  historias_especiales.py # CLI vía aparte (texto propio + BRells especiales/)
+  historias.py            # CLI historias normales (frases del proyecto en Supabase)
+  historias_especiales.py # CLI especiales (texto propio + especiales/ del proyecto)
   carruseles.py           # CLI carruseles (plan.json -> JPG 4:5 + carrusel.json)
-  config.py               # rutas y constantes de los lienzos
+  config.py               # rutas y constantes comunes
   lib/
-    env.py                # carga de credenciales
-    supabase_phrases.py   # leer frases sin usar / marcar usadas
-    fondos.py             # elegir fondo normal (match_broll semántico o azar)
-    fondos_especiales.py  # fondos de BRells especiales/ (rotación/azar, sin repetir)
-    embeddings.py         # modelo de embeddings (el mismo que indexó el catálogo)
-    render.py             # componer fondo + texto -> MP4 9:16 (Pillow + ffmpeg)
+    proyectos.py          # proyectos: regla --proyecto, configuración y política de recursos
+    env.py                # credenciales
+    supabase_phrases.py   # frases sin usar del proyecto / marcar usadas
+    fondos.py             # fondo según la política (banco común, propio o liso)
+    fondos_especiales.py  # fondos de las especiales (rotación sin repetir)
+    embeddings.py         # modelo de embeddings (el mismo del catálogo)
+    render.py             # fondo + texto -> MP4 9:16 (Pillow + ffmpeg)
     texto.py              # capitalización de las historias
-    carrusel_plan.py      # carruseles: esquema y validación del plan
-    carrusel_render.py    # carruseles: maquetación, ajuste, portada, JPG y vista
+    carrusel_plan.py      # carruseles: esquema, validación y material del proyecto
+    carrusel_render.py    # carruseles: maquetación, portada, JPG y vista
     carrusel_auditoria.py # carruseles: auditor de estilo de TheCopy (proceso aparte)
-  carruseles/
-    estilo.json           # diseño de los carruseles (marca MongeMalo)
-    planes/               # planes de cada carrusel (en git)
+  proyectos/
+    _plantilla/           # base de los proyectos nuevos
+    mongemalo/            # proyecto.json, estilo.json, reglas.md, especiales/, planes/
   fonts/                  # Montserrat (Bold + SemiBold)
-  BRells especiales/      # banco de fondos propio para historias especiales
-  salidas/                # MP4 y carruseles generados (gitignored)
+  salidas/<id>/           # historias y carruseles generados (gitignored)
 ```

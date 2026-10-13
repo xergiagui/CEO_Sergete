@@ -1,0 +1,37 @@
+{
+  "id": "<id>",
+  "nombre": "<Nombre>",
+  "_nota": "Configuración de TheHistoria para este proyecto (copiada de proyectos/_plantilla; CEO_Sergete/nuevo_proyecto.py sustituye <id> y <Nombre>). Reglas de contenido propias en reglas.md. La política de recursos (b-roll banco_comun | propio | ninguno, internet…) NO se define aquí: se lee de TheEditor/proyectos/<id>/proyecto.json → recursos. `recursos_respaldo` solo se usa mientras TheEditor no la tenga.",
+
+  "historias": {
+    "activas": true,
+    "n_por_defecto": 5,
+    "duracion": 6,
+    "orientacion": null,
+    "frases": {
+      "_nota": "Siempre se filtra por la etiqueta proyecto:<id> en tags y used_in_story=false. Filtros extra opcionales:",
+      "categorias": [],
+      "min_virality": null,
+      "lang": null
+    }
+  },
+
+  "especiales": {
+    "activas": true,
+    "variaciones": 3,
+    "duracion": 6,
+    "reserva_inferior": 0.25
+  },
+
+  "carruseles": {
+    "activos": true,
+    "estilo": "estilo.json",
+    "material_extra": [],
+    "_material_extra": "Carpetas extra (relativas a PruebasIA) que valen como material del proyecto para la portada. Por defecto solo las suyas: _Historico/<id>, TheEditor/proyectos/<id>, TheDescarga/descargas/<id>, proyectos/<id>…"
+  },
+
+  "fondo_liso": null,
+  "_fondo_liso": "Color #rrggbb para la política «ninguno» o especiales sin vídeos; null = colores.fondo de estilo.json.",
+
+  "recursos_respaldo": {"broll": "propio", "internet": false}
+}
