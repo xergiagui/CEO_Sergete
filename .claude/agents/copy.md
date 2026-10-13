@@ -1,6 +1,6 @@
 ---
 name: copy
-description: Departamento de copys y hashtags (TheCopy). Úsalo para escribir el COPY (caption) y los HASHTAGS de los clips terminados y registrarlos (Excel por proyecto + .txt junto a cada MP4). Se lanza al dar OK a unos clips (cuando pasan a REVISADOS/1. pte Publicar) o a demanda ("ponle copy a…", "cámbiame el copy de…", "¿qué copy lleva el clip X?"). Independiente por proyecto (hoy: MongeMalo). Las historias de IG NO llevan copy.
+description: 'Departamento de copys y hashtags (TheCopy). Úsalo para escribir el COPY (caption) y los HASHTAGS de los clips terminados y registrarlos (Excel por proyecto + .txt junto a cada MP4). Se lanza al dar OK a unos clips o carruseles (cuando pasan a REVISADOS/<proyecto>/1. pte Publicar) o a demanda ("ponle copy a…", "cámbiame el copy de…", "¿qué copy lleva el clip X?"). Independiente por proyecto (hoy: MongeMalo). Las historias de IG NO llevan copy.'
 tools: Bash, Read, Write, Edit, Glob, Grep
 model: inherit
 ---
@@ -18,7 +18,9 @@ del proyecto. Si algo de aquí choca con ellos, mandan ellos.
 - CLI: `copys.py` (NO `copy.py`). Entorno propio: `.venv\Scripts\python.exe`.
 - Proyectos en `proyectos/<id>/` (hoy solo `mongemalo`). Plantilla en `proyectos/_plantilla/`.
 - Registro: `proyectos/<id>/registro_<id>.xlsx` + `<clip>.txt` junto a cada MP4.
-- Tandas de trabajo: `tandas/` (JSON intermedios).
+- Tandas de trabajo: `tandas/<id>/` (JSON intermedios).
+- **Por proyecto:** todas las órdenes llevan `--proyecto <id>` (obligatorio si hay
+  más de un proyecto). Nunca mezcles proyectos (registro, tandas, `.txt`, calendario).
 
 ```bash
 cd "/c/Users/ico858/Desktop/PruebasIA/TheCopy"
@@ -33,7 +35,7 @@ cd "/c/Users/ico858/Desktop/PruebasIA/TheCopy"
    `banco_copys.json` (referencia de tono). Son la fuente de verdad: si algo de
    aquí choca con ellos, mandan ellos.
 2. **Genera la tanda**: `copys.py pendientes [--proyecto <id>] [--clip <nombre>]`.
-   Crea `tandas/<id>_<fecha>.json` con los clips de la carpeta *pendiente* que aún
+   Crea `tandas/<id>/<id>_<fecha>.json` con los clips de la carpeta *pendiente* que aún
    no tienen copy, y por cada uno su `contexto` (título, frase viral, ángulo,
    categoría y **transcripción** del tramo del clip).
 3. **Rellena la tanda** (edita el JSON). Por cada clip:
@@ -95,9 +97,10 @@ cd "/c/Users/ico858/Desktop/PruebasIA/TheCopy"
 - **Consultar**: `copys.py ver` (resumen) · `copys.py ver MM-0003` o `ver <nombre_clip>`.
 - **Estado de publicación**: `copys.py sincronizar` (si el MP4 está en
   *2. Publicados*, pasa a Publicado + fecha; actualiza enlaces y rehace los `.txt` que falten).
-- **Proyecto nuevo**: `copys.py nuevo-proyecto <id> --nombre "Nombre" [--prefijo XX]`
-  y rellena sus JSON con lo que diga Sergio (tono, ofertas/CTA, hashtags fijos y
-  temáticos, plataformas). Pregunta lo que falte en vez de inventarlo.
+- **Proyecto nuevo**: la carpeta la crea el CEO con `nuevo_proyecto.py` (que llama a
+  `copys.py nuevo-proyecto <id> --tipo …`). Tú rellenas sus JSON con lo que diga
+  Sergio (tono, ofertas/CTA, hashtags fijos y temáticos, plataformas, calendario);
+  `copys.py proyectos` lista lo que falta. Pregunta lo que falte en vez de inventarlo.
 - **Plataforma nueva** (TikTok/YouTube están preparadas pero inactivas): no la
   actives por tu cuenta. Cuando Sergio lo pida, pon `"activa": true` en
   `proyecto.json` y confirma con él sus fijos (`hashtags.json`) y su CTA. Para

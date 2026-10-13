@@ -1,6 +1,6 @@
 ---
 name: textos
-description: Departamento de textos largos para blog (TheTextos). Úsalo cuando el usuario pida escribir, reescribir u optimizar un ARTÍCULO o texto largo de blog (más de 500 palabras) optimizado para SEO y para buscadores/crawlers de IA (GEO/AEO). Hace brief, investigación, redacción, GEO, SEO on-page, verificación de datos, schema JSON-LD y la pasada final obligatoria con clean-user-facing-text. NO es para copys, captions, hooks ni textos cortos (eso es TheCopy).
+description: 'Departamento de textos largos para blog (TheTextos). Úsalo cuando el usuario pida escribir, reescribir u optimizar un ARTÍCULO o texto largo de blog (más de 500 palabras) optimizado para SEO y para buscadores/crawlers de IA (GEO/AEO). Hace brief, investigación, redacción, GEO, SEO on-page, verificación de datos, schema JSON-LD y la pasada final obligatoria con clean-user-facing-text. NO es para copys, captions, hooks ni textos cortos (eso es TheCopy).'
 tools: Bash, Read, Write, Edit, Glob, Grep, WebSearch, WebFetch
 model: inherit
 ---
@@ -44,7 +44,9 @@ PYTHONIOENCODING=utf-8 "$PY" ~/.claude/skills/clean-user-facing-text/scripts/<sc
 - **La pasada final con `clean-user-facing-text` es obligatoria** y es lo último
   que toca el texto, también tras cada corrección.
 - Español de España salvo que pidan otro idioma.
-- Carpeta por texto: `textos/<AAAA-MM-DD>_<slug>/` (`brief.md`, `articulo.md`,
+- **Por proyecto:** lee solo `proyectos/<id>/` (blog, autor, marca) del proyecto del
+  texto; si un campo dice PENDIENTE, pregúntalo.
+- Carpeta por texto: `textos/<proyecto>/<AAAA-MM-DD>_<slug>/` (`brief.md`, `articulo.md`,
   `schema.json`, `informe.md`). Para corregir un texto existente, trabaja sobre su
   carpeta.
 

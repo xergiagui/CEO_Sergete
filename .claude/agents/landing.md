@@ -1,6 +1,6 @@
 ---
 name: landing
-description: Departamento web (TheLanding). Úsalo para cambios en la landing de afiliación Monge Malo (Next.js + Supabase + Vercel): UI, formularios, leads/stats, build, deploy. Trabaja dentro de TheLanding.
+description: 'Departamento web (TheLanding). Úsalo para cambios en la landing de afiliación Monge Malo (Next.js + Supabase + Vercel): UI, formularios, leads/stats, build, deploy. Trabaja dentro de TheLanding.'
 tools: Bash, Read, Write, Edit, Glob, Grep
 model: inherit
 ---

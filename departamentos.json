@@ -1,6 +1,6 @@
 {
   "$schema": "./departamentos.schema.json",
-  "descripcion": "Registro de departamentos que CEO_Sergete dirige. Cada entrada es una funcionalidad concreta (una subcarpeta hermana en PruebasIA). Para añadir un módulo nuevo: crea la carpeta hermana, añade aquí su entrada y crea su subagente en .claude/agents/.",
+  "descripcion": "Registro de departamentos que CEO_Sergete dirige (cada uno, una carpeta hermana en PruebasIA). Todos trabajan POR PROYECTO: configuración en <departamento>/proyectos/<id>/ y proyectos listados en proyectos.json. Para añadir un departamento: ver CLAUDE.md.",
   "raiz_proyectos": "C:\\Users\\ico858\\Desktop\\PruebasIA",
   "departamentos": [
     {
@@ -12,9 +12,9 @@
       "subagente": "descarga",
       "que_hace": "Descarga vídeos de YouTube/Instagram/TikTok/etc. con yt-dlp local (sin instalar nada). Salida en TheDescarga/descargas/.",
       "disparadores": ["descarga", "descárgame", "baja este vídeo", "yt-dlp", "guardar reel", "bajar audio", "mp3 de"],
-      "entrypoint": "tools\\yt-dlp.exe  ·  o  descargar.bat \"URL\" [audio|1080p|720p]",
-      "salida": "TheDescarga\\descargas\\<video>.mp4",
-      "handoff": "Los vídeos bajados se tratan luego en TheEditor: descargas/ -> TheEditor/input/ (buzón). El subagente 'editor' hace la ingesta.",
+      "entrypoint": "tools\\yt-dlp.exe  ·  o  descargar.bat \"URL\" [best|audio|1080p|720p] [proyecto]",
+      "salida": "TheDescarga\\descargas\\<proyecto>\\<video>.mp4  (sin proyecto: descargas\\_general\\)",
+      "handoff": "El editor lleva el vídeo de descargas/<proyecto>/ a TheEditor/proyectos/<proyecto>/input/ (buzón).",
       "reglas": "TheDescarga/CLAUDE.md",
       "autonomo": true
     },
@@ -25,18 +25,18 @@
       "ruta_relativa": "../TheEditor",
       "repo": "https://github.com/xergiagui/TheEditor.git",
       "subagente": "editor",
-      "que_hace": "Pipeline viral end-to-end: 1 link → adaptaciones con avatar IA (HeyGen) → b-roll semántico + subtítulos + música → vídeo final local. Skill interactiva 'Editor_Sergio' con popups y gates por fases.",
-      "disparadores": ["editor", "viral pipeline", "adaptaciones de este reel", "monta el sistema viral", "avatar", "heygen", "b-roll", "subtítulos"],
-      "entrypoint": "Montaje interactivo → skill Editor_Sergio desde el hilo principal (Skill). Batch/scripts → subagente 'editor' con .venv/Scripts/python.",
-      "buzon_entrada": "TheEditor\\input\\  (aquí llegan los vídeos de TheDescarga para tratarse)",
-      "flujo_video_local": "transcribir.py -> el editor genera cortes.json (elige momentos) -> clips.py \"<video>\" -> editar_clips.py \"<video>\". 100% automatico: scripts genericos que leen cortes.json (esquema en TheEditor/cortes.example.json), sin editar codigo por video. transcribir/editar_clips admiten ejecuciones en paralelo.",
-      "flujo_clips_cortados": "procesar_batch_clip.py [RAIZ] [CARPETA] [MODO right|left|center|auto|auto-right|follow|<frac>] --solo-transcribir -> el editor escribe transcripciones/<CARPETA>/ganchos.json ({clip.mp4: texto}) -> mismo comando sin el flag: Fase C con gancho de texto por cada MP4 (reutiliza _prep/, no retranscribe; por defecto RAIZ = Desktop/Clip). NO lanzar dos batch a la vez (whisper/_edit_batch compartido).",
-      "gancho_texto": "Vías 1 y 2: texto quemado arriba los primeros 2,5 s (campo gancho_texto de cortes.json, o titulo; en batch, ganchos.json). La vía 3 (avatar) no lo lleva.",
+      "que_hace": "Vídeo → reels 9:16 editados (b-roll, música, subtítulos, gancho de texto) por proyecto, respetando su política de recursos (banco común o solo recursos propios). Tres vías: vídeo largo → clips, clips ya cortados / clipping (batch) y adaptaciones con avatar IA (skill Editor_Sergio).",
+      "disparadores": ["editor", "viral pipeline", "adaptaciones de este reel", "monta el sistema viral", "avatar", "heygen", "b-roll", "subtítulos", "clipping", "clips cortados"],
+      "entrypoint": "Avatar interactivo → skill Editor_Sergio desde el hilo principal. Resto → subagente 'editor' con .venv/Scripts/python y --proyecto <id>.",
+      "buzon_entrada": "TheEditor\\proyectos\\<id>\\input\\  (vídeos largos sueltos; clips ya cortados por subcarpetas)",
+      "flujo_video_local": "transcribir.py --proyecto <id> \"<video>.mp4\" -> el editor escribe cortes.json (con gancho_texto) -> clips.py --proyecto <id> \"<video>\" -> editar_clips.py --proyecto <id> \"<video>\". Salida en proyectos/<id>/transcripciones/<video>/finales/.",
+      "flujo_clips_cortados": "procesar_batch_clip.py --proyecto <id> \"<CARPETA>\" [MODO] --solo-transcribir -> el editor escribe proyectos/<id>/transcripciones/<CARPETA>/ganchos.json -> mismo comando sin el flag. NO lanzar dos batch a la vez.",
       "reglas": "TheEditor/CLAUDE.md (reglas de edición de Sergio: encuadre, b-roll a pantalla completa, subtítulos, silencios, correcciones solo al clip pedido).",
-      "assets_locales": ["superposiciones/", "musicas/", "whisper/", "fonts/"],
+      "assets_locales": ["superposiciones/ (banco común)", "musicas/ (banco común)", "whisper/", "fonts/"],
       "skill_interactiva": "Editor_Sergio (enlazada por junction en CEO_Sergete/.claude/skills/, fuente de verdad en TheEditor). Disponible desde el hilo principal de CEO_Sergete; sus popups funcionan igual que en TheEditor.",
-      "nota": "Assets resueltos por PROJECT_ROOT (raíz de TheEditor), no por el cwd → el montaje funciona desde cualquier carpeta. El flujo completo con popups va por la skill (hilo principal), no por el subagente.",
-      "autonomo": false
+      "nota": "El banco común solo lo usan los proyectos que lo permiten; con internet: false el código bloquea Pexels, imágenes libres y el catálogo común. viral_phrases se etiquetan proyecto:<id>.",
+      "autonomo": false,
+      "proyectos": "proyectos/<id>/{proyecto.json (tipo; recursos: broll/musica banco_comun|propio|ninguno, internet, gancho_visual, gancho_texto, guardar_frases; encuadre; silencios), reglas.md, input/, transcripciones/, recursos/{broll,musica,sfx}/, logs/} + _plantilla/. Alta: proyecto.py nuevo <id> --nombre --tipo."
     },
     {
       "id": "landing",
@@ -50,7 +50,8 @@
       "entrypoint": "npm run dev  ·  npm run build  ·  git push (deploy auto en Vercel)",
       "supabase": "https://akuykrrqmivrcjzcsksj.supabase.co (reutilizado de mis-finanzas)",
       "reglas": "TheLanding/CLAUDE.md (+ AGENTS.md): push = deploy (confirmar), base de SEO/accesibilidad/marca a conservar.",
-      "autonomo": true
+      "autonomo": true,
+      "proyecto": "mongemalo (toda la app). Un proyecto nuevo con web propia se decide aparte."
     },
     {
       "id": "historia",
@@ -61,16 +62,16 @@
       "subagente": "historia",
       "que_hace": "Genera historias de Instagram (MP4 vertical 9:16). Vía normal: frases virales de Supabase (viral_phrases, used_in_story=false) sobre un fondo de b-roll; marca la frase como usada. Vía especial (promos/eventos): texto que da Sergio sobre fondos de 'BRells especiales/', con la franja inferior libre para el botón de IG. Tercera vía: CARRUSELES de IG (2–10 slides 4:5) desde un clip/vídeo, un artículo de TheTextos o un tema; a diferencia de las historias, SÍ llevan copy (TheCopy) y entran en el calendario.",
       "disparadores": ["historia", "historias", "stories", "story de instagram", "genera historias", "monta historias", "frase con fondo", "historia especial", "promo", "evento", "carrusel", "carruseles", "slides", "pasa a carrusel"],
-      "entrypoint": "..\\TheEditor\\.venv\\Scripts\\python.exe historias.py [--n N|--categoria X|--min-virality N|--phrase \"...\"|--duracion S|--no-marcar]  ·  historias_especiales.py --texto \"...\" [--variaciones N|--duracion S|--reserva-inferior F]",
+      "entrypoint": "..\\TheEditor\\.venv\\Scripts\\python.exe historias.py --proyecto <id> [...]  ·  historias_especiales.py --proyecto <id> --texto \"...\"  ·  carruseles.py --plan proyectos\\<id>\\planes\\<slug>.json",
       "reglas": "TheHistoria/CLAUDE.md",
-      "al_dar_ok": "Mover los MP4 de salidas/<tanda>/ a CEO_Sergete/HISTORIAS/1. Pte publicar/ y borrar las carpetas de tanda (conservar salidas/.gitkeep). Sin copy.",
-      "fuente_frases": "Supabase viral_phrases (la puebla TheEditor). Esquema en TheLanding/supabase/viral_phrases.sql.",
-      "banco_fondos": "El MISMO b-roll que TheEditor: ../TheEditor/superposiciones/ catalogado en broll_assets. Match semantico via RPC match_broll o azar. No duplica assets.",
-      "salida": "TheHistoria\\salidas\\<timestamp>\\NN_slug.mp4 + manifest.json  (especiales: salidas\\especiales_<timestamp>\\)",
+      "al_dar_ok": "Historias: mover los MP4 de salidas/<id>/<tanda>/ a CEO_Sergete/HISTORIAS/<id>/1. Pte publicar/ y borrar las tandas (sin copy). Carruseles: mover la carpeta entera a CEO_Sergete/REVISADOS/<id>/1. pte Publicar/ y lanzar copy.",
+      "fuente_frases": "Supabase viral_phrases filtradas por tags proyecto:<id> y used_in_story=false.",
+      "banco_fondos": "Según la política de recursos del proyecto (TheEditor/proyectos/<id>/proyecto.json): banco común (superposiciones/ + match_broll) o solo el b-roll propio del proyecto. No duplica assets.",
+      "salida": "TheHistoria\\salidas\\<id>\\<tanda | especiales_… | carrusel_…>\\",
       "entorno": "Reutiliza el .venv de TheEditor (httpx, Pillow, imageio-ffmpeg, fastembed) — no instala nada.",
-      "carruseles": "..\\TheEditor\\.venv\\Scripts\\python.exe carruseles.py --plan <plan.json> (el subagente escribe el plan: formula, objetivo, pilar, slides) -> salidas\\carrusel_<AAAAMMDD-HHMM>_<slug>\\ (01.jpg…NN.jpg 1080x1350 + carrusel.json + _vista.jpg). Al dar OK: mover la carpeta entera a REVISADOS/1. pte Publicar/ y lanzar copy.",
       "nota": "Historias: PROCESO INDEPENDIENTE y a demanda (NO se encadenan con descarga/edicion; solo cuando el usuario pide historias). Carruseles: a demanda o cuando el calendario de TheCopy marca huecos (max. 2/semana, siempre con OK de Sergio).",
-      "autonomo": true
+      "autonomo": true,
+      "proyectos": "proyectos/<id>/{proyecto.json, estilo.json, reglas.md, especiales/, planes/} + _plantilla/"
     },
     {
       "id": "copy",
@@ -81,14 +82,14 @@
       "subagente": "copy",
       "que_hace": "Escribe el copy y los hashtags de cada clip terminado y registra la relación clip ↔ copy ↔ hashtags: Excel por proyecto (una fila por clip y plataforma, con enlace al MP4 y estado) + <clip>.txt junto a cada MP4 con el texto listo para pegar. También carruseles (.txt dentro de su carpeta) y el CALENDARIO DE PUBLICACIÓN (fecha y hora de cada pieza pendiente + historias del día).",
       "disparadores": ["copy", "copys", "caption", "hashtags", "hasktags", "texto del post", "descripción del reel", "ponle copy", "cámbiame el copy", "qué copy lleva", "calendario", "planifica la semana", "qué publico hoy", "que publico hoy", "cuándo publico", "atrasados"],
-      "entrypoint": ".venv\\Scripts\\python.exe copys.py pendientes|registrar|sincronizar|ver|banco|nuevo-proyecto  (el script es copys.py, NO copy.py)",
-      "proyectos": "proyectos/<id>/ autocontenidos (proyecto.json, ofertas.json, hashtags.json, banco_copys.json, fuentes/). Hoy: mongemalo. Nuevo: copys.py nuevo-proyecto <id> --nombre \"...\".",
+      "entrypoint": ".venv\\Scripts\\python.exe copys.py <orden> --proyecto <id>  (pendientes|registrar|sincronizar|ver|banco|hashtags|auditar|calendario|proyectos|nuevo-proyecto; el script es copys.py, NO copy.py)",
+      "proyectos": "proyectos/<id>/ autocontenidos (proyecto.json, ofertas.json, hashtags.json, banco_copys.json, fuentes/, registro_<id>.xlsx). Tandas en tandas/<id>/. Alta: copys.py nuevo-proyecto <id> --tipo (la llama nuevo_proyecto.py).",
       "plataformas": "Por proyecto. MongeMalo: Instagram activa; TikTok y YouTube (Shorts) preparadas sin activar.",
-      "fuente_contexto": "cortes.json + .srt de TheEditor/transcripciones/<video>/ o _Historico/<video>/ (el clip finales/<nombre>.mp4 = entrada 'nombre' de cortes.json).",
-      "salida": "TheCopy\\proyectos\\<id>\\registro_<id>.xlsx  +  <clip>.txt junto al MP4 (REVISADOS\\1. pte Publicar)",
+      "fuente_contexto": "Largos: cortes.json + .srt de TheEditor/proyectos/<id>/transcripciones/<video>/ o _Historico/<id>/<video>/. Clipping: textos/<clip>.txt + ganchos.json. Carruseles: carrusel.json.",
+      "salida": "TheCopy\\proyectos\\<id>\\registro_<id>.xlsx  +  <clip>.txt junto al MP4 (o dentro de la carpeta del carrusel) en REVISADOS\\<id>\\1. pte Publicar",
       "entorno": "Entorno propio TheCopy/.venv (solo openpyxl).",
       "reglas": "TheCopy/CLAUDE.md + proyectos/<id>/*.json",
-      "calendario": ".venv\\Scripts\\python.exe copys.py calendario planificar|hoy|ver -> Fecha/Hora prevista en el Excel + proyectos\\<id>\\calendario\\<AAAA>-W<ss>.md. Tras cada registro y a demanda. Config provisional en proyecto.json -> calendario; reglas en referencias\\calendario.md.",
+      "calendario": ".venv\\Scripts\\python.exe copys.py calendario planificar|hoy|ver --proyecto <id> -> Fecha/Hora prevista en el Excel + proyectos\\<id>\\calendario\\<AAAA>-W<ss>.md (línea final FALTAN con los huecos). Config provisional en proyecto.json -> calendario.",
       "nota": "Se lanza AL DAR OK a unos clips o carruseles (tras moverlos a REVISADOS/1. pte Publicar) o a demanda. Las historias de IG no llevan copy (pero el calendario las reparte).",
       "autonomo": true
     },
@@ -103,12 +104,13 @@
       "disparadores": ["artículo", "articulo", "post de blog", "texto para el blog", "texto largo", "blog", "seo", "geo", "aeo", "posicionar", "redacta un artículo", "optimiza este artículo"],
       "entrypoint": "Subagente 'textos' siguiendo TheTextos/CLAUDE.md. Skills globales: blog-brief, blog-write, ai-seo, blog-geo, blog-seo-check, blog-factcheck, blog-schema, clean-user-facing-text. Scripts: TheTextos/.venv/Scripts/python.exe ~/.claude/scripts/<x>.py",
       "tipos_texto": "DOS tipos, PENDIENTES de especificar por Sergio (ver tabla en TheTextos/CLAUDE.md).",
-      "salida": "TheTextos\\textos\\<AAAA-MM-DD>_<slug>\\  (brief.md, articulo.md, schema.json, informe.md)",
+      "salida": "TheTextos\\textos\\<proyecto>\\<AAAA-MM-DD>_<slug>\\  (brief.md, articulo.md, schema.json, informe.md)",
       "revision": "Tras 'textos', el CEO lanza el agente global 'blog-reviewer' sobre articulo.md; si BLOCKING o P0 → vuelve a 'textos' (máx. 2 vueltas).",
       "entorno": "Entorno propio TheTextos/.venv (textstat + beautifulsoup4). Nunca python3 (stub de la Store).",
       "reglas": "TheTextos/CLAUDE.md",
       "nota": "A demanda. NO es para copys/captions/hooks ni textos <=500 palabras (eso es TheCopy).",
-      "autonomo": true
+      "autonomo": true,
+      "proyectos": "proyectos/<id>/{proyecto.json (blog, nicho, autor, enlaces internos), marca/BRAND.md, marca/VOICE.md} + _plantilla/"
     },
     {
       "id": "perfil",

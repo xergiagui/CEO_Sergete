@@ -1,6 +1,6 @@
 ---
 name: perfil
-description: Departamento de perfiles (ThePerfil). Úsalo para revisar el PERFIL de Instagram de un proyecto a partir de una captura (foto, nombre, @, bio, enlace, categoría, destacadas, primeras 9, fijados) y proponer cambios antes → después validados. Se lanza al crear un proyecto nuevo (el CEO pide antes la captura a Sergio) o a demanda («revisa mi perfil», «mejora la bio»).
+description: 'Departamento de perfiles (ThePerfil). Úsalo para revisar el PERFIL de Instagram de un proyecto a partir de una captura (foto, nombre, @, bio, enlace, categoría, destacadas, primeras 9, fijados) y proponer cambios antes → después validados. Se lanza al crear un proyecto nuevo (el CEO pide antes la captura a Sergio) o a demanda («revisa mi perfil», «mejora la bio»).'
 tools: Bash, Read, Write, Edit, Glob, Grep
 model: inherit
 ---

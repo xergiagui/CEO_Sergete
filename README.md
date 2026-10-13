@@ -1,90 +1,83 @@
 # CEO_Sergete
 
 **Centro de mando.** Abres *solo* esta carpeta y le das órdenes en lenguaje
-natural. CEO_Sergete entiende la petición y la **delega al departamento
-correcto**, coordina y te responde. No contiene el código de los departamentos:
-los **dirige por ruta** mediante subagentes.
+natural. CEO_Sergete entiende la petición, sabe de qué **proyecto** es, la
+**delega al departamento correcto**, coordina y te responde. No contiene el código
+de los departamentos: los **dirige por ruta** mediante subagentes.
 
 ```
 PruebasIA/
-├── CEO_Sergete/        ← ABRES SOLO ESTO
-│   ├── CLAUDE.md            cerebro / protocolo de dirección
-│   ├── departamentos.json   registro maestro (rutas, repos, disparadores)
-│   ├── .claude/agents/      un subagente por departamento
-│   ├── .env                 Supabase compartido (no en git)
-│   └── supabase/            ceo_tasks.sql (historial opcional)
-├── TheDescarga/        departamento: descarga de vídeo/audio (yt-dlp)
-├── TheEditor/          departamento: pipeline viral (avatar IA + edición)
-├── TheLanding/         departamento: web de afiliación (Next.js + Supabase)
-├── TheHistoria/        departamento: historias de IG (frase + fondo → 9:16)
-├── TheCopy/            departamento: copys + hashtags por proyecto (registro Excel + .txt)
-└── TheTextos/          departamento: textos largos de blog (SEO + GEO/AEO)
+├── CEO_Sergete/          ← ABRES SOLO ESTO
+│   ├── CLAUDE.md              cerebro / protocolo de dirección
+│   ├── departamentos.json     registro de departamentos (rutas, disparadores, flujos)
+│   ├── proyectos.json         registro de proyectos (MongeMalo…)
+│   ├── nuevo_proyecto.py      alta de un proyecto en todos los departamentos
+│   ├── .claude/agents/        un subagente por departamento
+│   ├── REVISADOS/<proyecto>/  1. pte Publicar · 2. Publicados   (fuera de git)
+│   ├── HISTORIAS/<proyecto>/  1. Pte publicar · 2. Publicadas   (fuera de git)
+│   ├── .env                   Supabase compartido (fuera de git)
+│   └── supabase/              ceo_tasks.sql (historial opcional)
+├── _Historico/<proyecto>/ transcripciones de lo ya aprobado (fuera de git)
+├── TheDescarga/          descarga de vídeo/audio (yt-dlp)       → descargas/<proyecto>/
+├── TheEditor/            edición de reels, clipping y avatar IA → proyectos/<proyecto>/
+├── TheHistoria/          historias y carruseles de IG           → proyectos/<proyecto>/
+├── TheCopy/              copys, hashtags, registro y calendario → proyectos/<proyecto>/
+├── ThePerfil/            revisión del perfil de IG              → proyectos/<proyecto>/
+├── TheTextos/            artículos de blog (SEO + GEO/AEO)       → proyectos/<proyecto>/
+└── TheLanding/           web de afiliación de MongeMalo (Next.js + Supabase + Vercel)
 ```
 
 ## Departamentos
 
 | Di algo como… | CEO delega en | Qué hace |
 |---|---|---|
-| «descárgame este reel» + URL | **TheDescarga** | Baja el vídeo/audio a `TheDescarga/descargas/` |
-| «monta adaptaciones de este reel» | **TheEditor** | Link → avatar IA (HeyGen) → b-roll + subs + música |
-| «cambia esto de la landing» | **TheLanding** | Edita/despliega la web (Vercel) |
-| «genera historias» / «monta stories» | **TheHistoria** | Frases de `viral_phrases` + fondo de b-roll → MP4 9:16 |
-| «OK a estos clips» / «ponle copy» / «cámbiame el copy del 03» | **TheCopy** | Copy + hashtags por clip y proyecto → Excel `registro_<proyecto>.xlsx` + `.txt` junto al MP4 |
-| «escríbeme un artículo de blog sobre…» / «optimiza este artículo» | **TheTextos** | Texto largo (>500 palabras) con SEO + GEO/AEO → `TheTextos/textos/<fecha>_<slug>/` |
+| «descárgame este vídeo» + URL | **TheDescarga** | Baja el vídeo/audio a `descargas/<proyecto>/` |
+| «sácame 4 clips de este vídeo» / «edita estos clips cortados» | **TheEditor** | Reels 9:16 con b-roll, música, subtítulos y gancho de texto, con los recursos que permita el proyecto |
+| «monta adaptaciones de este reel» | **TheEditor** (skill `Editor_Sergio`) | Link → avatar IA (HeyGen) → edición |
+| «genera historias» / «hazme un carrusel de…» | **TheHistoria** | Historias 9:16 (frases del proyecto + fondo) y carruseles 4:5 |
+| «OK a estos clips» / «ponle copy» / «¿qué publico hoy?» | **TheCopy** | Copy + hashtags auditados → Excel + `.txt`, y calendario de publicación |
+| «revisa mi perfil» (+ captura) | **ThePerfil** | Auditoría de 9 partes con propuestas antes → después |
+| «escríbeme un artículo sobre…» | **TheTextos** | Texto largo con SEO + GEO/AEO, con revisión independiente |
+| «cambia esto de la landing» | **TheLanding** | Edita y despliega la web (Vercel) |
 
-También puedes encadenar: *«descarga este reel y móntame 3 adaptaciones»* →
-CEO corre `descarga` y pasa el MP4 a `editor`.
+Puedes encadenar: *«descarga este vídeo y sácame 3 clips»* → `descarga` → `editor`.
 
-**TheHistoria es independiente:** descargar/editar no crea historias. Se lanza
-solo cuando lo pides. Coge las frases que TheEditor deja en `viral_phrases` y les
-pone un fondo del mismo banco de b-roll (`TheEditor/superposiciones/`). Para
-promos o eventos tiene una vía de **historias especiales** con tu propio texto.
-Al darles OK pasan a `HISTORIAS/1. Pte publicar` (sin copy).
+## Proyectos
 
-**TheCopy entra al dar OK:** cuando apruebas clips y pasan a
-`REVISADOS/1. pte Publicar`, se escribe su copy y sus hashtags según las reglas del
-proyecto (hoy MongeMalo: 3–5 hashtags por tamaño, con `#grupoalfa` fijo y el resto
-rotando según el tema) y pasa una auditoría antes de registrarse. Cada clip queda con su
-`.txt` al lado y una fila en el Excel del proyecto (ID, enlace al vídeo, copy,
-hashtags, estado). Instagram activo; TikTok y YouTube preparados.
+Cada **proyecto** (cuenta o cliente) tiene su carpeta en cada departamento y sus
+propias carpetas de datos, así nunca se mezclan vídeos, copys ni recursos.
 
-**TheTextos, a demanda:** artículos de blog de más de 500 palabras optimizados
-para Google y para los buscadores de IA. Se apoya en las skills globales de
-`claude-blog`, `ai-seo` y `clean-user-facing-text` (pasada final obligatoria), y
-cada texto pasa una revisión independiente (`blog-reviewer`). Sus **dos tipos de
-texto están pendientes** de especificar.
+- **largos** (p. ej. MongeMalo): vídeos largos que se descargan y se cortan.
+- **clipping:** vídeos ya cortados que entrega el proyecto; se editan **solo con
+  sus recursos** (`TheEditor/proyectos/<id>/recursos/`), sin nada de internet.
 
-## Añadir una funcionalidad nueva
+**Proyecto nuevo:** dile al CEO «crea el proyecto X». Te pedirá los datos y una
+captura del perfil, ejecutará `nuevo_proyecto.py` y cada departamento rellenará su
+parte. Detalle en [`CLAUDE.md`](CLAUDE.md) → «Añadir un proyecto».
 
-Cada funcionalidad nueva es una **carpeta hermana** en `PruebasIA/`. Para que el
-CEO la dirija:
+## Flujo de publicación
 
-1. Crea la carpeta y su repo (`github.com/xergiagui/<Nombre>`).
-2. Escribe su `CLAUDE.md` con sus reglas y su `README.md`.
-3. Añade su entrada en [`departamentos.json`](departamentos.json).
-4. Crea su subagente en `.claude/agents/<id>.md` (lo primero que hace: leer su `CLAUDE.md`).
-5. Añade la ruta a `additionalDirectories` en `.claude/settings.local.json`.
+1. Apruebas clips o carruseles → pasan a `REVISADOS/<proyecto>/1. pte Publicar`.
+2. TheCopy escribe copy y hashtags (con auditoría) y el calendario les pone fecha y hora.
+3. Cada día: «¿qué publico hoy?» → pieza, hora y texto listo para pegar.
+4. Al publicar, mueves la pieza a `2. Publicados` y el registro se actualiza.
 
-Detalle del protocolo en [`CLAUDE.md`](CLAUDE.md).
+Las historias van a `HISTORIAS/<proyecto>/1. Pte publicar` (sin copy).
 
 ## Dónde viven las reglas
 
-Cada departamento tiene su **`CLAUDE.md`** con sus reglas (las de edición, en
-`TheEditor/CLAUDE.md`). Los subagentes lo leen siempre al empezar, porque no ven
-la memoria de la conversación. Cuando des una regla nueva, se apunta ahí.
+- Generales de cada departamento: su **`CLAUDE.md`**.
+- De cada proyecto: `<departamento>/proyectos/<id>/`.
+
+Los subagentes las leen siempre al empezar (no ven la memoria de la conversación).
 
 ## Supabase
 
-Proyecto único reutilizado (`akuykrrqmivrcjzcsksj.supabase.co`, de
-*mis-finanzas*), compartido con TheLanding y el catálogo b-roll de TheEditor.
-Credenciales en `.env` (copia de `.env.example`). Historial de órdenes opcional
-en `supabase/ceo_tasks.sql`.
+Proyecto único reutilizado (`akuykrrqmivrcjzcsksj.supabase.co`) para TheLanding,
+el catálogo de b-roll común y las frases virales (`viral_phrases`, etiquetadas por
+proyecto). Credenciales en `.env` (copia de `.env.example`).
 
-## Notas
+## Repos
 
-- **Repos git**: cada departamento mantiene el suyo propio; CEO_Sergete tiene el
-  suyo aparte. Nada se movió ni se rompió.
-- **Renombrado**: «Descargador de Videos» → **TheDescarga**, tanto la carpeta
-  local como el repo de GitHub (`github.com/xergiagui/TheDescarga`).
-- **Repos**: bajo `xergiagui` en GitHub (CEO_Sergete, TheDescarga, TheEditor,
-  TheLanding, TheHistoria, TheCopy, TheTextos).
+Bajo `xergiagui` en GitHub: CEO_Sergete y uno por departamento (TheDescarga,
+TheEditor, TheLanding, TheHistoria, TheCopy, TheTextos, ThePerfil).
