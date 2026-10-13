@@ -62,8 +62,12 @@ Cuando el CEO te pase una ruta de vídeo para tratar/editar:
    `cortes.example.json` en la raíz de TheEditor):
    ```json
    [{"nombre":"01_gancho","inicio":42.0,"fin":66.7,
-     "titulo":"...","hook_query":"stock query en inglés para la imagen-gancho"}]
+     "titulo":"...","gancho_texto":"texto que se quema arriba los primeros 2,5 s",
+     "hook_query":"stock query en inglés para la imagen-gancho"}]
    ```
+   `gancho_texto`: corto (≤ 2 líneas, ~45 caracteres), **con tildes y ñ**, abre un
+   bucle sin dar la respuesta y **se cumple dentro del clip**. Sin cifras que no
+   salgan del clip. Si falta, se usa `titulo` (escríbelo también con tildes).
 4. **Clips + edición** (los scripts YA son genéricos, no se edita código):
    - `.venv/Scripts/python clips.py "<video>"` → clips 9:16 sin silencios en
      `transcripciones/<video>/clips/`.
@@ -77,10 +81,18 @@ Regla: **no inventes cortes al azar**; básate en la transcripción y en las reg
 de recorte/hook. Si el usuario pidió un nº concreto de clips, respétalo.
 
 ## Batch de clips ya cortados
-Para carpetas de clips que ya vienen cortados (p. ej. `Desktop/Clip/Largo N Extractos`):
+Para carpetas de clips que ya vienen cortados (p. ej. `Desktop/Clip/Largo N Extractos`),
+en **tres pasos** para que cada clip lleve su gancho de texto:
 ```bash
+# 1) reencuadre + quitar silencios + transcribir (no renderiza)
+.venv/Scripts/python procesar_batch_clip.py "<RAIZ>" "<CARPETA>" <MODO> --solo-transcribir
+# 2) TÚ lees transcripciones/<CARPETA>/textos/<clip>.txt y escribes
+#    transcripciones/<CARPETA>/ganchos.json  →  {"<clip>.mp4": "texto"}
+# 3) render (reutiliza _prep/, no vuelve a transcribir)
 .venv/Scripts/python procesar_batch_clip.py "<RAIZ>" "<CARPETA>" <MODO>
 ```
+Mismas reglas del `gancho_texto` que arriba. Un clip sin texto sale sin gancho (con
+aviso): nunca pongas uno mecánico. Detalle en `TheEditor/CLAUDE.md`.
 `MODO` de encuadre (`right`, `left`, `center`, `auto`, `auto-right`, `follow` o una
 fracción como `0.81`) según el plano; el mapa de las carpetas de Luis Monge está
 en `TheEditor/CLAUDE.md`. **No lances dos batch a la vez** (comparten carpeta de
