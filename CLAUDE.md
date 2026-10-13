@@ -23,6 +23,7 @@ fuente de verdad: rutas, repos, disparadores y cómo se ejecuta cada uno.
 | **Landing** | `../TheLanding` | `landing` | Web de afiliación (Next.js + Supabase + Vercel) |
 | **Historia** | `../TheHistoria` | `historia` | Historias de IG (9:16): frase de `viral_phrases` + fondo de b-roll |
 | **Copy** | `../TheCopy` | `copy` | Copy + hashtags de cada clip, por proyecto; registro clip ↔ copy ↔ hashtags (Excel + `.txt` junto al MP4) |
+| **Textos** | `../TheTextos` | `textos` | Textos largos para blog (>500 palabras) optimizados para SEO y para buscadores de IA (GEO/AEO) |
 
 ---
 
@@ -74,6 +75,18 @@ fuente de verdad: rutas, repos, disparadores y cómo se ejecuta cada uno.
   **proyecto** (hoy solo MongeMalo) tiene sus reglas en `TheCopy/proyectos/<id>/`;
   si hay varios y no está claro de cuál es el clip, pregunta. Las **historias de
   IG no llevan copy**.
+- **Textos — a demanda, con revisión independiente:** TheTextos escribe textos
+  largos de blog (>500 palabras) optimizados para SEO y GEO/AEO. Copys, captions
+  y textos cortos **no** van aquí (eso es `copy`). Flujo:
+  1. Delega en el subagente `textos` (tema/keyword, tipo de texto, público, blog
+     de destino y lo que haya dicho Sergio). Hay **dos tipos de texto aún
+     PENDIENTES** de especificar: si `textos` devuelve preguntas, pásaselas a
+     Sergio en vez de inventar.
+  2. Lanza el agente global **`blog-reviewer`** sobre su `articulo.md` (puntos de
+     nivel sitio = N/A). Si sale `BLOCKING: true` o hay algún P0, devuelve la
+     revisión a `textos` para corregir (máx. 2 vueltas).
+  3. Reporta: ruta de `TheTextos/textos/<fecha>_<slug>/`, título, keyword, nº de
+     palabras, resultados SEO/GEO/revisión y avisos (`[VERIFICAR]`).
 
 ---
 

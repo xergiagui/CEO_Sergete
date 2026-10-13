@@ -81,6 +81,23 @@
       "entorno": "Entorno propio TheCopy/.venv (solo openpyxl).",
       "nota": "Se lanza AL DAR OK a unos clips (tras moverlos a REVISADOS/1. pte Publicar) o a demanda. Las historias de IG no llevan copy.",
       "autonomo": true
+    },
+    {
+      "id": "textos",
+      "nombre": "TheTextos",
+      "ruta": "C:\\Users\\ico858\\Desktop\\PruebasIA\\TheTextos",
+      "ruta_relativa": "../TheTextos",
+      "repo": "https://github.com/xergiagui/TheTextos.git",
+      "subagente": "textos",
+      "que_hace": "Escribe textos largos para blog (>500 palabras) optimizados para SEO (Google) y para buscadores/crawlers de IA (GEO/AEO): brief, investigación, redacción, GEO, SEO on-page, verificación de datos, schema JSON-LD y pasada final con clean-user-facing-text.",
+      "disparadores": ["artículo", "articulo", "post de blog", "texto para el blog", "texto largo", "blog", "seo", "geo", "aeo", "posicionar", "redacta un artículo", "optimiza este artículo"],
+      "entrypoint": "Subagente 'textos' siguiendo TheTextos/CLAUDE.md. Skills globales: blog-brief, blog-write, ai-seo, blog-geo, blog-seo-check, blog-factcheck, blog-schema, clean-user-facing-text. Scripts: TheTextos/.venv/Scripts/python.exe ~/.claude/scripts/<x>.py",
+      "tipos_texto": "DOS tipos, PENDIENTES de especificar por Sergio (ver tabla en TheTextos/CLAUDE.md).",
+      "salida": "TheTextos\\textos\\<AAAA-MM-DD>_<slug>\\  (brief.md, articulo.md, schema.json, informe.md)",
+      "revision": "Tras 'textos', el CEO lanza el agente global 'blog-reviewer' sobre articulo.md; si BLOCKING o P0 → vuelve a 'textos' (máx. 2 vueltas).",
+      "entorno": "Entorno propio TheTextos/.venv (textstat + beautifulsoup4). Nunca python3 (stub de la Store).",
+      "nota": "A demanda. NO es para copys/captions/hooks ni textos <=500 palabras (eso es TheCopy).",
+      "autonomo": true
     }
   ],
   "supabase_compartido": {
