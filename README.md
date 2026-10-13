@@ -69,4 +69,4 @@ en `supabase/ceo_tasks.sql`.
 - **Renombrado**: «Descargador de Videos» → **TheDescarga**, tanto la carpeta
   local como el repo de GitHub (`github.com/xergiagui/TheDescarga`).
 - **Repos**: bajo `xergiagui` en GitHub (CEO_Sergete, TheDescarga, TheEditor,
-  TheLanding, TheHistoria). TheCopy tiene su repo git local; súbelo cuando quieras.
+  TheLanding, TheHistoria, TheCopy).

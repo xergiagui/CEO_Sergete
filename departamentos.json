@@ -69,7 +69,7 @@
       "nombre": "TheCopy",
       "ruta": "C:\\Users\\ico858\\Desktop\\PruebasIA\\TheCopy",
       "ruta_relativa": "../TheCopy",
-      "repo": "(repo git local, aún sin GitHub)",
+      "repo": "https://github.com/xergiagui/TheCopy.git",
       "subagente": "copy",
       "que_hace": "Escribe el copy y los hashtags de cada clip terminado y registra la relación clip ↔ copy ↔ hashtags: Excel por proyecto (una fila por clip y plataforma, con enlace al MP4 y estado) + <clip>.txt junto a cada MP4 con el texto listo para pegar.",
       "disparadores": ["copy", "copys", "caption", "hashtags", "hasktags", "texto del post", "descripción del reel", "ponle copy", "cámbiame el copy", "qué copy lleva"],
