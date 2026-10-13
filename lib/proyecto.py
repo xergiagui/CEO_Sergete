@@ -1,8 +1,13 @@
 """
 Carga de un PROYECTO (cliente/marca) desde `proyectos/<id>/`.
 
-Cada proyecto es autocontenido:
-  proyecto.json     reglas: tipo, tono, CTA, carpetas, plataformas, campos propios, calendario
+La IDENTIDAD del proyecto (cuenta, landing, afiliado, voz: persona/tono/idioma/emojis,
+palabras prohibidas, marca) NO está aquí: se lee del índice del CEO
+(`CEO_Sergete/proyectos.json` → proyectos[].identidad), que es su fuente única.
+Sin ella, error de configuración.
+
+Lo propio de TheCopy, en la carpeta del proyecto:
+  proyecto.json     reglas del copy, CTA, carpetas, plataformas, campos propios, calendario
   ofertas.json      productos/ofertas a los que puede apuntar un copy
   hashtags.json     fijos por plataforma + banco temático (por tamaño: nicho/medio/amplio)
   banco_copys.json  copys de referencia (tono) y de reserva
@@ -63,7 +68,7 @@ def valida_id(pid: str) -> None:
 
 
 class Proyecto:
-    def __init__(self, pid: str):
+    def __init__(self, pid: str, exigir_identidad: bool = True):
         self.dir = config.PROYECTOS_DIR / pid
         if pid == config.PLANTILLA or not (self.dir / "proyecto.json").exists():
             raise ErrorProyecto(
@@ -84,8 +89,34 @@ class Proyecto:
         self.id = pid
         self.nombre = self.conf.get("nombre") or pid
         self.prefijo_id = self.conf.get("prefijo_id") or pid.strip("_")[:2].upper()
+        self.identidad = cargar_identidad(pid, exigir_identidad)
         self._tamanos, self._conflictos_tamano = self._indexar_tamanos()
         self._comprobar()
+
+    # ---------- identidad (CEO_Sergete/proyectos.json → identidad) ----------
+    @property
+    def voz(self) -> dict:
+        return self.identidad.get("voz") or {}
+
+    @property
+    def tono(self) -> str:
+        return str(self.voz.get("tono") or "")
+
+    @property
+    def idioma(self) -> str:
+        return str(self.voz.get("idioma") or "")
+
+    @property
+    def landing(self) -> str:
+        return str(self.identidad.get("landing") or "")
+
+    @property
+    def afiliado(self) -> str:
+        return str(self.identidad.get("afiliado") or "")
+
+    @property
+    def palabras_prohibidas(self) -> list[str]:
+        return [str(x) for x in (self.identidad.get("palabras_prohibidas") or []) if str(x).strip()]
 
     # ---------- validación de la configuración ----------
     def _comprobar(self) -> None:
@@ -109,6 +140,7 @@ class Proyecto:
                 if fmt not in config.FORMATOS:
                     errores.append(f"plataformas.{pid}.formatos: formato desconocido '{fmt}' "
                                    f"(usa {', '.join(config.FORMATOS)}).")
+            errores += self._comprobar_cuotas(pid)
         errores += self._comprobar_calendario()
         for propia in self.carpetas_propias():
             for ajena, otro in carpetas_ajenas(self.id, internas=False).items():
@@ -163,9 +195,55 @@ class Proyecto:
         return formato in self.formatos(pid)
 
     def conf_formato(self, pid: str, formato: str = "reel") -> dict:
-        """Configuración de la plataforma con lo propio del formato encima (guia, copy_recomendado…)."""
-        base = {k: v for k, v in self.plataforma(pid).items() if k != "formatos"}
+        """Configuración efectiva: identidad (emojis_max de la voz) < plataforma < formato.
+
+        `emojis_max` sale de identidad.voz.emojis_max salvo que la plataforma o el formato lo
+        sobrescriban; lo propio del formato (guia, copy_recomendado…) va encima de la plataforma.
+        """
+        base = {}
+        if self.voz.get("emojis_max") is not None:
+            base["emojis_max"] = self.voz["emojis_max"]
+        base.update({k: v for k, v in self.plataforma(pid).items() if k != "formatos"})
         return {**base, **{k: v for k, v in self.formatos(pid).get(formato, {}).items() if not k.startswith("_")}}
+
+    def reglas_hashtags(self, pid: str) -> dict:
+        """plataformas.<p>.hashtags: FUENTE ÚNICA de las cifras de hashtags."""
+        return dict(self.plataforma(pid).get("hashtags") or {})
+
+    def texto_reglas_hashtags(self, pid: str) -> str:
+        """Las cifras de hashtags tal y como las comprueba lib/tanda.py."""
+        r = self.reglas_hashtags(pid)
+        partes = []
+        if "tematicos_min" in r or "tematicos_max" in r:
+            partes.append(f"temáticos {r.get('tematicos_min', 0)}–{r.get('tematicos_max', '…')} (error)")
+        tmax = r.get("total_max") or r.get("max_total")
+        if r.get("total_min") or tmax:
+            partes.append(f"total {r.get('total_min', 0)}–{tmax or '…'} con los fijos (error)")
+        if "nicho_min" in r:
+            partes.append(f"≥ {r['nicho_min']} de nicho contando los fijos (aviso)")
+        if "amplios_max" in r:
+            partes.append(f"≤ {r['amplios_max']} amplio (error)")
+        n = int(r.get("rotacion_ultimos", config.ROTACION_ULTIMOS) or 0)
+        if n:
+            partes.append(f"rotar: conjunto distinto de los {n} últimos y del resto de la tanda (aviso)")
+        return " · ".join(partes) or "sin reglas"
+
+    def _comprobar_cuotas(self, pid: str) -> list[str]:
+        """Las cuotas de hashtags tienen que poder cumplirse con los fijos de la plataforma."""
+        r = self.reglas_hashtags(pid)
+        nf = len(self.fijos(pid))
+        tmin, tmax = r.get("tematicos_min", 0), r.get("tematicos_max")
+        total_min, total_max = r.get("total_min"), r.get("total_max") or r.get("max_total")
+        err = []
+        if tmax is not None and tmin > tmax:
+            err.append(f"plataformas.{pid}.hashtags: tematicos_min ({tmin}) > tematicos_max ({tmax}).")
+        if total_min and tmax is not None and tmax + nf < total_min:
+            err.append(f"plataformas.{pid}.hashtags: con {nf} fijo(s) y como mucho {tmax} temáticos no se llega "
+                       f"a total_min {total_min}.")
+        if total_max and tmin + nf > total_max:
+            err.append(f"plataformas.{pid}.hashtags: con {nf} fijo(s) y al menos {tmin} temáticos se pasa "
+                       f"de total_max {total_max}.")
+        return err
 
     # ---------- hashtags ----------
     def fijos(self, pid: str) -> list[str]:
@@ -271,18 +349,12 @@ class Proyecto:
     def carpeta_publicado(self) -> Path | None:
         return self._carpeta("publicado")
 
-    def carpetas_contexto(self) -> list[tuple[Path, bool]]:
-        """[(carpeta, es_transicion)] donde buscar cortes.json/.srt o textos/ de los clips.
-
-        Las del proyecto (proyecto.json → carpetas.contexto) y, al final, la ruta antigua de
-        TheEditor sin proyecto (es_transicion=True: solo se usa si el clip no sale en las otras).
-        """
+    def carpetas_contexto(self) -> list[Path]:
+        """Carpetas donde buscar cortes.json/.srt o textos/ de los clips (proyecto.json → carpetas.contexto)."""
         propias = (self.conf.get("carpetas") or {}).get("contexto")
         if propias is None:
             propias = config.CONTEXTO_POR_DEFECTO
-        out = [(ruta(p, self.id), False) for p in propias]
-        out += [(ruta(p, self.id), True) for p in config.CONTEXTO_TRANSICION]
-        return out
+        return [ruta(p, self.id) for p in propias]
 
     def carpetas_propias(self) -> list[Path]:
         """Carpetas de piezas del proyecto (pendiente, publicado, historias)."""
@@ -315,9 +387,12 @@ class Proyecto:
         except Exception:
             return []
         pc, falta = pl["proyecto.json"], []
+        if not self.identidad:
+            falta.append(f"identidad (voz, tono, emojis, landing, palabras prohibidas) en "
+                         f"{config.INDICE_PROYECTOS} → proyectos[{self.id}].identidad: la añade el CEO")
         for clave, que in (("descripcion", "descripcion (qué es el proyecto)"),
                            ("como_reconocerlo", "como_reconocerlo (pistas para saber que un clip es suyo)"),
-                           ("tono", "tono"), ("reglas_copy", "reglas_copy (siguen las genéricas: revísalas)")):
+                           ("reglas_copy", "reglas_copy (siguen las genéricas: revísalas)")):
             if self.conf.get(clave) == pc.get(clave):
                 falta.append(que)
         if not self.tipo:
@@ -334,7 +409,7 @@ class Proyecto:
         plats, pplats = self.conf.get("plataformas") or {}, pc.get("plataformas") or {}
         for pid in self.plataformas_activas():
             if plats.get(pid) == pplats.get(pid):
-                falta.append(f"plataformas.{pid}: CTA (cta_patrones, cta_ejemplo), emojis, nº de hashtags y guía "
+                falta.append(f"plataformas.{pid}: CTA (cta_patrones, cta_ejemplo), nº de hashtags y guía "
                              "(siguen los de la plantilla)")
         if not self.calendario_activo:
             falta.append("calendario (desactivado: días, franjas y nº de posts cuando Sergio los dé)")
@@ -440,6 +515,41 @@ def de_otro_proyecto(pid: str, ruta_x: Path | str | None) -> str | None:
     return None
 
 
+def cargar_identidad(pid: str, exigir: bool = True) -> dict:
+    """identidad del proyecto en el índice del CEO (fuente única). Sin ella, ErrorProyecto si `exigir`."""
+    motivo = ""
+    try:
+        data = leer_json(config.INDICE_PROYECTOS)
+    except FileNotFoundError:
+        data, motivo = {}, f"no existe {config.INDICE_PROYECTOS}"
+    except Exception as e:
+        data, motivo = {}, f"no se puede leer {config.INDICE_PROYECTOS} ({e})"
+    entrada = next((x for x in (data.get("proyectos") or []) if isinstance(x, dict) and x.get("id") == pid), None)
+    ident = (entrada or {}).get("identidad")
+    if not motivo and entrada is None:
+        motivo = f"'{pid}' no está en {config.INDICE_PROYECTOS.name}"
+    elif not motivo and not isinstance(ident, dict):
+        motivo = f"'{pid}' no tiene bloque «identidad» en {config.INDICE_PROYECTOS.name}"
+    if not motivo:
+        errores = []
+        voz = ident.get("voz")
+        if not isinstance(voz, dict) or not voz.get("tono"):
+            errores.append("identidad.voz.tono")
+        elif voz.get("emojis_max") is not None and not isinstance(voz["emojis_max"], int):
+            errores.append("identidad.voz.emojis_max (número entero)")
+        if not isinstance(ident.get("palabras_prohibidas", []), list):
+            errores.append("identidad.palabras_prohibidas (lista)")
+        if errores:
+            motivo = f"identidad de '{pid}' incompleta o mal formada: {', '.join(errores)}"
+    if motivo:
+        if exigir:
+            raise ErrorProyecto(f"Configuración: {motivo}. La identidad (cuenta, landing, voz, tono, emojis, "
+                                "palabras prohibidas) se lee de CEO_Sergete/proyectos.json → proyectos[].identidad "
+                                "y la mantiene el CEO.")
+        return {}
+    return ident
+
+
 def indice_ceo() -> dict[str, dict]:
     """{id: entrada} del índice común de proyectos del CEO (solo lectura; {} si no está)."""
     try:
@@ -484,8 +594,6 @@ def crear(pid: str, nombre: str | None = None, prefijo: str | None = None,
         nuevo["tipo"] = tipo
     if ceo.get("descripcion"):
         nuevo["descripcion"] = ceo["descripcion"]
-    if ceo.get("cuenta_ig"):
-        nuevo["cuenta_ig"] = ceo["cuenta_ig"]
     escribir_json(conf_path, nuevo)
     return destino, ceo
 

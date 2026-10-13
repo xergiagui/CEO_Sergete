@@ -12,3 +12,6 @@ tandas/*
 
 # Plan semanal del calendario (se rehace desde el Excel con `copys.py calendario planificar`)
 proyectos/*/calendario/
+
+# Registro Excel de cada proyecto (datos de trabajo, no código)
+proyectos/*/registro_*.xlsx

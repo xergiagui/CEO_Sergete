@@ -99,9 +99,12 @@ def contexto(carpeta: Path, proyecto) -> dict:
         if campo and data.get(cid) and proyecto.canon_valor(campo, data[cid]) is None:
             avisos.append(f"{cid} = '{data[cid]}' no es válido ({', '.join(proyecto.valores_campo(campo) or {})}).")
 
-    ctx = {k: data[k] for k in ("tema", "formula", "objetivo", "pilar", "slug", "fuente", "creado") if k in data}
+    ctx = {k: data[k] for k in ("tema", "formula", "objetivo", "pilar") if k in data}
     if ctx.get("tema"):
         ctx["tema"] = sin_marcado(ctx["tema"])
+    f = data.get("fuente")
+    if isinstance(f, dict) and (f.get("tipo") or f.get("credito")):
+        ctx["fuente"] = {k: f[k] for k in ("tipo", "credito") if f.get(k)}  # sin rutas
     ctx["n_imagenes"] = len(imgs)
     ctx["gancho_slide1"] = gancho_slide1(data)
     ctx["slides"] = []
@@ -113,14 +116,20 @@ def contexto(carpeta: Path, proyecto) -> dict:
         if isinstance(s.get("puntos"), list) and s["puntos"]:
             d["puntos"] = [sin_marcado(x) for x in s["puntos"]]
         ctx["slides"].append(d)
-    # Texto de las slides: cuenta como "literal de la pieza" en la auditoría (repetir el gancho
-    # de la slide 1 en el caption es obligatorio).
-    ctx["texto_slides"] = " ".join(
-        ". ".join([d.get("titulo", ""), d.get("texto", ""), *d.get("puntos", []), d.get("peticion", "")])
-        for d in ctx["slides"]).strip()
     if avisos:
         ctx["aviso"] = " ".join(avisos)
     return ctx
+
+
+def texto_slides(ctx: dict | None) -> str:
+    """Todo el texto de las slides de un contexto de carrusel (se calcula al auditar: cuenta
+    como «literal de la pieza», porque el caption tiene que repetir el gancho de la slide 1)."""
+    out = []
+    for d in (ctx or {}).get("slides") or []:
+        if isinstance(d, dict):
+            out.append(". ".join(x for x in [d.get("titulo", ""), d.get("texto", ""), *(d.get("puntos") or []),
+                                             d.get("peticion", "")] if x))
+    return " ".join(out).strip()
 
 
 def formula(carpeta: Path | None) -> str | None:

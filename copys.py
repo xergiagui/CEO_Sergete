@@ -3,13 +3,14 @@ TheCopy — copys y hashtags de las piezas (Reels y carruseles), relacionados en
 registro, y calendario de publicación.
 
 Flujo normal (lo lleva el subagente `copy` de CEO_Sergete):
-  1. copys.py pendientes            → tanda JSON con las piezas sin copy + su contexto
-                                      (Reels = MP4; carruseles = carpetas con carrusel.json)
-  2. (el subagente rellena la tanda: tema, oferta, objetivo, pilar, copy y hashtags
-      temáticos; `copys.py hashtags` enseña el banco por tamaño y los últimos conjuntos usados)
-  3. copys.py auditar --entrada <tanda>     → informe de estilo (se corrige reescribiendo)
-  4. copys.py registrar --entrada <tanda>   → valida + audita → Excel + .txt
-  5. copys.py calendario planificar → fecha y hora a lo registrado (+ historias del día)
+  1. copys.py brief                 → TODO lo que hace falta para escribir (identidad, reglas,
+                                      ofertas, plataformas, hashtags) en ~1,5k tokens
+  2. copys.py pendientes            → tanda JSON con las piezas sin copy + su contexto mínimo
+                                      (Reels = MP4; carruseles = carpetas con carrusel.json),
+                                      con tema, oferta y temas de hashtags sugeridos
+  3. (el subagente rellena la tanda: objetivo, pilar y copy; hashtags automáticos)
+  4. copys.py registrar --entrada <tanda> --simular   → errores y avisos (se corrige reescribiendo)
+  5. copys.py registrar --entrada <tanda> --planificar → Excel + .txt + calendario (línea FALTAN)
   6. copys.py calendario hoy        → qué se publica hoy, con el texto listo para pegar
   7. copys.py sincronizar           → Estado/ruta según la carpeta donde esté cada pieza
 
@@ -30,6 +31,7 @@ from pathlib import Path
 
 import config
 from lib import auditoria as audit
+from lib import brief as brf
 from lib import calendario as cal
 from lib import carrusel as car
 from lib import proyecto as proy
@@ -107,6 +109,68 @@ def _clips_en(carpeta: Path, recursivo: bool = False) -> list[Path]:
     return sorted(f for f in it if f.is_file() and f.suffix.lower() in config.EXT_VIDEO)
 
 
+def _detectar(p: proy.Proyecto, reg: Registro, pend: Path | None, publ: Path | None, hoy: dt.date,
+              no_encontrado: bool = True) -> dict:
+    """Detección por CARPETA (común a `sincronizar` y `calendario`), solo EN MEMORIA (`reg`).
+
+    Lo que está en *publicados* pasa a Publicado (+ Fecha publicación si falta); lo que ha
+    vuelto a *pendiente* desde No encontrado, a Pendiente; lo que no está en ninguna, a No
+    encontrado (si `no_encontrado`). Actualiza el enlace/ruta y rellena el Formato vacío.
+    Nunca rebaja un estado puesto a mano. Guardar el Excel, borrar el .txt que se quedó atrás y
+    rehacer los que falten lo decide quien llama (`_aplicar_archivos`).
+    """
+    donde: dict[str, tuple[Path, str]] = {}  # si está en las dos carpetas, manda Publicados
+    for base, sitio in ((pend, "pendiente"), (publ, "publicado")):
+        for f in _clips_en(base, recursivo=True):
+            donde[f.name.lower()] = (f, sitio)
+        for d in car.carruseles_en(base, recursivo=True):
+            donde[d.name.lower()] = (d, sitio)
+    res = {"cambios": [], "txt_viejos": [], "txt_rehacer": set(), "formato_puesto": 0,
+           "publicados": {k for k, (_, sitio) in donde.items() if sitio == "publicado"}}
+    for fila, d in reg.filas():
+        clip = str(d.get("Clip") or "")
+        estado = d.get("Estado") or "Pendiente"
+        fmt = formato_de_fila(d)
+        if not d.get("Formato"):
+            reg.escribir(fila, {"Formato": config.FORMATOS[fmt]})  # Excel antiguo: se rellena el hueco
+            res["formato_puesto"] += 1
+        hallado = donde.get(clip.lower())
+        if not hallado:
+            if estado == "Pendiente" and no_encontrado:
+                reg.escribir(fila, {"Estado": "No encontrado"})
+                res["cambios"].append(f"{d.get('ID')} {clip} [{d.get('Plataforma')}]: Pendiente → No encontrado")
+            continue
+        ruta, sitio = hallado
+        if str(d.get("Ruta") or "") != str(ruta.resolve()):
+            antigua = Path(str(d.get("Ruta") or ""))
+            reg.enlazar(fila, ruta)
+            res["cambios"].append(f"{d.get('ID')} {clip} [{d.get('Plataforma')}]: ruta → {ruta.parent.name}")
+            if d.get("Ruta"):
+                res["txt_viejos"].append((txt.ruta_txt(antigua, fmt), antigua))
+        nuevo = None
+        if sitio == "publicado" and estado in ("Pendiente", "No encontrado"):
+            nuevo = "Publicado"
+            if not d.get("Fecha publicación"):
+                reg.escribir(fila, {"Fecha publicación": hoy})
+        elif sitio == "pendiente" and estado == "No encontrado":
+            nuevo = "Pendiente"
+        if nuevo:
+            reg.escribir(fila, {"Estado": nuevo})
+            res["cambios"].append(f"{d.get('ID')} {clip} [{d.get('Plataforma')}]: {estado} → {nuevo}")
+        if not txt.ruta_txt(ruta, fmt).exists():
+            res["txt_rehacer"].add((clip, ruta))
+    return res
+
+
+def _aplicar_archivos(p: proy.Proyecto, reg: Registro, res: dict) -> None:
+    """Tras guardar: borra el .txt que se quedó atrás al mover la pieza y rehace los que falten."""
+    for viejo, antigua in res["txt_viejos"]:
+        if viejo.exists() and not antigua.exists():
+            viejo.unlink()
+    for clip, ruta in sorted(res["txt_rehacer"]):
+        txt.escribir(p, ruta, _filas_de_clip(reg, clip))
+
+
 def _fecha_arg(txt_fecha: str | None, nombre: str) -> dt.date | None:
     if not txt_fecha:
         return None
@@ -171,6 +235,21 @@ def cmd_pendientes(args) -> int:
     reg = Registro(excel, p) if excel.exists() else None
     meta = BuscadorMetadatos(p)
 
+    # Mismo nombre ya registrado con OTRA ruta (en clipping, «Luis 1» se repite en cada carpeta):
+    # se trataría como la misma pieza, así que se avisa antes de escribir nada.
+    repetidos = []
+    if reg:
+        rutas_reg: dict[str, set[tuple[str, str]]] = {}
+        for _, d in reg.filas():
+            if d.get("Clip") and d.get("Ruta"):
+                rutas_reg.setdefault(str(d["Clip"]).lower(), set()).add((str(d.get("ID") or ""), str(d["Ruta"])))
+        for pieza in [*clips, *carrs]:
+            propia = str(pieza.resolve()).lower()
+            otras = sorted({(i, r) for i, r in rutas_reg.get(pieza.name.lower(), set()) if r.lower() != propia})
+            if otras:
+                repetidos.append(f"«{pieza.name}» ya está en el registro ({otras[0][0]}) con otra ruta: {otras[0][1]}. "
+                                 "Si es otra pieza, renómbrala antes de registrar; si no, se trata como la misma.")
+
     def faltan_en(nombre: str, plats: list[str]) -> list[str]:
         return [pid for pid in plats
                 if args.incluir_registrados or not (reg and reg.buscar(nombre, p.nombre_plataforma(pid)))]
@@ -219,6 +298,8 @@ def cmd_pendientes(args) -> int:
     print(f"{n_r} Reel(s) y {n_c} carrusel(es) en la carpeta · {len(ya)} ya tienen copy · {len(piezas)} pendiente(s)")
     if sin_plataforma:
         print(f"  aviso: ninguna de las plataformas pedidas admite carrusel: {', '.join(sin_plataforma)}")
+    for a in repetidos + meta.avisos:
+        print(f"  aviso: {a}")
     if not piezas:
         return 0
 
@@ -231,8 +312,24 @@ def cmd_pendientes(args) -> int:
             info = ctx.get("frase_viral") or ctx.get("titulo") or ctx.get("gancho_texto") or ""
         aviso = f"  [aviso: {ctx['aviso']}]" if ctx.get("aviso") else ""
         print(f"  - {Path(pz['ruta']).name}  [{', '.join(pz['plataformas'])}]  {info}{aviso}")
-    print(f"\nTANDA: {salida}")
+    print(f"\nReglas: copys.py brief --proyecto {p.id}")
+    print(f"TANDA: {salida}")
     return 0
+
+
+def _resumen_bloques(p: proy.Proyecto, c: dict, verbose: bool) -> list[str]:
+    """Una línea por plataforma (caracteres + hashtags finales); con --verbose, el texto entero."""
+    fmt = c.get("formato") or "reel"
+    out = []
+    for pid, b in (c.get("plataformas") or {}).items():
+        texto = tnd.texto_para_pegar(p, pid, b, fmt)
+        tags = " ".join(tnd.hashtags_finales(p, pid, b.get("hashtags") or []))
+        out.append(f"      {pid}: {len(texto)} car. · {tags or '(sin hashtags)'}")
+        if verbose:
+            if b.get("titulo"):
+                out.append(f"      Título: {b['titulo']}")
+            out += ["      " + linea for linea in texto.splitlines()] + [""]
+    return out
 
 
 def cmd_registrar(args) -> int:
@@ -249,9 +346,12 @@ def cmd_registrar(args) -> int:
         if pid and d.get("Copy"):
             existentes.setdefault(pid, {})[normalizar(str(d["Copy"]))] = str(d.get("Clip"))
 
-    errores, avisos = tnd.validar(p, tanda, existentes, _hashtags_recientes(p, reg))
+    errores, avisos, estilo = tnd.validar(p, tanda, existentes, _hashtags_recientes(p, reg))
     # Nunca se escribe un .txt en las carpetas de otro proyecto.
-    propias = p.carpetas_propias()
+    propias = p.carpetas_propias() + [Path(x) for x in (args.pendiente, args.publicado) if x]
+    for x in (args.pendiente, args.publicado):
+        if x:
+            _ajena(p, x, "La carpeta")
     for c in tanda.get("clips") or []:
         ruta = c.get("ruta")
         if not ruta:
@@ -275,16 +375,22 @@ def cmd_registrar(args) -> int:
         for e in errores:
             print(f"  - {e}")
         return 1
+    if args.estricto and estilo:
+        print(f"\n[X] --estricto: {len(estilo)} aviso(s) de estilo sin corregir (no son literales del clip); "
+              "no se ha registrado nada. Reescribe esas frases y repite.")
+        return 1
 
+    clips = tanda.get("clips") or []
+    n_textos = sum(len(c.get("plataformas") or {}) for c in clips)
     if args.simular:
-        print(f"\n[simulación] Todo válido. Esto se registraría en {excel}:\n")
-        for c in tanda["clips"]:
-            fmt = c.get("formato") or "reel"
-            for pid, b in c["plataformas"].items():
-                print(f"── {c['clip']} · {config.FORMATOS[fmt]} · {p.nombre_plataforma(pid)}")
-                if b.get("titulo"):
-                    print(f"Título: {b['titulo']}")
-                print(tnd.texto_para_pegar(p, pid, b, fmt) + "\n")
+        print(f"\n[simulación] Todo válido: {len(clips)} pieza(s), {n_textos} texto(s)"
+              + (f", {len(avisos)} aviso(s)" if avisos else "") + f" → {excel}")
+        for c in clips:
+            print(f"  - {c['clip']} · {config.FORMATOS[c.get('formato') or 'reel']}")
+            for linea in _resumen_bloques(p, c, args.verbose):
+                print(linea)
+        if args.planificar:
+            print("(--planificar no se aplica en simulación)")
         return 0
 
     if esta_bloqueado(excel):
@@ -293,7 +399,7 @@ def cmd_registrar(args) -> int:
 
     hoy = dt.date.today()
     resumen = []
-    for c in tanda["clips"]:
+    for c in clips:
         fmt = c.get("formato") or "reel"
         ruta = Path(c["ruta"]) if c.get("ruta") else None
         id_clip = reg.id_de_clip(c["clip"]) or reg.siguiente_id()
@@ -327,20 +433,30 @@ def cmd_registrar(args) -> int:
         print(f"[!] {e}")
         return 2
 
-    print(f"[OK] Registrado en {excel}")
+    print(f"[OK] Registrado en {excel}: {len(resumen)} pieza(s), {n_textos} texto(s)")
     for id_clip, c, ruta, fmt in resumen:
         destino = None
         if not args.sin_txt and ruta:
             destino = txt.escribir(p, ruta, _filas_de_clip(reg, c["clip"]))
         donde = (f"{destino.parent.name}\\{destino.name}" if fmt == "carrusel" else destino.name) if destino else ""
-        print(f"  {id_clip}  {config.FORMATOS[fmt]:<9} {c['clip']}  [{', '.join(c['plataformas'])}]"
-              + (f"  → {donde}" if destino else "  (sin .txt)"))
+        print(f"  {id_clip}  {config.FORMATOS[fmt]:<9} {c['clip']}" + (f"  → {donde}" if destino else "  (sin .txt)"))
+        for linea in _resumen_bloques(p, c, args.verbose):
+            print(linea)
 
     tanda["registrada"] = dt.datetime.now().isoformat(timespec="seconds")
     tanda["registro"] = str(excel)
-    escribir_json(entrada, tanda)
+    escribir_json(entrada, tanda)  # con los hashtags elegidos
+    if args.planificar:
+        if not p.calendario_activo:
+            print(f"\n(El calendario de {p.nombre} está desactivado: no se planifica.)")
+            return 0
+        print()
+        return cmd_calendario(argparse.Namespace(
+            proyecto=p.id, excel=args.excel, carpeta_historias=args.carpeta_historias, pendiente=args.pendiente,
+            publicado=args.publicado, accion="planificar", semanas=None, desde=None, simular=False,
+            replanificar_atrasados=False, json=False))
     if p.calendario_activo:
-        print(f"\nSiguiente: copys.py calendario planificar --proyecto {p.id}  (fecha y hora de publicación para lo registrado)")
+        print(f"\nSiguiente: copys.py calendario planificar --proyecto {p.id}  (o registrar con --planificar)")
     return 0
 
 
@@ -356,66 +472,22 @@ def cmd_sincronizar(args) -> int:
     if faltan:
         print(f"  aviso: no existe {' ni '.join(faltan)} (la crea el CEO): lo que estuviera ahí saldrá como No encontrado.")
 
-    # Reels (MP4) y carruseles (carpetas con carrusel.json), por nombre; si está en las dos, manda Publicados.
-    donde: dict[str, tuple[Path, str]] = {}
-    for base, sitio in ((pend, "pendiente"), (publ, "publicado")):
-        for f in _clips_en(base, recursivo=True):
-            donde[f.name.lower()] = (f, sitio)
-        for d in car.carruseles_en(base, recursivo=True):
-            donde[d.name.lower()] = (d, sitio)
-
     reg = Registro(excel, p)
-    hoy = dt.date.today()
-    cambios, txt_rehechos, formato_puesto = [], set(), 0
-    for fila, d in reg.filas():
-        clip = str(d.get("Clip") or "")
-        estado = d.get("Estado") or "Pendiente"
-        fmt = formato_de_fila(d)
-        if not d.get("Formato"):
-            reg.escribir(fila, {"Formato": config.FORMATOS[fmt]})  # Excel antiguo: se rellena el hueco
-            formato_puesto += 1
-        hallado = donde.get(clip.lower())
-        if not hallado:
-            if estado == "Pendiente":
-                reg.escribir(fila, {"Estado": "No encontrado"})
-                cambios.append(f"{d.get('ID')} {clip} [{d.get('Plataforma')}]: Pendiente → No encontrado")
-            continue
-        ruta, sitio = hallado
-        if str(d.get("Ruta") or "") != str(ruta.resolve()):
-            antigua = Path(str(d.get("Ruta") or ""))
-            reg.enlazar(fila, ruta)
-            cambios.append(f"{d.get('ID')} {clip} [{d.get('Plataforma')}]: ruta → {ruta.parent.name}")
-            txt_viejo = txt.ruta_txt(antigua, fmt) if d.get("Ruta") else None
-            if txt_viejo and txt_viejo.exists() and not antigua.exists():
-                txt_viejo.unlink()  # el .txt se quedó atrás al mover el MP4; se rehace junto al MP4
-        nuevo = None
-        if sitio == "publicado" and estado in ("Pendiente", "No encontrado"):
-            nuevo = "Publicado"
-            if not d.get("Fecha publicación"):
-                reg.escribir(fila, {"Fecha publicación": hoy})
-        elif sitio == "pendiente" and estado == "No encontrado":
-            nuevo = "Pendiente"
-        if nuevo:
-            reg.escribir(fila, {"Estado": nuevo})
-            cambios.append(f"{d.get('ID')} {clip} [{d.get('Plataforma')}]: {estado} → {nuevo}")
-        if not txt.ruta_txt(ruta, fmt).exists():
-            txt_rehechos.add((clip, ruta))
-
-    if cambios or formato_puesto or reg.columnas_nuevas:
+    res = _detectar(p, reg, pend, publ, dt.date.today())
+    if res["cambios"] or res["formato_puesto"] or reg.columnas_nuevas:
         try:
             reg.guardar()
         except RegistroBloqueado as e:
             print(f"[!] {e}")
             return 2
-    for clip, ruta in sorted(txt_rehechos):
-        txt.escribir(p, ruta, _filas_de_clip(reg, clip))
+    _aplicar_archivos(p, reg, res)
 
-    print(f"Sincronizado {p.nombre}: {len(cambios)} cambio(s), {len(txt_rehechos)} .txt regenerado(s).")
+    print(f"Sincronizado {p.nombre}: {len(res['cambios'])} cambio(s), {len(res['txt_rehacer'])} .txt regenerado(s).")
     if reg.columnas_nuevas:
         print(f"  columnas añadidas al Excel: {', '.join(reg.columnas_nuevas)}")
-    if formato_puesto:
-        print(f"  Formato rellenado en {formato_puesto} fila(s) que lo tenían vacío.")
-    for c in cambios:
+    if res["formato_puesto"]:
+        print(f"  Formato rellenado en {res['formato_puesto']} fila(s) que lo tenían vacío.")
+    for c in res["cambios"]:
         print(f"  - {c}")
     return 0
 
@@ -480,15 +552,30 @@ def cmd_auditar(args) -> int:
     """Solo informe: no reescribe nada. Checklist en referencias/auditoria_copy.md.
 
     --solo-estilo: solo estilo y emojis (+ cebos y cierres vacíos): sin gancho, CTA, hashtags ni
-    longitud. Lo usa TheHistoria para el texto de las slides. --json: lista JSON por stdout.
+    longitud. CONTRATO con TheHistoria (no cambiarlo sin avisar al CEO):
+      copys.py auditar --solo-estilo --json --proyecto <id> --texto "a" [--texto "b" …]
+      copys.py auditar --solo-estilo --json --proyecto <id> --stdin   (lista JSON de cadenas)
+    → stdout: lista JSON (ASCII) de {i, nivel, regla, fragmento, mensaje}; i = índice del texto.
+    Con --proyecto aplica también la identidad (palabras prohibidas, primera persona y
+    voz.emojis_max); sin él, como siempre (estilo y emojis del único proyecto, o 0 emojis).
+    Código de salida: 0 sin errores · 1 con errores · 2 uso incorrecto.
     """
     def fallo(msg: str) -> int:
         print(msg, file=sys.stderr if args.json else sys.stdout)
         return 2
 
-    if sum(bool(x) for x in (args.entrada, args.texto, args.banco)) != 1:
-        return fallo("[!] Usa una (y solo una) de: --entrada <tanda>, --texto \"...\" o --banco.")
-    items = []  # (etiqueta, copy, conf_plataforma, nombre_plataforma, contexto)
+    if sum(bool(x) for x in (args.entrada, args.texto, args.stdin, args.banco)) != 1:
+        return fallo("[!] Usa una (y solo una) de: --entrada <tanda>, --texto \"...\" (repetible), --stdin o --banco.")
+    textos = list(args.texto or [])
+    if args.stdin:
+        try:
+            datos = json.loads(sys.stdin.buffer.read().decode("utf-8-sig") or "null")
+        except Exception as e:
+            return fallo(f"[!] --stdin: no es JSON válido ({e}).")
+        if not isinstance(datos, list) or not all(isinstance(x, str) for x in datos):
+            return fallo("[!] --stdin espera una lista JSON de cadenas: [\"texto 1\", \"texto 2\"].")
+        textos = datos
+    items = []  # (i, etiqueta, copy, conf, nombre_plataforma, contexto, identidad)
     p = None
     if args.entrada:
         tanda = leer_json(Path(args.entrada))
@@ -498,36 +585,40 @@ def cmd_auditar(args) -> int:
             for pid, b in (c.get("plataformas") or {}).items():
                 if pid in (p.conf.get("plataformas") or {}):
                     nombre = p.nombre_plataforma(pid)
-                    conf = p.conf_formato(pid, fmt) if p.admite(pid, fmt) else p.plataforma(pid)
-                    items.append((f"{c.get('clip')} · {nombre}", b.get("copy") or "", conf, nombre, c.get("contexto")))
+                    conf = p.conf_formato(pid, fmt) if p.admite(pid, fmt) else p.conf_formato(pid)
+                    items.append((len(items), f"{c.get('clip')} · {nombre}", b.get("copy") or "", conf, nombre,
+                                  c.get("contexto"), p.identidad))
     else:
         try:
             p = _proyecto(args.proyecto)
             pid = args.plataforma or p.plataformas_activas()[0]
-            conf, nombre = p.plataforma(pid), p.nombre_plataforma(pid)
+            conf, nombre = p.conf_formato(pid), p.nombre_plataforma(pid)
         except proy.ErrorProyecto:
-            if not (args.solo_estilo and args.texto):
+            if args.proyecto or not (args.solo_estilo and textos):
                 raise
-            conf, nombre = {"emojis_max": 0}, ""  # sin proyecto claro: estilo con 0 emojis
-        if args.texto:
-            items.append(("texto", args.texto, conf, nombre, None))
-        else:
+            p, conf, nombre = None, {"emojis_max": 0}, ""  # sin proyecto claro: estilo con 0 emojis
+        if args.banco:
+            ident = p.identidad
             grupos = {"genericos": p.banco.get("genericos") or []}
             grupos.update(p.banco.get("por_oferta") or {})
             for grupo, copys in grupos.items():
-                for i, copy in enumerate(copys, 1):
-                    items.append((f"{grupo} {i}", copy, conf, nombre, None))
+                for n, copy in enumerate(copys, 1):
+                    items.append((len(items), f"{grupo} {n}", copy, conf, nombre, None, ident))
+        else:
+            ident = p.identidad if (p and args.proyecto) else None  # la identidad, solo con --proyecto
+            for i, t in enumerate(textos):
+                items.append((i, f"texto {i + 1}" if len(textos) > 1 else "texto", t, conf, nombre, None, ident))
 
-    resultados = [(et, copy, audit.auditar(copy, conf, ctx, nombre, solo_estilo=args.solo_estilo))
-                  for et, copy, conf, nombre, ctx in items]
-    hay_error = any(h.nivel == "error" for _, _, hs in resultados for h in hs)
+    resultados = [(i, et, copy, audit.auditar(copy, conf, ctx, nombre, solo_estilo=args.solo_estilo, identidad=ident))
+                  for i, et, copy, conf, nombre, ctx, ident in items]
+    hay_error = any(h.nivel == "error" for *_, hs in resultados for h in hs)
 
     if args.json:
         lista = []
-        for et, _, hs in resultados:
+        for i, et, _, hs in resultados:
             for h in hs:
-                d = {"nivel": h.nivel, "regla": h.regla, "fragmento": h.fragmento, "mensaje": h.mensaje}
-                if not args.texto:
+                d = {"i": i, "nivel": h.nivel, "regla": h.regla, "fragmento": h.fragmento, "mensaje": h.mensaje}
+                if args.entrada or args.banco:
                     d["pieza"] = et
                 lista.append(d)
         # ASCII puro: se lee bien desde cualquier consola o subprocess de Windows
@@ -537,7 +628,7 @@ def cmd_auditar(args) -> int:
     modo = " · solo estilo" if args.solo_estilo else ""
     print(f"Auditoría{' · ' + p.nombre if p else ''}{modo} · checklist: referencias/auditoria_copy.md")
     n_err = n_av = n_ok = 0
-    for etiqueta, copy, hs in resultados:
+    for _, etiqueta, copy, hs in resultados:
         errores = [h for h in hs if h.nivel == "error"]
         avisos = [h for h in hs if h.nivel == "aviso"]
         n_err += bool(errores)
@@ -560,19 +651,10 @@ def cmd_hashtags(args) -> int:
     """Banco temático por tamaño, reglas de la plataforma y últimos conjuntos usados."""
     p = _proyecto(args.proyecto)
     pid = args.plataforma or p.plataformas_activas()[0]
-    nombre, reglas = p.nombre_plataforma(pid), (p.plataforma(pid).get("hashtags") or {})
+    nombre, reglas = p.nombre_plataforma(pid), p.reglas_hashtags(pid)
     fijos = p.fijos(pid)
     fijos_txt = " ".join(f"{t} ({p.tamano_hashtag(t) or '?'})" for t in fijos) or "(ninguno)"
-    partes = [f"fijos: {fijos_txt}",
-              f"temáticos {reglas.get('tematicos_min', 0)}–{reglas.get('tematicos_max', '…')}"]
-    tmax = reglas.get("total_max") or reglas.get("max_total")
-    if reglas.get("total_min") or tmax:
-        partes.append(f"total {reglas.get('total_min', 0)}–{tmax or '…'} con los fijos")
-    if "nicho_min" in reglas:
-        partes.append(f"mín. {reglas['nicho_min']} de nicho")
-    if "amplios_max" in reglas:
-        partes.append(f"máx. {reglas['amplios_max']} amplio(s)")
-    print(f"{p.nombre} · {nombre}: " + " · ".join(partes))
+    print(f"{p.nombre} · {nombre}: fijos {fijos_txt} · {p.texto_reglas_hashtags(pid)}")
     if p.hashtags.get("_tamanos"):
         print(f"Tamaños: {p.hashtags['_tamanos']}")
     for tema, g in p.banco_por_tamano().items():
@@ -602,6 +684,8 @@ def cmd_calendario(args) -> int:
         return 1
     excel = _excel(args, p)
     carpeta_hist = _carpeta(p, args.carpeta_historias, p.carpeta_historias, "--carpeta-historias")
+    pend = _carpeta(p, getattr(args, "pendiente", None), p.carpeta_pendiente, "--pendiente")
+    publ = _carpeta(p, getattr(args, "publicado", None), p.carpeta_publicado, "--publicado")
     hoy = cal.hoy_en(cfg.zona)
     if not excel.exists():
         msg = f"Aún no hay registro para {p.nombre} ({excel}): no hay piezas en el calendario."
@@ -609,15 +693,39 @@ def cmd_calendario(args) -> int:
             msg += f" Tampoco existe la carpeta de historias {carpeta_hist} (la crea el CEO)."
         print(json.dumps({"aviso": msg}, ensure_ascii=True) if getattr(args, "json", False) else msg)
         return 0
+    reg = Registro(excel, p)
+    # Detección por carpeta antes de nada: lo que está en publicados es Publicado (nunca ATRASADO
+    # ni se replanifica). En `hoy` y `ver` solo en memoria; `planificar` lo guarda.
+    ambas = bool(pend and publ and pend.exists() and publ.exists())
+    sync = _detectar(p, reg, pend, publ, hoy, no_encontrado=ambas)
     acciones = {"planificar": _cal_planificar, "hoy": _cal_hoy, "ver": _cal_ver}
-    return acciones[args.accion](args, p, cfg, excel, carpeta_hist, hoy)
+    return acciones[args.accion](args, p, cfg, excel, reg, sync, carpeta_hist, hoy)
 
 
-def _cal_planificar(args, p, cfg, excel: Path, carpeta_hist: Path | None, hoy: dt.date) -> int:
+def _piezas(p, reg: Registro, sync: dict, buscador=None) -> list:
+    piezas = cal.piezas_de_registro(p, reg, buscador)
+    for pz in piezas:
+        pz.en_publicados = pz.clip.lower() in sync["publicados"]
+    return piezas
+
+
+def _linea_sync(sync: dict, guardado: bool) -> str | None:
+    if not sync["cambios"]:
+        return None
+    pub = [c for c in sync["cambios"] if c.endswith("→ Publicado")]
+    otros = len(sync["cambios"]) - len(pub)
+    partes = [f"{len(pub)} publicada(s) según la carpeta"] if pub else []
+    if otros:
+        partes.append(f"{otros} cambio(s) de estado o ruta")
+    cola = "guardado en el Excel" if guardado else "sin guardar: copys.py sincronizar lo guarda"
+    return f"Carpetas: {', '.join(partes)} ({cola})."
+
+
+def _cal_planificar(args, p, cfg, excel: Path, reg: Registro, sync: dict, carpeta_hist: Path | None,
+                    hoy: dt.date) -> int:
     inicio = _fecha_arg(args.desde, "--desde") or hoy + dt.timedelta(days=1)
     semanas = args.semanas or cfg.semanas
-    reg = Registro(excel, p)
-    piezas = cal.piezas_de_registro(p, reg, BuscadorMetadatos(p))
+    piezas = _piezas(p, reg, sync, BuscadorMetadatos(p))
     ilegibles = [pz for pz in piezas if pz.fecha is None and _celda_llena(reg, pz, "Fecha prevista")]
     for pz in ilegibles:
         pz.estado = "Descartado"  # no se planifica (ni se pisa lo escrito) hasta que se corrija
@@ -671,6 +779,7 @@ def _cal_planificar(args, p, cfg, excel: Path, carpeta_hist: Path | None, hoy: d
         except RegistroBloqueado as e:
             print(json.dumps({"error": str(e)}, ensure_ascii=True) if args.json else f"[!] {e}")
             return 2
+        _aplicar_archivos(p, reg, sync)
         dir_cal.mkdir(parents=True, exist_ok=True)
         for b in balances:
             mds[b["semana"]].write_text(cal.md_semana(p, cfg, b, vivas, hist_por_dia, carpeta_hist, hoy, inicio),
@@ -680,6 +789,7 @@ def _cal_planificar(args, p, cfg, excel: Path, carpeta_hist: Path | None, hoy: d
         out = {
             "proyecto": p.id, "simulacion": bool(args.simular), "hoy": hoy.isoformat(),
             "desde": inicio.isoformat(), "hasta": fin.isoformat(), "excel": str(excel),
+            "carpetas": sync["cambios"],
             "asignadas": [pz.resumen() for pz in res["asignadas"]],
             "replanificadas": [{**pz.resumen(), "fecha_antes": pz.fecha_antes.isoformat()} for pz in res["movidas"]],
             "horas_puestas": [pz.resumen() for pz in res["horas"]],
@@ -699,6 +809,9 @@ def _cal_planificar(args, p, cfg, excel: Path, carpeta_hist: Path | None, hoy: d
 
     print(f"Calendario {p.nombre} · desde {cal.dia_corto(inicio)}/{inicio:%Y} · {len(balances)} semana(s): "
           f"{balances[0]['semana']} a {balances[-1]['semana']}" + ("  [simulación: no se escribe nada]" if args.simular else ""))
+    linea = _linea_sync(sync, not args.simular)
+    if linea:
+        print(linea)
     if res["asignadas"]:
         print(f"\nAsignadas {len(res['asignadas'])} pieza(s):")
         for pz in sorted(res["asignadas"], key=lambda x: x.momento):
@@ -744,17 +857,18 @@ def _celda_llena(reg: Registro, pz, col: str) -> bool:
     return any(reg.ws.cell(row=f, column=reg.col[col]).value not in (None, "") for f in pz.filas)
 
 
-def _cal_hoy(args, p, cfg, excel: Path, carpeta_hist: Path | None, hoy: dt.date) -> int:
+def _cal_hoy(args, p, cfg, excel: Path, reg: Registro, sync: dict, carpeta_hist: Path | None, hoy: dt.date) -> int:
     fecha = _fecha_arg(args.fecha, "--fecha") or hoy
-    reg = Registro(excel, p)
-    piezas = cal.piezas_de_registro(p, reg)
+    piezas = _piezas(p, reg, sync)
     print(cal.texto_hoy(p, cfg, piezas, fecha, hoy, cal.historias_por_dia(reg.historias()), carpeta_hist))
+    linea = _linea_sync(sync, False)
+    if linea:
+        print("\n" + linea)
     return 0
 
 
-def _cal_ver(args, p, cfg, excel: Path, carpeta_hist: Path | None, hoy: dt.date) -> int:
-    reg = Registro(excel, p)
-    piezas = cal.piezas_de_registro(p, reg)
+def _cal_ver(args, p, cfg, excel: Path, reg: Registro, sync: dict, carpeta_hist: Path | None, hoy: dt.date) -> int:
+    piezas = _piezas(p, reg, sync)
     hist_por_dia = cal.historias_por_dia(reg.historias())
     manana = hoy + dt.timedelta(days=1)
     if args.semana:
@@ -770,6 +884,9 @@ def _cal_ver(args, p, cfg, excel: Path, carpeta_hist: Path | None, hoy: dt.date)
         n = min(((max(futuras, default=w0) - w0).days // 7) + 1, 8)
         semanas = [w0 + k * cal.UNA_SEMANA for k in range(n)]
     print(f"Calendario {p.nombre} · hoy {cal.dia_corto(hoy)}/{hoy:%Y}")
+    linea = _linea_sync(sync, False)
+    if linea:
+        print(linea)
     for w in semanas:
         b = cal.balance(w, piezas, cfg, manana, dt.date.max, hist_por_dia, hoy)
         print("\n" + cal.linea_semana(b))
@@ -799,6 +916,41 @@ def _cal_ver(args, p, cfg, excel: Path, carpeta_hist: Path | None, hoy: dt.date)
     return 0
 
 
+def cmd_brief(args) -> int:
+    """Lo único que el subagente necesita leer (junto con la tanda) para escribir los copys."""
+    p = _proyecto(args.proyecto)
+    excel = _excel(args, p)
+    recientes = _hashtags_recientes(p, Registro(excel, p)) if excel.exists() else {}
+    print(brf.brief(p, recientes))
+    return 0
+
+
+def campos_json(p: proy.Proyecto) -> dict:
+    """CONTRATO con TheHistoria (`copys.py campos --json`): no cambiar el formato sin avisar al CEO."""
+    def valores(cid: str) -> list[str]:
+        campo = p.campo(cid)
+        vals = p.valores_campo(campo) if campo else None
+        return list(vals) if vals else []
+    objetivos = valores("objetivo")
+    mapa = {f: [o for o in objs if not objetivos or o in objetivos] for f, objs in config.FORMULA_OBJETIVOS.items()}
+    return {"formulas": list(config.FORMULAS_CARRUSEL), "objetivos": objetivos, "pilares": valores("pilar"),
+            "formula_objetivos": mapa}
+
+
+def cmd_campos(args) -> int:
+    p = _proyecto(args.proyecto)
+    datos = campos_json(p)
+    if args.json:
+        print(json.dumps(datos, ensure_ascii=True))
+        return 0
+    print(f"{p.nombre} · campos para carruseles y piezas")
+    print(f"  fórmulas:  {', '.join(datos['formulas'])}")
+    print(f"  objetivos: {', '.join(datos['objetivos'])}")
+    print(f"  pilares:   {', '.join(datos['pilares'])}")
+    print("  fórmula → objetivo: " + " · ".join(f"{f} → {'/'.join(o)}" for f, o in datos["formula_objetivos"].items()))
+    return 0
+
+
 def cmd_nuevo_proyecto(args) -> int:
     """Crea proyectos/<id>/ desde la plantilla (solo en TheCopy) y dice qué falta rellenar.
 
@@ -809,7 +961,7 @@ def cmd_nuevo_proyecto(args) -> int:
         raise proy.ErrorProyecto(f"El prefijo {args.prefijo.upper()} ya lo usa el proyecto "
                                  f"'{proy.prefijos_usados()[args.prefijo.upper()]}': elige otro con --prefijo.")
     destino, ceo = proy.crear(args.id, args.nombre, args.prefijo, args.tipo)
-    p = proy.Proyecto(args.id)
+    p = proy.Proyecto(args.id, exigir_identidad=False)
     print(f"[OK] Proyecto '{p.id}' creado en {destino}")
     print(f"  nombre: {p.nombre} · tipo: {p.tipo or '(sin tipo)'} · IDs: {p.prefijo_id}-0001… · "
           f"registro: {p.registro_path.name}")
@@ -829,9 +981,8 @@ def cmd_nuevo_proyecto(args) -> int:
     for que, c in (("pendiente", p.carpeta_pendiente), ("publicado", p.carpeta_publicado),
                    ("historias", p.carpeta_historias)):
         print(f"  {que:<10} {c}  " + ("[ok]" if c and c.exists() else "[NO EXISTE: avisa al CEO]"))
-    for c, transicion in p.carpetas_contexto():
-        if not transicion:
-            print(f"  {'contexto':<10} {c}  " + ("[ok]" if c.exists() else "[aún no existe: la crean TheEditor/el CEO]"))
+    for c in p.carpetas_contexto():
+        print(f"  {'contexto':<10} {c}  " + ("[ok]" if c.exists() else "[aún no existe: la crean TheEditor/el CEO]"))
 
     print("\nFalta rellenar (pregunta a Sergio lo que no sepas; no lo inventes):")
     for x in p.sin_rellenar():
@@ -848,6 +999,15 @@ def main() -> int:
 
     sub.add_parser("proyectos", help="Lista los proyectos y sus plataformas activas.")
 
+    s = sub.add_parser("brief", help="Todo lo necesario para escribir los copys (identidad, reglas, ofertas, "
+                                     "plataformas y hashtags), en compacto.")
+    s.add_argument("--proyecto")
+    s.add_argument("--excel", help="Registro alternativo (pruebas): últimos hashtags usados.")
+
+    s = sub.add_parser("campos", help="Fórmulas, objetivos, pilares y fórmula → objetivo (contrato con TheHistoria).")
+    s.add_argument("--proyecto")
+    s.add_argument("--json", action="store_true", help="JSON (ASCII) para TheHistoria.")
+
     s = sub.add_parser("pendientes", help="Crea una tanda con las piezas (Reels y carruseles) que aún no tienen copy.")
     s.add_argument("--proyecto")
     s.add_argument("--carpeta", help="Carpeta de piezas (def. la 'pendiente' del proyecto).")
@@ -861,9 +1021,17 @@ def main() -> int:
     s.add_argument("--entrada", required=True)
     s.add_argument("--proyecto", help="Opcional: si se da, tiene que ser el de la tanda.")
     s.add_argument("--excel", help="Registro alternativo (pruebas).")
-    s.add_argument("--simular", action="store_true", help="Solo valida y muestra; no escribe nada.")
+    s.add_argument("--simular", action="store_true", help="Solo valida y resume; no escribe nada.")
     s.add_argument("--reemplazar", action="store_true", help="Sobrescribe el copy de piezas ya registradas.")
+    s.add_argument("--planificar", action="store_true",
+                   help="Después de registrar, calendario planificar (termina con la línea FALTAN).")
+    s.add_argument("--estricto", action="store_true",
+                   help="No escribe si quedan avisos de estilo que no sean literales del clip.")
+    s.add_argument("--verbose", action="store_true", help="Enseña el texto completo de cada plataforma.")
     s.add_argument("--sin-txt", action="store_true", help="No escribe el .txt.")
+    s.add_argument("--pendiente", help="Carpeta pendiente alternativa (pruebas; la usa --planificar).")
+    s.add_argument("--publicado", help="Carpeta publicados alternativa (pruebas; la usa --planificar).")
+    s.add_argument("--carpeta-historias", help="Carpeta de historias alternativa (pruebas; la usa --planificar).")
 
     s = sub.add_parser("sincronizar", help="Actualiza Estado/ruta según dónde esté cada MP4 o carpeta de carrusel.")
     s.add_argument("--proyecto")
@@ -883,14 +1051,15 @@ def main() -> int:
 
     s = sub.add_parser("auditar", help="Audita copys (gancho, cebos, estilo). Solo informe, no reescribe.")
     s.add_argument("--entrada", help="Tanda JSON (usa el contexto de la pieza para las frases literales).")
-    s.add_argument("--texto", help="Un texto suelto.")
+    s.add_argument("--texto", action="append", help="Texto suelto (repetible; en el JSON, i = su índice).")
+    s.add_argument("--stdin", action="store_true", help="Lee de stdin una lista JSON de cadenas.")
     s.add_argument("--banco", action="store_true", help="Audita banco_copys.json del proyecto.")
     s.add_argument("--proyecto", help="Para --texto/--banco; con --entrada, si se da, tiene que ser el de la tanda.")
     s.add_argument("--plataforma", help="Reglas de esta plataforma para --texto/--banco (def. la 1.ª activa).")
     s.add_argument("--solo-estilo", action="store_true",
                    help="Solo estilo y emojis (+ cebos y cierres vacíos): sin gancho, CTA, hashtags ni longitud.")
     s.add_argument("--json", action="store_true",
-                   help="Lista JSON de {nivel, regla, fragmento, mensaje} por stdout. Sale con 1 si hay errores.")
+                   help="Lista JSON de {i, nivel, regla, fragmento, mensaje} por stdout. Sale con 1 si hay errores.")
 
     s = sub.add_parser("hashtags", help="Banco de hashtags por tamaño, reglas y últimos conjuntos usados.")
     s.add_argument("--proyecto")
@@ -905,6 +1074,8 @@ def main() -> int:
         x.add_argument("--proyecto")
         x.add_argument("--excel", help="Registro alternativo (pruebas). Los .md van a <carpeta del Excel>/calendario/.")
         x.add_argument("--carpeta-historias", help="Carpeta de historias alternativa (def. calendario.historias.carpeta).")
+        x.add_argument("--pendiente", help="Carpeta pendiente alternativa (pruebas).")
+        x.add_argument("--publicado", help="Carpeta publicados alternativa (pruebas).")
 
     c = cs.add_parser("planificar", help="Pone fecha y hora a lo registrado y pendiente sin fecha; reparte historias.")
     comunes(c)
@@ -928,7 +1099,8 @@ def main() -> int:
     s.add_argument("--tipo", choices=list(config.TIPOS), help="largos | clipping (def. el del índice del CEO).")
 
     args = ap.parse_args()
-    ordenes = {"proyectos": cmd_proyectos, "pendientes": cmd_pendientes, "registrar": cmd_registrar,
+    ordenes = {"proyectos": cmd_proyectos, "brief": cmd_brief, "campos": cmd_campos,
+               "pendientes": cmd_pendientes, "registrar": cmd_registrar,
                "sincronizar": cmd_sincronizar, "ver": cmd_ver, "banco": cmd_banco,
                "auditar": cmd_auditar, "hashtags": cmd_hashtags, "calendario": cmd_calendario,
                "nuevo-proyecto": cmd_nuevo_proyecto}
@@ -936,7 +1108,8 @@ def main() -> int:
         return ordenes[args.orden](args)
     except proy.ErrorProyecto as e:
         print(f"[!] {e}", file=sys.stderr if getattr(args, "json", False) else sys.stdout)
-        return 1
+        # auditar y campos: 1 = «hay errores en el texto» (contrato); un fallo de configuración es 2
+        return 2 if args.orden in ("auditar", "campos") else 1
     except RegistroBloqueado as e:
         print(f"[!] {e}", file=sys.stderr if getattr(args, "json", False) else sys.stdout)
         return 2

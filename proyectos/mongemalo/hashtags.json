@@ -1,6 +1,6 @@
 {
   "_fuente": "fuentes/Copys_MongeMalo.pdf + fuentes/Hasktask.txt. Banco ampliado y clasificado por tamaño el 2026-10-13 (estrategia de tamaños adaptada de sergebulaev/instagram-skills, MIT).",
-  "_regla": "Instagram: 3–5 hashtags en total contando el fijo #grupoalfa (lo pone el script): 2–3 de nicho, 1–2 medios y como mucho 1 amplio. Se rotan por tema: no repetir siempre el mismo bloque. TikTok/YouTube (inactivas): sus fijos + 1–2 temáticos.",
+  "_regla": "Las cifras (temáticos, total con los fijos, nicho, amplios, rotación) están SOLO en proyecto.json → plataformas.<p>.hashtags; copys.py brief las enseña.",
   "_tamanos": "ESTIMADOS por especificidad (la API no da el nº de publicaciones): verificar en el buscador de IG. nicho < 50k publicaciones · medio 50k–500k · amplio > 500k.",
   "fijos": {
     "instagram": ["#grupoalfa"],

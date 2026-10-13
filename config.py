@@ -7,9 +7,11 @@ registrada la relación pieza ↔ copy ↔ hashtags (Excel por proyecto + un .tx
 junto a cada MP4 o dentro de la carpeta del carrusel). Con el calendario, además,
 le pone fecha y hora de publicación a lo aprobado.
 
-El código es GENÉRICO: no sabe nada de ningún proyecto concreto. Todo lo
-específico (tono, ofertas, CTA, hashtags, plataformas, carpetas, calendario) vive
-en `proyectos/<id>/`. Un proyecto nuevo = `copys.py nuevo-proyecto <id>` (copia
+El código es GENÉRICO: no sabe nada de ningún proyecto concreto. La IDENTIDAD de
+cada proyecto (cuenta, landing, voz, tono, emojis, palabras prohibidas) se lee del
+índice del CEO (`CEO_Sergete/proyectos.json` → proyectos[].identidad); lo propio de
+TheCopy (reglas del copy, ofertas, CTA, hashtags, plataformas, carpetas, calendario)
+vive en `proyectos/<id>/`. Un proyecto nuevo = `copys.py nuevo-proyecto <id>` (copia
 `proyectos/_plantilla/`). Las rutas de proyecto.json son relativas a PruebasIA/ y
 admiten la plantilla `<id>` (se sustituye por el id del proyecto).
 """
@@ -26,7 +28,8 @@ TANDAS_DIR = PROJECT_ROOT / "tandas"          # una subcarpeta por proyecto: tan
 # --- Hermanos (PruebasIA/) ---
 PRUEBAS_IA = PROJECT_ROOT.parent
 CEO_ROOT = PRUEBAS_IA / "CEO_Sergete"
-# Índice común de proyectos del CEO (solo se LEE: nombre, tipo, prefijo… al crear uno).
+# Índice común de proyectos del CEO (solo se LEE): nombre, tipo y prefijo al crear un
+# proyecto, y la IDENTIDAD de cada uno (fuente única: no se copia en proyecto.json).
 INDICE_PROYECTOS = CEO_ROOT / "proyectos.json"
 
 # Id de proyecto: minúsculas, sin espacios (letras, números, _ y -).
@@ -56,14 +59,9 @@ CONTEXTO_POR_DEFECTO = [
     "TheEditor/proyectos/<id>/transcripciones",
     "_Historico/<id>",
 ]
-# Ruta ANTIGUA de TheEditor (sin proyecto), solo durante la transición: se mira únicamente
-# si el clip no aparece en las carpetas del proyecto, y el contexto sale con un aviso.
-CONTEXTO_TRANSICION = [
-    "TheEditor/transcripciones",
-]
 
-# Fragmento de transcripción que se pasa como contexto (caracteres máx.).
-MAX_CHARS_TRANSCRIPCION = 1500
+# Fragmento de transcripción que se pasa como contexto en la tanda (caracteres máx.).
+MAX_CHARS_TRANSCRIPCION = 1000
 
 # Extensiones de vídeo que se consideran "clip" (Reel).
 EXT_VIDEO = {".mp4", ".mov", ".m4v"}
@@ -83,6 +81,14 @@ FORMULAS_CARRUSEL = {
     "IG6_antes_despues": "Antes/después",
     "IG7_mitos": "Mitos",
     "IG8_metodo": "Método",
+}
+# Objetivo(s) para los que rinde cada fórmula. FUENTE ÚNICA: TheHistoria la lee con
+# `copys.py campos --json --proyecto <id>` (contrato: no cambiar el formato).
+FORMULA_OBJETIVOS = {
+    "IG5_lista": ["guardados"],
+    "IG6_antes_despues": ["guardados", "seguidores"],
+    "IG7_mitos": ["compartidos"],
+    "IG8_metodo": ["guardados"],
 }
 
 # Historias de IG (para el calendario): archivos que cuentan como historia.

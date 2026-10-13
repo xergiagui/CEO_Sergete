@@ -1,6 +1,5 @@
 {
-  "_uso": "Referencia de TONO para escribir copys a medida, y de RESERVA cuando un clip no tiene contexto.",
-  "cta_generico": "Todo en el link de la bio.",
+  "_uso": "De RESERVA cuando un clip trae `aviso` (sin contexto): elegir uno '(libre)' con `copys.py banco` y adaptarlo. El CTA genérico está en ofertas.json → generico.cta.",
   "genericos": [],
   "por_oferta": {}
 }

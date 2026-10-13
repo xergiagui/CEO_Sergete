@@ -1,5 +1,5 @@
 {
-  "_regla": "Por post: los FIJOS de la plataforma (se añaden solos) + los TEMÁTICOS que marque proyecto.json (tematicos_min..tematicos_max). Instagram: 3–5 en total contando los fijos: 2–3 de nicho, 1–2 medios y como mucho 1 amplio. Rotar por tema: no repetir siempre el mismo bloque.",
+  "_regla": "Por post: los FIJOS de la plataforma (se añaden solos) + los TEMÁTICOS del banco. Las cifras (temáticos, total con los fijos, nicho, amplios, rotación) están SOLO en proyecto.json → plataformas.<p>.hashtags y tienen que cuadrar con el nº de fijos de aquí.",
   "_tamanos": "ESTIMADOS por especificidad (la API no da el nº de publicaciones): verificar en el buscador de IG. nicho < 50k publicaciones · medio 50k–500k · amplio > 500k. El formato antiguo (tema → lista) también vale, pero sin tamaños.",
   "fijos": {
     "instagram": [],

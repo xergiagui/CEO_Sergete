@@ -12,11 +12,14 @@ tiene una subcarpeta por vídeo:
             Lo que escribe procesar_batch_clip.py: la transcripción del clip entero y,
             si existe, el gancho de texto que se le quemó.
 
-Durante la transición también se mira la ruta antigua `TheEditor/transcripciones/`
-(sin proyecto), solo si el clip no sale en las del proyecto y con un aviso.
+El contexto que va a la tanda es el mínimo para escribir el copy (CAMPOS_CORTE +
+transcripción recortada a config.MAX_CHARS_TRANSCRIPCION): sin rutas ni tiempos.
+Si dos carpetas de vídeo tienen el mismo .srt (mismo hash), se avisa: una de las dos
+está mal copiada y los clips pueden coger la transcripción equivocada.
 """
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,7 +27,8 @@ from pathlib import Path
 import config
 from lib.util import leer_json
 
-CAMPOS_CORTE = ("titulo", "frase_viral", "gancho_texto", "angle", "category", "rationale", "inicio", "fin")
+# Lo que pasa a la tanda de cada entrada de cortes.json (ni rationale, ni inicio/fin, ni rutas).
+CAMPOS_CORTE = ("titulo", "frase_viral", "gancho_texto", "angle", "category")
 
 
 @dataclass
@@ -32,7 +36,6 @@ class Candidato:
     carpeta: Path            # carpeta del vídeo (o de la tanda de clipping)
     fuente: Path             # cortes.json o textos/<clip>.txt
     entrada: dict | None     # entrada de cortes.json (largos) o None (clipping)
-    transicion: bool         # viene de la ruta antigua sin proyecto
 
     @property
     def mtime(self) -> float:
@@ -42,10 +45,18 @@ class Candidato:
             return 0.0
 
 
-def _indexar(proyecto) -> dict[str, list[Candidato]]:
-    """nombre_clip (sin extensión) -> candidatos en las carpetas de contexto del proyecto."""
+def _hash(path: Path) -> str | None:
+    try:
+        return hashlib.md5(path.read_bytes()).hexdigest()
+    except OSError:
+        return None
+
+
+def _indexar(proyecto) -> tuple[dict[str, list[Candidato]], dict[Path, list[Path]]]:
+    """(nombre_clip → candidatos, carpeta → otras carpetas con el mismo .srt)."""
     indice: dict[str, list[Candidato]] = {}
-    for base, transicion in proyecto.carpetas_contexto():
+    por_hash: dict[str, list[Path]] = {}
+    for base in proyecto.carpetas_contexto():
         if not base.exists():
             continue
         for cortes in base.glob("*/cortes.json"):
@@ -56,10 +67,15 @@ def _indexar(proyecto) -> dict[str, list[Candidato]]:
             for e in entradas if isinstance(entradas, list) else []:
                 if isinstance(e, dict) and e.get("nombre"):
                     nombre = Path(str(e["nombre"])).stem if str(e["nombre"]).lower().endswith(".mp4") else str(e["nombre"])
-                    indice.setdefault(nombre, []).append(Candidato(cortes.parent, cortes, e, transicion))
+                    indice.setdefault(nombre, []).append(Candidato(cortes.parent, cortes, e))
+            srts = sorted(cortes.parent.glob("*.srt"))
+            h = _hash(srts[0]) if srts else None
+            if h:
+                por_hash.setdefault(h, []).append(cortes.parent)
         for txt in base.glob("*/textos/*.txt"):
-            indice.setdefault(txt.stem, []).append(Candidato(txt.parent.parent, txt, None, transicion))
-    return indice
+            indice.setdefault(txt.stem, []).append(Candidato(txt.parent.parent, txt, None))
+    duplicados = {c: [o for o in grupo if o != c] for grupo in por_hash.values() if len(grupo) > 1 for c in grupo}
+    return indice, duplicados
 
 
 def _seg(ts: str) -> float:
@@ -111,14 +127,25 @@ def _gancho_clipping(carpeta: Path, nombre: str) -> str:
 class BuscadorMetadatos:
     def __init__(self, proyecto):
         self.proyecto = proyecto
-        self.indice = _indexar(proyecto)
+        self.indice, self.duplicados = _indexar(proyecto)
+
+    @property
+    def avisos(self) -> list[str]:
+        """Avisos generales del contexto (carpetas con el mismo .srt)."""
+        vistos, out = set(), []
+        for c, otros in self.duplicados.items():
+            grupo = tuple(sorted([c.name, *(o.name for o in otros)]))
+            if grupo not in vistos:
+                vistos.add(grupo)
+                out.append("contexto duplicado: " + " y ".join(f"«{g}»" for g in grupo)
+                           + " tienen el mismo .srt (mismo hash); una de las dos está mal copiada y sus clips "
+                             "pueden coger la transcripción equivocada. Avisa al CEO.")
+        return out
 
     def candidatos(self, nombre: str) -> list[Candidato]:
-        """Los del proyecto; los de la ruta antigua solo si no hay ninguno. Más reciente primero."""
+        """Candidatos del clip, el más reciente primero."""
         todos = self.indice.get(Path(nombre).stem if nombre.lower().endswith(tuple(config.EXT_VIDEO)) else nombre, [])
-        propios = [c for c in todos if not c.transicion]
-        elegidos = propios or todos
-        return sorted(elegidos, key=lambda c: c.mtime, reverse=True)
+        return sorted(todos, key=lambda c: c.mtime, reverse=True)
 
     def _resolver(self, nombre: str) -> tuple[Candidato | None, list[Candidato], bool]:
         """(candidato elegido, todos, ambiguo). En clipping, con el nombre en varias carpetas
@@ -147,36 +174,35 @@ class BuscadorMetadatos:
         elegido, cands, ambiguo = self._resolver(nombre)
         if not cands:
             return {"aviso": "Sin contexto (ni cortes.json ni textos/<clip>.txt en las carpetas del proyecto): "
-                             "escribe el copy viendo el vídeo o desde el banco."}
+                             "escribe el copy desde el banco (copys.py banco) o pide al CEO una línea sobre el clip."}
         if elegido is None:
             lista = ", ".join(sorted({c.carpeta.name for c in cands}))
             return {"aviso": f"El nombre «{nombre}» está en {len(cands)} carpetas de clipping ({lista}): no se "
-                             "sabe de cuál es. Pide al CEO la carpeta de origen o una línea sobre el clip.",
-                    "candidatos": sorted({str(c.fuente) for c in cands})}
+                             "sabe de cuál es. Pide al CEO la carpeta de origen o una línea sobre el clip."}
 
         avisos = []
         if elegido.entrada is not None:  # largos: cortes.json + .srt
             e = elegido.entrada
-            ctx = {k: e[k] for k in CAMPOS_CORTE if k in e}
-            ctx["video_carpeta"] = elegido.carpeta.name
-            ctx["fuente"] = str(elegido.fuente)
+            ctx = {k: e[k] for k in CAMPOS_CORTE if e.get(k) not in (None, "")}
             if "inicio" in e and "fin" in e:
                 frag = _fragmento_srt(elegido.carpeta, float(e["inicio"]), float(e["fin"]))
                 if frag:
                     ctx["transcripcion"] = frag
         else:  # clipping: textos/<clip>.txt (+ ganchos.json)
-            ctx = {"video_carpeta": elegido.carpeta.name, "fuente": str(elegido.fuente)}
-            texto = elegido.fuente.read_text(encoding="utf-8-sig", errors="replace")
-            if texto.strip():
-                ctx["transcripcion"] = _recortar(texto)
+            ctx = {}
             gancho = _gancho_clipping(elegido.carpeta, nombre)
             if gancho:
                 ctx["gancho_texto"] = gancho
+            texto = elegido.fuente.read_text(encoding="utf-8-sig", errors="replace")
+            if texto.strip():
+                ctx["transcripcion"] = _recortar(texto)
         if ambiguo:
             avisos.append(f"Nombre repetido en {len(cands)} sitios; se usa el más reciente "
                           f"({elegido.carpeta.name}). Revisa que el contexto cuadra con el clip.")
-        if elegido.transicion:
-            avisos.append("Contexto sacado de la ruta antigua TheEditor/transcripciones (sin proyecto).")
+        otros = self.duplicados.get(elegido.carpeta)
+        if otros:
+            avisos.append(f"La transcripción de «{elegido.carpeta.name}» es idéntica a la de "
+                          + ", ".join(f"«{o.name}»" for o in otros) + ": comprueba que cuadra con el clip.")
         if avisos:
             ctx["aviso"] = " ".join(avisos)
         return ctx

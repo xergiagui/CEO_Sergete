@@ -6,6 +6,11 @@ para alcance, carruseles para guardados, historias para la relación; 4–5 post
 de feed por semana con una mezcla equilibrada de formatos, objetivos y pilares.
 Explicación para personas: referencias/calendario.md.
 
+Antes de nada, `copys.py calendario …` mira las carpetas del proyecto (la misma detección
+que `sincronizar`): lo que está en *publicados* es Publicado, así que nunca sale como
+ATRASADO ni lo mueve --replanificar-atrasados (`hoy` y `ver` solo en memoria; `planificar`
+lo guarda en el Excel).
+
 `copys.py calendario planificar`:
   1. Lee el registro. Una PIEZA = un ID (sus filas por plataforma comparten fecha).
   2. Respeta TODAS las fechas ya puestas: es ESTABLE (volver a ejecutarlo no
@@ -185,6 +190,7 @@ class Pieza:
     orden: tuple = (10 ** 9, "")
     nueva: bool = False                # fecha puesta en esta ejecución
     fecha_antes: dt.date | None = None  # atrasada que se ha replanificado
+    en_publicados: bool = False        # la pieza está en la carpeta de publicados
 
     @property
     def cuando(self) -> dt.date | None:
@@ -199,7 +205,9 @@ class Pieza:
         return config.FORMATOS.get(self.formato, self.formato)
 
     def atrasada(self, hoy: dt.date) -> bool:
-        return self.estado == "Pendiente" and bool(self.fecha) and self.fecha < hoy
+        """Fecha pasada y sin publicar. Lo que está en publicados nunca está atrasado."""
+        return (self.estado == "Pendiente" and not self.en_publicados and bool(self.fecha)
+                and self.fecha < hoy)
 
     def resumen(self) -> dict:
         return {"id": self.id, "pieza": self.clip, "formato": self.formato, "fecha": self.fecha.isoformat()

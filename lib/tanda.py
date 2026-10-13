@@ -1,16 +1,18 @@
 """
-TANDA = el JSON de trabajo de una orden de copys.
+TANDA = el JSON de trabajo de una orden de copys. Las REGLAS no van aquí: están en
+`copys.py brief --proyecto <id>` (un solo sitio).
 
 1) `copys.py pendientes` crea el esqueleto: un bloque por pieza (Reel = MP4 o
-   carrusel = carpeta con carrusel.json) con su contexto y huecos vacíos por cada
-   plataforma activa que admita ese formato.
-2) El subagente `copy` (LLM) rellena los huecos: tema, campos propios
-   (oferta, objetivo, pilar), y por plataforma copy (+ título si aplica) y
-   hashtags TEMÁTICOS. Los fijos los añade el script: no hay que escribirlos.
-   En los carruseles, tema/objetivo/pilar vienen ya de carrusel.json.
-   `copys.py auditar --entrada <tanda>` revisa el estilo antes de registrar.
-3) `copys.py registrar` valida todo (incluida la auditoría) y, si está bien,
-   escribe Excel + .txt. Después: `copys.py calendario planificar`.
+   carrusel = carpeta con carrusel.json) con su contexto mínimo y huecos por cada
+   plataforma activa que admita ese formato. Prerrellena lo que puede: `tema` (título
+   del corte o tema del carrusel), `extra.oferta` (sugerida cruzando ofertas[].temas
+   con la categoría y lo que se dice) y `hashtags_temas` (temas del banco que encajan).
+2) El subagente `copy` (LLM) revisa lo sugerido y rellena el resto: campos propios
+   (objetivo, pilar) y, por plataforma, copy (+ título si aplica). Hashtags: deja
+   `hashtags` vacío y `registrar` elige un conjunto válido y rotado de `hashtags_temas`;
+   solo se escriben para forzar alguno (si van menos de los mínimos, se completan).
+3) `copys.py registrar --entrada <tanda> [--simular] [--planificar] [--estricto]` valida
+   todo (incluida la auditoría) y, si está bien, escribe Excel + .txt.
 
 Esquema de cada pieza:
 {
@@ -20,6 +22,7 @@ Esquema de cada pieza:
   "contexto": {...},                 # solo lectura, lo pone el script
   "tema": "",                        # resumen corto (columna Tema)
   "extra": {"oferta": "", "objetivo": "", "pilar": ""},   # campos_extra del proyecto
+  "hashtags_temas": ["ventas"],      # temas del banco para los hashtags automáticos
   "plataformas": {                   # solo las que le faltan y admiten el formato
     "instagram": {"copy": "", "hashtags": []},
     "youtube":   {"titulo": "", "copy": "", "hashtags": []}
@@ -29,6 +32,7 @@ Esquema de cada pieza:
 from __future__ import annotations
 
 import datetime as dt
+import itertools
 import re
 from pathlib import Path
 
@@ -51,48 +55,113 @@ def hueco_plataforma(conf_plat: dict) -> dict:
 def esqueleto(proyecto, piezas: list[dict]) -> dict:
     """piezas: [{"ruta": Path, "contexto": dict, "plataformas": [pid], "formato": "reel"|"carrusel",
                  "tema": str (opcional), "extra": {campo: valor} (opcional)}]"""
-    formatos = sorted({pz.get("formato") or "reel" for pz in piezas})
-    guias = {}
+    clips = []
     for pz in piezas:
-        fmt = pz.get("formato") or "reel"
-        for pid in pz["plataformas"]:
-            guia = proyecto.conf_formato(pid, fmt).get("guia")
-            if guia:
-                guias[f"{pid}/{fmt}"] = guia
-    campos = [c for c in proyecto.campos_extra() if isinstance(c.get("valores"), list)]
+        ctx = pz.get("contexto") or {}
+        extra = {c["id"]: (pz.get("extra") or {}).get(c["id"]) or "" for c in proyecto.campos_extra()}
+        if "oferta" in extra and not extra["oferta"]:
+            extra["oferta"] = sugerir_oferta(proyecto, ctx)
+        clips.append({
+            "clip": Path(pz["ruta"]).name,
+            "formato": pz.get("formato") or "reel",
+            "ruta": str(pz["ruta"]),
+            "contexto": ctx,
+            "tema": pz.get("tema") or str(ctx.get("titulo") or ctx.get("tema") or ""),
+            "extra": extra,
+            "hashtags_temas": sugerir_temas(proyecto, ctx),
+            "plataformas": {p: hueco_plataforma(proyecto.conf_formato(p, pz.get("formato") or "reel"))
+                            for p in pz["plataformas"]},
+        })
     return {
         "proyecto": proyecto.id,
         "creada": dt.datetime.now().isoformat(timespec="seconds"),
-        "instrucciones": (
-            "Rellena tema, extra y, por plataforma, copy (+titulo si aparece) y hashtags TEMÁTICOS "
-            "(solo los temáticos: los fijos los añade el script; nº y tamaños en proyecto.json → "
-            "plataformas.<p>.hashtags, banco por tamaño en hashtags.json, últimos usados con "
-            f"copys.py hashtags --proyecto {proyecto.id}). Reglas del copy en proyectos/{proyecto.id}/proyecto.json y guía de "
-            "cada plataforma/formato en 'guias'. "
-            + "".join(f"extra.{c['id']}: {' / '.join(c['valores'])}"
-                      + (f" ({c['ayuda']})" if c.get("ayuda") else "") + ". " for c in campos)
-            + ("Carruseles: tema, objetivo y pilar vienen de carrusel.json (revísalos); el caption repite "
-               "el gancho de la slide 1 (contexto.gancho_slide1) en los primeros 125 caracteres, va corto "
-               "y termina con el CTA a la bio. " if "carrusel" in formatos else "")
-            + "Antes de registrar: copys.py auditar --entrada <este archivo> y corrige los avisos de "
-            "estilo reescribiendo (solo se dejan si la frase es literal del clip o de las slides). "
-            "Luego: copys.py registrar --entrada <este archivo> --simular, sin --simular y "
-            f"copys.py calendario planificar --proyecto {proyecto.id}."),
-        "guias": guias,
-        "clips": [
-            {
-                "clip": Path(pz["ruta"]).name,
-                "formato": pz.get("formato") or "reel",
-                "ruta": str(pz["ruta"]),
-                "contexto": pz.get("contexto") or {},
-                "tema": pz.get("tema") or "",
-                "extra": {c["id"]: (pz.get("extra") or {}).get(c["id"]) or "" for c in proyecto.campos_extra()},
-                "plataformas": {p: hueco_plataforma(proyecto.conf_formato(p, pz.get("formato") or "reel"))
-                                for p in pz["plataformas"]},
-            }
-            for pz in piezas
-        ],
+        "instrucciones": f"Reglas y formato: copys.py brief --proyecto {proyecto.id}. Después: copys.py registrar "
+                         "--entrada <esta tanda> --simular y, limpio, --planificar.",
+        "clips": clips,
     }
+
+
+# ---------------------------------------------------------------- sugerencias
+_STOP = {"de", "del", "la", "el", "los", "las", "y", "en", "sin", "con", "por", "para", "a", "un", "una"}
+
+
+def _coincide(palabra: str, token: str) -> bool:
+    """Misma palabra, singular/plural o la misma raíz larga (≥ 6 letras en común)."""
+    if palabra == token or palabra + "s" == token or token + "s" == palabra:
+        return True
+    if palabra + "es" == token or token + "es" == palabra:
+        return True
+    n = 0
+    for a, b in zip(palabra, token):
+        if a != b:
+            break
+        n += 1
+    return n >= 6
+
+
+def _aparece(termino: str, texto: str, tokens: set[str]) -> bool:
+    """`termino` (normalizado) en `texto` (normalizado): frase exacta o todas sus palabras con contenido."""
+    if not termino or not texto:
+        return False
+    if f" {termino} " in f" {texto} ":
+        return True
+    palabras = [w for w in termino.split() if w not in _STOP and len(w) >= 4]
+    return bool(palabras) and all(any(_coincide(w, t) for t in tokens) for w in palabras)
+
+
+def _textos(ctx: dict) -> tuple[str, str, str, set[str], set[str]]:
+    cat = normalizar(str(ctx.get("category") or ""))
+    cab = normalizar(" ".join(str(ctx.get(k) or "") for k in ("titulo", "frase_viral", "gancho_texto",
+                                                               "tema", "gancho_slide1")))
+    cuerpo = normalizar(str(ctx.get("transcripcion") or ""))
+    return cat, cab, cuerpo, set(cab.split()), set(cuerpo.split())
+
+
+def sugerir_oferta(proyecto, ctx: dict) -> str:
+    """Id de la oferta cuyos `temas` más encajan con la categoría, el título/frase y la transcripción
+    del clip ("" si no hay una clara: lo decide el subagente). Solo una sugerencia."""
+    ofertas = [o for o in (proyecto.ofertas.get("ofertas") or []) if o.get("id")]
+    if not ofertas or not ctx or ctx.get("aviso") and not ctx.get("transcripcion"):
+        return ""
+    cat, cab, cuerpo, t_cab, t_cuerpo = _textos(ctx)
+    puntos = []
+    for o in ofertas:
+        sc, distintos = 0, 0
+        for t in o.get("temas") or []:
+            tn = normalizar(str(t))
+            hit = 0
+            if tn and tn == cat:
+                hit += 1
+            if _aparece(tn, cab, t_cab):
+                hit += 2
+            elif _aparece(tn, cuerpo, t_cuerpo):
+                hit += 1
+            sc += hit
+            distintos += bool(hit)
+        puntos.append((sc, distintos, o["id"]))
+    puntos.sort(key=lambda x: (-x[0], -x[1]))
+    mejor = puntos[0]
+    segundo = puntos[1][0] if len(puntos) > 1 else -1
+    return mejor[2] if mejor[0] >= 3 and mejor[1] >= 2 and mejor[0] > segundo else ""
+
+
+def sugerir_temas(proyecto, ctx: dict, maximo: int = 2) -> list[str]:
+    """Temas del banco de hashtags que encajan con el clip (categoría y lo que se dice)."""
+    if not ctx:
+        return []
+    cat, cab, cuerpo, t_cab, t_cuerpo = _textos(ctx)
+    puntos = []
+    for i, tema in enumerate(proyecto.banco_por_tamano()):
+        partes = [normalizar(x) for x in tema.split("_") if x]
+        nombre = " ".join(partes)
+        sc = 2 if nombre == cat or (partes and partes[0] == cat) else 0
+        if any(_aparece(x, cab, t_cab) for x in partes):
+            sc += 2
+        elif any(_aparece(x, cuerpo, t_cuerpo) for x in partes):
+            sc += 1
+        if sc >= 2:
+            puntos.append((-sc, i, tema))
+    return [t for _, _, t in sorted(puntos)[:maximo]]
 
 
 _VACIAS = {"para", "porque", "como", "cuando", "donde", "pero", "esto", "esta", "este", "estos", "estas",
@@ -126,6 +195,88 @@ def hashtags_finales(proyecto, pid: str, tematicos: list[str]) -> list[str]:
     return out
 
 
+def elegir_hashtags(proyecto, pid: str, temas: list[str], forzados: list[str],
+                    evitar: list[frozenset[str]], historial: list[frozenset[str]]) -> tuple[list[str] | None, str]:
+    """Conjunto de temáticos VÁLIDO y ROTADO del banco, de los `temas` dados (más los `forzados`).
+
+    Cumple las cuotas de plataformas.<p>.hashtags (temáticos, total con los fijos, amplios_max y,
+    si se puede, nicho_min), no repite ningún conjunto de `evitar` (los últimos registrados y los
+    de la misma tanda) si hay alternativa y, a igualdad, usa lo que menos ha salido en `historial`
+    (lo más reciente al final), cubre todos los temas y mezcla tamaños. Determinista.
+    Devuelve (temáticos, "") o (None, motivo).
+    """
+    banco = proyecto.banco_por_tamano()
+    temas = [temas] if isinstance(temas, str) else [str(t) for t in temas or [] if str(t).strip()]
+    raros = [t for t in temas if t not in banco]
+    if raros:
+        return None, f"hashtags_temas desconocidos: {', '.join(raros)} (temas del banco: {', '.join(banco)})"
+    if not temas:
+        return None, "hashtags_temas vacío"
+    reglas = proyecto.reglas_hashtags(pid)
+    fijos = proyecto.fijos(pid)
+    forz = list(dict.fromkeys(t for t in (normalizar_hashtag(x) for x in forzados or []) if t and t not in fijos))
+    tam = proyecto.tamano_hashtag
+    # candidatos: por tamaño y alternando entre los temas pedidos (orden estable = el del banco)
+    cands, de_tema = [], {}
+    for t_tam in ("nicho", "medio", "amplio", "sin_tamano"):
+        listas = [banco[t][t_tam] for t in temas]
+        for i in range(max((len(l) for l in listas), default=0)):
+            for t, l in zip(temas, listas):
+                if i < len(l):
+                    de_tema.setdefault(l[i], set()).add(t)
+                    if l[i] not in cands and l[i] not in fijos and l[i] not in forz:
+                        cands.append(l[i])
+    for t in temas:  # una etiqueta que sale en varios temas los cubre todos
+        for g in banco[t].values():
+            for x in g:
+                de_tema.setdefault(x, set()).add(t)
+    tmin = int(reglas.get("tematicos_min", 1) or 0)
+    tmax = int(reglas.get("tematicos_max", max(tmin, 3)))
+    nf = len(fijos)
+    tot_min, tot_max = reglas.get("total_min"), reglas.get("total_max") or reglas.get("max_total")
+    lo = max(tmin, (tot_min - nf) if tot_min else 0, len(forz), 1)
+    hi = min(tmax, (tot_max - nf) if tot_max else tmax)
+    if lo > hi:
+        return None, f"las cuotas de {pid} no se pueden cumplir con {len(forz)} forzado(s)"
+    ideal = min(hi, max(lo, (tmin + tmax + 1) // 2))
+    tamanos = sorted(range(lo, hi + 1), key=lambda n: (abs(n - ideal), n))
+    amax, nmin = reglas.get("amplios_max"), int(reglas.get("nicho_min") or 0)
+    hay_medio = any(tam(x) == "medio" for x in cands)
+    ventana = max(2 * int(reglas.get("rotacion_ultimos", config.ROTACION_ULTIMOS) or 0), 6)
+    peso: dict[str, int] = {}
+    for k, conj in enumerate(reversed(historial or []), start=1):
+        for x in conj:
+            peso[x] = peso.get(x, 0) + max(0, ventana - k + 1)
+    evitar = set(evitar or [])
+    idx = {x: i for i, x in enumerate(cands)}
+    mejor = None
+    for n in tamanos:
+        k = n - len(forz)
+        if k < 0 or k > len(cands):
+            continue
+        for combo in itertools.combinations(cands, k):
+            conj = forz + list(combo)
+            finales = fijos + conj
+            amplios = sum(tam(x) == "amplio" for x in finales)
+            if amax is not None and amplios > amax:
+                continue
+            nichos = sum(tam(x) == "nicho" for x in finales)
+            cubiertos = set().union(*(de_tema.get(x, set()) for x in conj)) if conj else set()
+            clave = (max(0, nmin - nichos), frozenset(conj) in evitar, sum(peso.get(x, 0) for x in conj),
+                     -len(cubiertos & set(temas)), int(hay_medio and not any(tam(x) == "medio" for x in conj)),
+                     abs(n - ideal), sum(idx.get(x, 0) for x in combo))
+            if mejor is None or clave < mejor[0]:
+                mejor = (clave, conj)
+        if mejor is not None and mejor[0][:2] == (0, False):
+            break  # el tamaño ideal ya da un conjunto que cumple todo
+    if mejor is None:
+        return None, (f"no hay un conjunto válido con los temas {', '.join(temas)} "
+                      f"({proyecto.texto_reglas_hashtags(pid)}): añade temas o escribe los hashtags")
+    orden = {"nicho": 0, "medio": 1, "amplio": 2}
+    conj = forz + sorted(mejor[1][len(forz):], key=lambda x: (orden.get(tam(x) or "", 3), idx.get(x, 0)))
+    return conj, ""
+
+
 def tematicos_de(proyecto, pid: str, hashtags) -> frozenset[str]:
     """Conjunto de temáticos (sin los fijos actuales de la plataforma) de una lista o texto de hashtags."""
     if isinstance(hashtags, str):
@@ -143,14 +294,19 @@ def texto_para_pegar(proyecto, pid: str, bloque: dict, formato: str = "reel") ->
 
 
 def validar(proyecto, tanda: dict, copys_existentes: dict[str, dict[str, str]],
-            recientes: dict[str, list[tuple[str, frozenset[str]]]] | None = None) -> tuple[list[str], list[str]]:
-    """Devuelve (errores, avisos). Con errores no se registra nada.
+            recientes: dict[str, list[tuple[str, frozenset[str]]]] | None = None
+            ) -> tuple[list[str], list[str], list[str]]:
+    """Devuelve (errores, avisos, avisos_de_estilo). Con errores no se registra nada.
 
+    avisos_de_estilo ⊂ avisos: los de la auditoría que no son literales del clip
+    (`registrar --estricto` no escribe si queda alguno).
     copys_existentes: {plataforma: {copy normalizado: clip}} ya registrados, para no repetir.
     recientes: {plataforma: [(clip, temáticos), ...]} registrados, en orden de alta, para la
                rotación de hashtags (se miran los últimos `rotacion_ultimos`).
+    Con `hashtags_temas` (en la pieza o en el bloque de la plataforma) y `hashtags` vacío (o con
+    menos de los mínimos), elige los temáticos (elegir_hashtags) y los deja en el bloque.
     """
-    errores, avisos = [], []
+    errores, avisos, estilo = [], [], []
     if tanda.get("proyecto") != proyecto.id:
         errores.append(f"La tanda es del proyecto '{tanda.get('proyecto')}', no de '{proyecto.id}'.")
     clips = tanda.get("clips") or []
@@ -214,6 +370,8 @@ def validar(proyecto, tanda: dict, copys_existentes: dict[str, dict[str, str]],
                     errores.append(f"{ep} falta 'titulo'.")
                 elif conf.get("titulo_max") and len(tit) > conf["titulo_max"]:
                     errores.append(f"{ep} título de {len(tit)} caracteres (máx. {conf['titulo_max']}).")
+                for frag in auditoria.palabras_prohibidas(tit, proyecto.palabras_prohibidas):
+                    errores.append(f"{ep} el título lleva la palabra prohibida «{frag}» (identidad del proyecto).")
 
             # --- copy ---
             if not copy:
@@ -238,14 +396,36 @@ def validar(proyecto, tanda: dict, copys_existentes: dict[str, dict[str, str]],
                                   f"en sus primeros {n125} caracteres.")
 
             # --- auditoría (lib/auditoria.py · referencias/auditoria_copy.md) ---
-            for h in auditoria.auditar(copy, conf, c.get("contexto"), proyecto.nombre_plataforma(pid)):
+            for h in auditoria.auditar(copy, conf, c.get("contexto"), proyecto.nombre_plataforma(pid),
+                                       identidad=proyecto.identidad):
                 if h.nivel == "error":
                     errores.append(f"{ep} {h.mensaje}")
                 elif h.nivel == "aviso":
                     avisos.append(f"{ep} estilo: {h.mensaje}")
+                    estilo.append(avisos[-1])
                 # "literal": frase literal del clip → se permite, no se avisa
 
-            # --- hashtags ---
+            # --- hashtags (automáticos si vienen hashtags_temas y faltan) ---
+            temas = b.get("hashtags_temas") or c.get("hashtags_temas")
+            if temas:
+                actuales = b.get("hashtags") or []
+                if isinstance(actuales, str):
+                    actuales = actuales.split()
+                reglas = proyecto.reglas_hashtags(pid)
+                nf = len(proyecto.fijos(pid))
+                minimo = max(int(reglas.get("tematicos_min", 1) or 0),
+                             (reglas["total_min"] - nf) if reglas.get("total_min") else 0, 1)
+                forz = [t for t in actuales if normalizar_hashtag(str(t)) not in proyecto.fijos(pid)]
+                if len(forz) < minimo:
+                    n = int(reglas.get("rotacion_ultimos", config.ROTACION_ULTIMOS) or 0)
+                    previos = [st for cl, st in recientes.get(pid, []) if cl.lower() != et.lower()]
+                    en_tanda = list(sets_tanda.get(pid, {}))
+                    elegidos, motivo = elegir_hashtags(proyecto, pid, temas, forz,
+                                                       (previos[-n:] if n else []) + en_tanda, previos + en_tanda)
+                    if elegidos is None:
+                        errores.append(f"{ep} hashtags automáticos: {motivo}.")
+                    else:
+                        b["hashtags"] = elegidos
             errores_h, avisos_h, tem = _validar_hashtags(proyecto, pid, b, pool, et, recientes, sets_tanda)
             errores += [f"{ep} {e}" for e in errores_h]
             avisos += [f"{ep} {a}" for a in avisos_h]
@@ -265,7 +445,7 @@ def validar(proyecto, tanda: dict, copys_existentes: dict[str, dict[str, str]],
             if otro and otro.lower() != et.lower():
                 errores.append(f"{ep} este copy ya está registrado para {otro}; escribe uno distinto.")
 
-    return errores, avisos
+    return errores, avisos, estilo
 
 
 def _validar_hashtags(proyecto, pid: str, bloque: dict, pool: set[str], clip: str,

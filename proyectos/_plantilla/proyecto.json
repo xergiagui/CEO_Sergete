@@ -2,10 +2,10 @@
   "id": "PLANTILLA",
   "nombre": "PLANTILLA",
   "descripcion": "Qué es el proyecto y qué se busca con sus clips (captar leads, vender X, marca personal...).",
+  "_identidad": "Cuenta, landing, afiliado, voz (persona, tono, idioma, emojis_max), palabras prohibidas y marca: CEO_Sergete/proyectos.json → identidad (fuente única; la añade el CEO, no se copia aquí).",
   "prefijo_id": "XX",
   "tipo": "",
   "_tipo": "largos (vídeos largos cortados en clips por TheEditor) | clipping (vídeos ya cortados que entrega el proyecto). El mismo que en CEO_Sergete/proyectos.json.",
-  "idioma": "es-ES",
   "como_reconocerlo": [
     "Pistas para que el CEO sepa que un clip es de este proyecto (persona que sale, canal de origen, temática)."
   ],
@@ -17,25 +17,22 @@
   },
   "registro": "registro_PLANTILLA.xlsx",
 
-  "tono": "Cómo habla la marca: persona (tú/usted), registro, emojis sí/no, longitud.",
   "reglas_copy": [
-    "La primera frase es el gancho y conecta con lo que se dice en el clip. Máx. gancho_max caracteres (Instagram: 125, lo que se lee antes del «más»).",
+    "La primera frase es el gancho y sale de lo que se dice en el clip; tiene que entenderse sola.",
     "Termina con el CTA del proyecto.",
-    "Sin paralelismos negativos ('No necesitas X. Necesitas Y.', 'no es X, es Y'), revelaciones ('¿El resultado?'), anuncios de sinceridad, cebos de interacción ('comenta SÍ', 'etiqueta a…') ni cierres vacíos ('¿qué opinas?').",
-    "Antes de registrar: copys.py auditar --entrada <tanda> (referencias/auditoria_copy.md). Los avisos de estilo se corrigen reescribiendo; solo se dejan si la frase es literal del clip.",
-    "Hashtags: los temáticos del banco por tamaño de hashtags.json, acordes al tema y rotados (no repetir el mismo conjunto).",
-    "Carruseles (si la plataforma los admite): el caption repite el gancho de la slide 1 en los primeros 125 caracteres, va corto y termina con el CTA del proyecto.",
-    "Objetivo y pilar de cada pieza (obligatorios): en los carruseles vienen de carrusel.json; en los Reels se eligen al escribir el copy. 'promocion' solo si la pieza va sobre todo de vender un producto."
+    "Si el tema encaja con una oferta, nómbrala; si no, oferta = generico.",
+    "Nada de datos ni cifras que no salgan del clip.",
+    "Estilo: lo marca el auditor al registrar; corrige los avisos reescribiendo (solo se dejan si la frase es literal del clip)."
   ],
 
   "campos_extra": [
     {"id": "oferta", "columna": "Oferta", "obligatorio": true, "valores": "ofertas"},
     {"id": "objetivo", "columna": "Objetivo", "obligatorio": true,
      "valores": ["guardados", "compartidos", "comentarios", "seguidores"],
-     "ayuda": "señal que busca la pieza: guardados = lista/método/pasos; compartidos = algo que se manda a alguien; comentarios; seguidores = historia personal"},
+     "ayuda": "señal que busca la pieza: guardados = lista, método o pasos; compartidos = algo que se le manda a alguien; comentarios = situación que invita a responder; seguidores = historia, antes/después"},
     {"id": "pilar", "columna": "Pilar", "obligatorio": true,
      "valores": ["educativo", "historia", "interaccion", "promocion"],
-     "ayuda": "promocion solo si la pieza va sobre todo de vender un producto"}
+     "ayuda": "educativo = enseña; historia = historia contada; interaccion = situación con la que se identifica la audiencia; promocion = solo si la pieza va sobre todo de vender un producto. En los carruseles vienen de carrusel.json; en los Reels se eligen al escribir el copy"}
   ],
 
   "calendario": {
@@ -71,7 +68,7 @@
         "reel": {},
         "carrusel": {
           "copy_recomendado": [60, 250],
-          "guia": "Caption de carrusel: repite el gancho de la slide 1 en los primeros 125 caracteres, corto, y termina con el CTA. Mismas reglas de hashtags y auditoría que los Reels."
+          "guia": "Caption de carrusel: repite el gancho de la slide 1 (contexto.gancho_slide1) al principio, dentro de lo que se lee antes del «más». Corto: las slides cuentan el resto. Termina con el CTA."
         }
       },
       "max_caracteres": 2200,
@@ -81,11 +78,10 @@
       "cta_patrones": ["\\bbio\\b"],
       "cta_ejemplo": "Link en bio.",
       "gancho_max": 125,
-      "emojis_max": 3,
-      "_ayuda": "gancho_max = máx. de caracteres de la 1.ª frase/línea · emojis_max = máx. de emojis (0 si el tono es sin emojis) · hashtags: total_min/total_max cuentan los fijos; amplios_max (error) y nicho_min (aviso) según los tamaños de hashtags.json.",
+      "_ayuda": "gancho_max = máx. de caracteres de la 1.ª frase/línea · emojis_max: sale de identidad.voz.emojis_max; ponlo aquí solo para sobrescribirlo en esta plataforma · hashtags (FUENTE ÚNICA de las cifras): tematicos_min/max sin contar los fijos; total_min/total_max contando los fijos de hashtags.json (tienen que cuadrar: total = temáticos + nº de fijos); amplios_max (error) y nicho_min (aviso) según los tamaños de hashtags.json.",
       "hashtags": {"tematicos_min": 3, "tematicos_max": 5, "total_min": 3, "total_max": 5, "nicho_min": 2, "amplios_max": 1},
       "formato_texto": "{copy}\n\n{hashtags}",
-      "guia": "Caption de Reel: gancho (≤ 125 caracteres) + idea + CTA. Hashtags al final: 3–5 (2–3 de nicho, 1–2 medios, máx. 1 amplio)."
+      "guia": "Caption de Reel: gancho + idea + CTA. Los hashtags los añade el script al final."
     },
     "tiktok": {
       "activa": false,
@@ -97,14 +93,13 @@
       "cta_obligatorio": true,
       "cta_patrones": ["\\bbio\\b", "perfil"],
       "cta_ejemplo": "Link en bio.",
-      "hashtags": {"tematicos_min": 1, "tematicos_max": 2, "max_total": 8},
+      "hashtags": {"tematicos_min": 1, "tematicos_max": 2, "total_min": 1, "total_max": 2},
       "formato_texto": "{copy}\n\n{hashtags}",
       "guia": "Más corto que en IG: gancho + CTA."
     },
     "youtube": {
       "activa": false,
       "nombre": "YouTube",
-      "formato": "Short",
       "formatos": {"reel": {}},
       "requiere_titulo": true,
       "titulo_max": 100,
@@ -113,9 +108,9 @@
       "cta_obligatorio": true,
       "cta_patrones": ["\\bbio\\b", "canal", "descripci[oó]n", "enlace", "link"],
       "cta_ejemplo": "Link en la descripción del canal.",
-      "hashtags": {"tematicos_min": 1, "tematicos_max": 2, "max_total": 15},
+      "hashtags": {"tematicos_min": 1, "tematicos_max": 2, "total_min": 2, "total_max": 3},
       "formato_texto": "{copy}\n\n{hashtags}",
-      "guia": "Título (≤100 car.) con el gancho + descripción breve + CTA."
+      "guia": "Título con el gancho + descripción breve + CTA."
     }
   }
 }

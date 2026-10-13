@@ -2,9 +2,9 @@
   "id": "mongemalo",
   "nombre": "MongeMalo",
   "descripcion": "Clips (Reels) y carruseles de Luis Monge (MongeMalo) para captar tráfico hacia sus productos con el link de afiliado de Sergio.",
+  "_identidad": "Cuenta, landing, afiliado, voz (persona, tono, idioma, emojis_max), palabras prohibidas y marca: CEO_Sergete/proyectos.json → identidad (fuente única; no se copian aquí).",
   "prefijo_id": "MM",
   "tipo": "largos",
-  "idioma": "es-ES",
   "como_reconocerlo": [
     "Clips sacados de vídeos de Luis Monge / MongeMalo (ventas, copywriting, emprendimiento, dinero).",
     "Cuenta de IG @xergi.ventas."
@@ -16,34 +16,25 @@
     "contexto": ["TheEditor/proyectos/<id>/transcripciones", "_Historico/<id>"]
   },
   "registro": "registro_mongemalo.xlsx",
-  "landing_afiliacion": "https://the-landing-ten.vercel.app",
-  "afiliado": "?via=sergio-aguilar",
 
-  "tono": "Directo, contundente y en segunda persona (tú). Frases cortas. Español de España. Sin emojis. Habla de ventas, dinero, copywriting y mentalidad sin rodeos; puede provocar, nunca suena a gurú vacío.",
   "reglas_copy": [
-    "La PRIMERA frase es el gancho: tiene que conectar con lo que se dice en el clip (usa contexto.frase_viral / contexto.transcripcion), no un genérico. Máx. 125 caracteres (gancho_max): es lo que se lee antes del «más» y tiene que entenderse sola.",
-    "1–3 frases en total. Sin paja ni relleno.",
-    "Termina SIEMPRE con CTA a la bio: 'Link en bio.', 'Bio.' o 'Todo en el link de la bio.'.",
-    "Si el tema encaja con una oferta, menciónala por su nombre (ver ofertas.json → cuando_usarla). Si no encaja ninguna, oferta = 'generico' y CTA genérico.",
-    "No pongas precios salvo que el ángulo del clip vaya de dinero/inversión y sume.",
-    "No inventes datos ni cifras que no salgan del clip.",
-    "No repitas un copy ya registrado; usa banco_copys.json solo como referencia de tono (o de reserva si el clip no tiene contexto).",
-    "Sin paralelismos negativos ('No necesitas X. Necesitas Y.', 'no es X, es Y', 'no va de X, va de Y', 'El problema no es X, es Y', 'Sin X. Sin Y. Solo Z.'): dilo en positivo. Tampoco revelaciones ('¿El resultado?', '¿Por qué? Porque…'), anuncios de sinceridad ('te voy a ser sincero', 'la verdad es que…') ni vocabulario de IA (potenciar, transformar, llevar al siguiente nivel…).",
-    "Nada de cebos de interacción ('comenta SÍ', 'etiqueta a…', 'dale like', 'comparte si…') ni cierres vacíos ('¿qué opinas?', '¿estás de acuerdo?'): el cierre es el CTA a la bio. Sin emojis.",
-    "Antes de registrar: copys.py auditar --entrada <tanda> (checklist en referencias/auditoria_copy.md). Los errores bloquean; los avisos de estilo se corrigen reescribiendo y solo se dejan si la frase es literal del clip.",
-    "Hashtags (Instagram): 3–5 en total contando el fijo #grupoalfa, que pone el script (escribe solo 2–4 temáticos): 2–3 de nicho (#grupoalfa ya cuenta como uno), 1–2 medios y como mucho 1 amplio. Del banco por tamaño de hashtags.json y acordes al tema del clip. Rota: no repitas el conjunto de temáticos de otro clip de la tanda ni de los 5 últimos registrados (copys.py hashtags).",
-    "CARRUSELES (formato carrusel, solo Instagram): el caption repite el gancho de la slide 1 (contexto.gancho_slide1, sin el marcado **) dentro de los primeros 125 caracteres, va corto (1–2 frases: las slides ya cuentan el resto) y termina con el CTA a la bio, que manda siempre. Si el objetivo es guardados, puede invitar a guardarlo antes del CTA ('Guárdalo para tu próxima venta. Link en bio.'). Mismas reglas de hashtags y auditoría que los Reels.",
-    "OBJETIVO y PILAR (obligatorios en cada pieza; en los carruseles vienen de carrusel.json, en los Reels los eliges tú): objetivo = la señal que busca la pieza: guardados (lista, método, pasos, algo para volver a consultar), compartidos (verdad incómoda, mito, algo que se manda a alguien), comentarios, seguidores (historia personal, antes/después). Pilar: educativo (enseña), historia (experiencia en primera persona), interaccion (situación con la que se identifica la audiencia), promocion (SOLO si la pieza va sobre todo de vender un producto; mencionar la oferta en el caption no la convierte en promoción)."
+    "La primera frase es el gancho y sale de lo que se dice en el clip (frase_viral / transcripcion); tiene que entenderse sola.",
+    "1–3 frases en total, sin relleno.",
+    "Termina siempre con CTA a la bio: «Link en bio.», «Bio.» o «Todo en el link de la bio.».",
+    "Si el tema encaja con una oferta, nómbrala; si no encaja ninguna, oferta = generico.",
+    "Precios solo si el clip va de dinero o inversión y suma. Nada de datos ni cifras que no salgan del clip.",
+    "De tú al lector; Luis Monge en tercera persona; nunca hablar como él.",
+    "Estilo: lo marca el auditor al registrar; corrige los avisos reescribiendo (solo se dejan si la frase es literal del clip)."
   ],
 
   "campos_extra": [
     {"id": "oferta", "columna": "Oferta", "obligatorio": true, "valores": "ofertas"},
     {"id": "objetivo", "columna": "Objetivo", "obligatorio": true,
      "valores": ["guardados", "compartidos", "comentarios", "seguidores"],
-     "ayuda": "señal que busca la pieza: guardados = lista/método/pasos; compartidos = verdad incómoda, mito, algo que se manda a alguien; comentarios; seguidores = historia personal, antes/después"},
+     "ayuda": "señal que busca la pieza: guardados = lista, método o pasos para volver a consultar; compartidos = verdad incómoda, mito, algo que se le manda a alguien; comentarios = situación que invita a responder; seguidores = historia, antes/después"},
     {"id": "pilar", "columna": "Pilar", "obligatorio": true,
      "valores": ["educativo", "historia", "interaccion", "promocion"],
-     "ayuda": "promocion solo si la pieza va sobre todo de vender un producto; mencionar la oferta en el caption no la convierte en promoción"}
+     "ayuda": "educativo = enseña; historia = historia contada (de Luis o de un caso), no en primera persona; interaccion = situación con la que se identifica la audiencia; promocion = solo si la pieza va sobre todo de vender un producto (nombrar la oferta en el caption no la convierte en promoción). En los carruseles, objetivo y pilar vienen de carrusel.json; en los Reels se eligen al escribir el copy"}
   ],
 
   "calendario": {
@@ -83,7 +74,7 @@
         "reel": {"_nota": "Hereda todo lo de la plataforma (guia, copy_recomendado, gancho, hashtags)."},
         "carrusel": {
           "copy_recomendado": [60, 250],
-          "guia": "Caption de carrusel: repite el gancho de la slide 1 (contexto.gancho_slide1) dentro de los primeros 125 caracteres, lo que se lee antes del «más». Corto: 1–2 frases, porque las slides ya cuentan el resto. Termina con el CTA a la bio, que manda siempre. Si el objetivo es guardados, puede invitar a guardarlo antes del CTA. Mismas reglas de hashtags (3–5 contando #grupoalfa) y de auditoría que los Reels."
+          "guia": "Caption de carrusel: repite el gancho de la slide 1 (contexto.gancho_slide1) al principio, antes del «más». 1–2 frases: las slides cuentan el resto. Cierra con el CTA a la bio; si el objetivo es guardados, puede invitar a guardarlo antes («Guárdalo para tu próxima venta. Link en bio.»)."
         }
       },
       "max_caracteres": 2200,
@@ -93,10 +84,9 @@
       "cta_patrones": ["\\bbio\\b"],
       "cta_ejemplo": "Link en bio.",
       "gancho_max": 125,
-      "emojis_max": 0,
       "hashtags": {"tematicos_min": 2, "tematicos_max": 4, "total_min": 3, "total_max": 5, "nicho_min": 2, "amplios_max": 1},
       "formato_texto": "{copy}\n\n{hashtags}",
-      "guia": "Caption de Reel: gancho (≤ 125 caracteres) + idea + CTA a la bio. Los hashtags van al final, separados por una línea en blanco: 3–5 contando #grupoalfa (2–3 de nicho, 1–2 medios, máx. 1 amplio), rotados por tema."
+      "guia": "Caption de Reel: gancho + idea + CTA a la bio."
     },
     "tiktok": {
       "activa": false,
@@ -109,8 +99,7 @@
       "cta_obligatorio": true,
       "cta_patrones": ["\\bbio\\b", "perfil"],
       "cta_ejemplo": "Link en bio.",
-      "emojis_max": 0,
-      "hashtags": {"tematicos_min": 1, "tematicos_max": 2, "max_total": 8},
+      "hashtags": {"tematicos_min": 1, "tematicos_max": 2, "total_min": 5, "total_max": 6},
       "formato_texto": "{copy}\n\n{hashtags}",
       "guia": "Más corto que en IG: una frase gancho + CTA al perfil/bio. El gancho manda."
     },
@@ -118,7 +107,6 @@
       "activa": false,
       "_nota": "PREPARADA, sin activar (YouTube Shorts). Antes de activarla, Sergio confirma fijos y CTA.",
       "nombre": "YouTube",
-      "formato": "Short",
       "formatos": {"reel": {}},
       "requiere_titulo": true,
       "titulo_max": 100,
@@ -127,10 +115,9 @@
       "cta_obligatorio": true,
       "cta_patrones": ["\\bbio\\b", "canal", "descripci[oó]n", "enlace", "link"],
       "cta_ejemplo": "Link en la descripción del canal.",
-      "emojis_max": 0,
-      "hashtags": {"tematicos_min": 1, "tematicos_max": 2, "max_total": 15},
+      "hashtags": {"tematicos_min": 1, "tematicos_max": 2, "total_min": 4, "total_max": 5},
       "formato_texto": "{copy}\n\n{hashtags}",
-      "guia": "Título (≤100 car.) con el gancho del clip. Descripción breve + CTA. Los 3 primeros hashtags salen sobre el título."
+      "guia": "Título con el gancho del clip. Descripción breve + CTA. Los 3 primeros hashtags salen sobre el título."
     }
   }
 }
