@@ -1,0 +1,20 @@
+{
+  "_ayuda": "Productos/ofertas a los que puede apuntar un copy. Si el proyecto no vende nada concreto, deja 'ofertas' vacío y quita el campo 'oferta' de campos_extra en proyecto.json.",
+  "generico": {
+    "id": "generico",
+    "nombre": "Genérico",
+    "cta": "Todo en el link de la bio.",
+    "cuando_usarla": "El clip no encaja con ninguna oferta."
+  },
+  "ofertas": [
+    {
+      "id": "ejemplo_oferta",
+      "nombre": "Nombre visible de la oferta",
+      "tipo": "curso | comunidad | servicio | ...",
+      "precio": "",
+      "url": "",
+      "cuando_usarla": "Temas del clip que encajan con esta oferta.",
+      "temas": []
+    }
+  ]
+}

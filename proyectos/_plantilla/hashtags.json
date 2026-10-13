@@ -1,0 +1,11 @@
+{
+  "_regla": "Por post: los FIJOS de la plataforma (se añaden solos) + los TEMÁTICOS que marque proyecto.json (tematicos_min..tematicos_max).",
+  "fijos": {
+    "instagram": [],
+    "tiktok": [],
+    "youtube": ["#shorts"]
+  },
+  "tematicos": {
+    "tema_ejemplo": ["#hashtag1", "#hashtag2"]
+  }
+}

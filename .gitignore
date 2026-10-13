@@ -1,0 +1,11 @@
+# Entorno propio
+.venv/
+__pycache__/
+*.pyc
+
+# Tandas de trabajo (JSON intermedios; lo que vale queda en el registro Excel)
+tandas/*
+!tandas/.gitkeep
+
+# Bloqueos de Office (Excel abierto)
+~$*

@@ -1,0 +1,81 @@
+{
+  "id": "mongemalo",
+  "nombre": "MongeMalo",
+  "descripcion": "Clips de Luis Monge (MongeMalo) para captar tráfico hacia sus productos con el link de afiliado de Sergio.",
+  "prefijo_id": "MM",
+  "idioma": "es-ES",
+  "como_reconocerlo": [
+    "Clips sacados de vídeos de Luis Monge / MongeMalo (ventas, copywriting, emprendimiento, dinero).",
+    "Mientras sea el único proyecto, es el proyecto por defecto."
+  ],
+  "carpetas": {
+    "pendiente": "CEO_Sergete/REVISADOS/1. pte Publicar",
+    "publicado": "CEO_Sergete/REVISADOS/2. Publicados"
+  },
+  "registro": "registro_mongemalo.xlsx",
+  "landing_afiliacion": "https://the-landing-ten.vercel.app",
+  "afiliado": "?via=sergio-aguilar",
+
+  "tono": "Directo, contundente y en segunda persona (tú). Frases cortas. Español de España. Sin emojis. Habla de ventas, dinero, copywriting y mentalidad sin rodeos; puede provocar, nunca suena a gurú vacío.",
+  "reglas_copy": [
+    "La PRIMERA frase es el gancho: tiene que conectar con lo que se dice en el clip (usa contexto.frase_viral / contexto.transcripcion), no un genérico.",
+    "1–3 frases en total. Sin paja ni relleno.",
+    "Termina SIEMPRE con CTA a la bio: 'Link en bio.', 'Bio.' o 'Todo en el link de la bio.'.",
+    "Si el tema encaja con una oferta, menciónala por su nombre (ver ofertas.json → cuando_usarla). Si no encaja ninguna, oferta = 'generico' y CTA genérico.",
+    "No pongas precios salvo que el ángulo del clip vaya de dinero/inversión y sume.",
+    "No inventes datos ni cifras que no salgan del clip.",
+    "No repitas un copy ya registrado; usa banco_copys.json solo como referencia de tono (o de reserva si el clip no tiene contexto).",
+    "Hashtags: SOLO 1–2 temáticos según el tema del clip (los 4 fijos se añaden solos). Preferiblemente del banco temático de hashtags.json."
+  ],
+
+  "campos_extra": [
+    {"id": "oferta", "columna": "Oferta", "obligatorio": true, "valores": "ofertas"}
+  ],
+
+  "plataformas": {
+    "instagram": {
+      "activa": true,
+      "nombre": "Instagram",
+      "formato": "Reel",
+      "max_caracteres": 2200,
+      "copy_recomendado": [80, 400],
+      "requiere_titulo": false,
+      "cta_obligatorio": true,
+      "cta_patrones": ["\\bbio\\b"],
+      "cta_ejemplo": "Link en bio.",
+      "hashtags": {"tematicos_min": 1, "tematicos_max": 2, "max_total": 30},
+      "formato_texto": "{copy}\n\n{hashtags}",
+      "guia": "Caption de Reel: gancho + idea + CTA a la bio. Los hashtags van al final, separados por una línea en blanco."
+    },
+    "tiktok": {
+      "activa": false,
+      "_nota": "PREPARADA, sin activar. Antes de activarla, Sergio confirma fijos/nº de hashtags y CTA.",
+      "nombre": "TikTok",
+      "max_caracteres": 4000,
+      "copy_recomendado": [40, 220],
+      "requiere_titulo": false,
+      "cta_obligatorio": true,
+      "cta_patrones": ["\\bbio\\b", "perfil"],
+      "cta_ejemplo": "Link en bio.",
+      "hashtags": {"tematicos_min": 1, "tematicos_max": 2, "max_total": 8},
+      "formato_texto": "{copy}\n\n{hashtags}",
+      "guia": "Más corto que en IG: una frase gancho + CTA al perfil/bio. El gancho manda."
+    },
+    "youtube": {
+      "activa": false,
+      "_nota": "PREPARADA, sin activar (YouTube Shorts). Antes de activarla, Sergio confirma fijos y CTA.",
+      "nombre": "YouTube",
+      "formato": "Short",
+      "requiere_titulo": true,
+      "titulo_max": 100,
+      "max_caracteres": 5000,
+      "copy_recomendado": [80, 500],
+      "cta_obligatorio": true,
+      "cta_patrones": ["\\bbio\\b", "canal", "descripci[oó]n", "enlace", "link"],
+      "cta_ejemplo": "Link en la descripción del canal.",
+      "hashtags": {"tematicos_min": 1, "tematicos_max": 2, "max_total": 15},
+      "formato_texto": "{copy}\n\n{hashtags}",
+      "guia": "Título (≤100 car.) con el gancho del clip. Descripción breve + CTA. Los 3 primeros hashtags salen sobre el título."
+    }
+  }
+}

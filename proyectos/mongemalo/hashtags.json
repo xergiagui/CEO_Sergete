@@ -1,0 +1,20 @@
+{
+  "_fuente": "fuentes/Copys_MongeMalo.pdf + PruebasIA/Hasktask.txt",
+  "_regla": "Por post: los FIJOS de la plataforma (se añaden solos) + 1–2 TEMÁTICOS según el tema del clip.",
+  "fijos": {
+    "instagram": ["#ventas", "#dinero", "#grupoalfa", "#exitopersonal"],
+    "tiktok": ["#ventas", "#dinero", "#grupoalfa", "#exitopersonal"],
+    "youtube": ["#shorts", "#ventas", "#dinero"]
+  },
+  "tematicos": {
+    "ventas": ["#vendermas"],
+    "objeciones": ["#gestiondeobjeciones"],
+    "copywriting": ["#copywriting"],
+    "emprendimiento": ["#emprendimiento", "#emprender"],
+    "mentalidad": ["#mentalidadganadora"],
+    "dinero_finanzas": ["#libertadfinanciera", "#finanzaspersonales", "#exitofinanciero"],
+    "marketing": ["#marketingdigital", "#marketingonline"],
+    "negocio_online": ["#negociosonline", "#trabajardesdecasa"],
+    "afiliacion": ["#afiliados"]
+  }
+}

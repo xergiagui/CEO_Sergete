@@ -1,0 +1,70 @@
+{
+  "id": "PLANTILLA",
+  "nombre": "PLANTILLA",
+  "descripcion": "Qué es el proyecto y qué se busca con sus clips (captar leads, vender X, marca personal...).",
+  "prefijo_id": "XX",
+  "idioma": "es-ES",
+  "como_reconocerlo": [
+    "Pistas para que el CEO sepa que un clip es de este proyecto (persona que sale, canal de origen, temática)."
+  ],
+  "carpetas": {
+    "pendiente": "CEO_Sergete/REVISADOS/1. pte Publicar",
+    "publicado": "CEO_Sergete/REVISADOS/2. Publicados"
+  },
+  "registro": "registro_PLANTILLA.xlsx",
+
+  "tono": "Cómo habla la marca: persona (tú/usted), registro, emojis sí/no, longitud.",
+  "reglas_copy": [
+    "La primera frase es el gancho y conecta con lo que se dice en el clip.",
+    "Termina con el CTA del proyecto."
+  ],
+
+  "campos_extra": [
+    {"id": "oferta", "columna": "Oferta", "obligatorio": true, "valores": "ofertas"}
+  ],
+
+  "plataformas": {
+    "instagram": {
+      "activa": true,
+      "nombre": "Instagram",
+      "formato": "Reel",
+      "max_caracteres": 2200,
+      "copy_recomendado": [80, 400],
+      "requiere_titulo": false,
+      "cta_obligatorio": true,
+      "cta_patrones": ["\\bbio\\b"],
+      "cta_ejemplo": "Link en bio.",
+      "hashtags": {"tematicos_min": 1, "tematicos_max": 2, "max_total": 30},
+      "formato_texto": "{copy}\n\n{hashtags}",
+      "guia": "Caption de Reel: gancho + idea + CTA."
+    },
+    "tiktok": {
+      "activa": false,
+      "nombre": "TikTok",
+      "max_caracteres": 4000,
+      "copy_recomendado": [40, 220],
+      "requiere_titulo": false,
+      "cta_obligatorio": true,
+      "cta_patrones": ["\\bbio\\b", "perfil"],
+      "cta_ejemplo": "Link en bio.",
+      "hashtags": {"tematicos_min": 1, "tematicos_max": 2, "max_total": 8},
+      "formato_texto": "{copy}\n\n{hashtags}",
+      "guia": "Más corto que en IG: gancho + CTA."
+    },
+    "youtube": {
+      "activa": false,
+      "nombre": "YouTube",
+      "formato": "Short",
+      "requiere_titulo": true,
+      "titulo_max": 100,
+      "max_caracteres": 5000,
+      "copy_recomendado": [80, 500],
+      "cta_obligatorio": true,
+      "cta_patrones": ["\\bbio\\b", "canal", "descripci[oó]n", "enlace", "link"],
+      "cta_ejemplo": "Link en la descripción del canal.",
+      "hashtags": {"tematicos_min": 1, "tematicos_max": 2, "max_total": 15},
+      "formato_texto": "{copy}\n\n{hashtags}",
+      "guia": "Título (≤100 car.) con el gancho + descripción breve + CTA."
+    }
+  }
+}
