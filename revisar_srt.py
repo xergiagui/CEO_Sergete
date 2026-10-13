@@ -4,14 +4,17 @@
 Paso 2 (parte SRT): genera un .srt revisado conservando los tiempos de cada
 segmento. Limpia el texto dentro de cada cue: enmascara palabrotas, corrige
 errores obvios de reconocimiento y normaliza marcas, sin fusionar segmentos.
+
+Uso:
+    python revisar_srt.py --proyecto mongemalo "Mi Adicción"
+      -> proyectos/<id>/transcripciones/<nombre>/revisadas/<nombre> - revisado.srt
+Los REEMPLAZOS son de ese vídeo: ajústalos para cada uno.
 """
+import argparse
 import re
 from pathlib import Path
 
-RAIZ = Path(__file__).resolve().parent
-NOMBRE = "Mi Adicción"
-SRC = RAIZ / "transcripciones" / NOMBRE / f"{NOMBRE}.srt"
-DST = RAIZ / "transcripciones" / NOMBRE / "revisadas" / f"{NOMBRE} - revisado.srt"
+import proyecto
 
 # Reemplazos exactos (respetando mayus/minus tal cual aparecen)
 REEMPLAZOS = [
@@ -39,6 +42,14 @@ def limpiar(texto: str) -> str:
 
 
 def main():
+    ap = argparse.ArgumentParser(description="SRT revisado conservando los tiempos.")
+    ap.add_argument("nombre", help="Nombre del vídeo (carpeta de transcripciones/).")
+    proyecto.add_argumento(ap)
+    args = ap.parse_args()
+    p = proyecto.abrir(args.proyecto, "revisar_srt", log=False)
+    base = p.transcripciones_dir / args.nombre
+    SRC = base / f"{args.nombre}.srt"
+    DST = base / "revisadas" / f"{args.nombre} - revisado.srt"
     lineas = SRC.read_text(encoding="utf-8").splitlines()
     salida = []
     for ln in lineas:

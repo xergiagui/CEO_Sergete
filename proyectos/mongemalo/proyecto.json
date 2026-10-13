@@ -1,0 +1,36 @@
+{
+  "id": "mongemalo",
+  "nombre": "MongeMalo",
+  "tipo": "largos",
+  "idioma": "es",
+  "recursos": {
+    "broll": "banco_comun",
+    "musica": "banco_comun",
+    "internet": true,
+    "gancho_visual": "pexels",
+    "gancho_texto": true,
+    "guardar_frases": true
+  },
+  "encuadre": {
+    "modo_por_defecto": "right",
+    "carpetas": {
+      "Largo 1 Extractos": "right",
+      "Largo 2 Extractos": "follow",
+      "Largo 3 Extractos": "follow",
+      "Largo 4 Extractos": "auto",
+      "Largo 5 Extractos": "follow",
+      "Largo 6 Extractos": "follow",
+      "Largo 7 Extractos": "follow"
+    }
+  },
+  "silencios": {
+    "umbral": "6%",
+    "margen": "0.15s"
+  },
+  "gancho": {
+    "texto_duracion_s": 2.5
+  },
+  "frases": {
+    "etiquetas_extra": []
+  }
+}

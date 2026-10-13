@@ -9,11 +9,14 @@ GENERICO: funciona con cualquier video. Los momentos de corte se leen de un
 automatico: el agente 'editor' genera ese JSON desde la transcripcion aplicando
 las reglas de recorte/hook, y este script solo lo ejecuta.
 
+Trabaja por PROYECTO (`--proyecto <id>`, ver proyecto.py): lee el vídeo del
+buzón proyectos/<id>/input/ y escribe en proyectos/<id>/transcripciones/<video>/.
+
 Uso:
-    python clips.py "Mi Adicción"                 -> input/Mi Adicción.mp4
-    python clips.py "input/video.mp4"             -> ruta concreta
-    python clips.py "../TheDescarga/descargas/x.mp4"
-    python clips.py "video" --cortes cortes.json  -> spec de cortes explicito
+    python clips.py --proyecto mongemalo "Mi Adicción"   -> su input/Mi Adicción.mp4
+    python clips.py --proyecto mongemalo "C:/ruta/video.mp4"   -> ruta concreta
+    python clips.py --proyecto x "video" --cortes cortes.json  -> spec explicito
+Si solo hay un proyecto, --proyecto se puede omitir.
 
 Formato de cortes.json (lista de objetos):
     [
@@ -35,7 +38,7 @@ Formato de cortes.json (lista de objetos):
                                 Admite tambien angle/virality/category/rationale/
                                 tags opcionales por corte. Si falta frase_viral se
                                 cae al titulo/hook, y si no hay Supabase no rompe.
-Si no se pasa --cortes, se busca en transcripciones/<video>/cortes.json.
+Si no se pasa --cortes, se busca en proyectos/<id>/transcripciones/<video>/cortes.json.
 
 Los subtitulos NO se queman aqui. Se anaden UNA sola vez en la edicion final
 con la skill Editor_Sergio (b-roll + musica + subs), para no generarlos dos
@@ -43,7 +46,8 @@ veces ni acabar con subtitulos duplicados en pantalla.
 
 Pipeline por clip:
   1) ffmpeg  -> recorte + crop vertical 1080x1920
-  2) auto-editor (umbral 6%, margen 0.15s) -> quita silencios -> clip final
+  2) auto-editor (umbral 6%, margen 0.15s, o los `silencios` del proyecto)
+     -> quita silencios -> clip final
 """
 import argparse
 import json
@@ -54,6 +58,8 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
+import proyecto
 
 # --- Encuadre 9:16 que SIGUE al hablante (A2) --------------------------------
 # El recorte vertical de un 16:9 conserva TODA la altura y toma una franja
@@ -141,13 +147,14 @@ def resolver_ffmpeg() -> str:
 FFMPEG = resolver_ffmpeg()
 
 
-def resolver_video(arg: str) -> tuple[Path, str]:
-    """Devuelve (ruta_video, nombre). Acepta ruta concreta o nombre en input/."""
+def resolver_video(arg: str, input_dir: Path) -> tuple[Path, str]:
+    """Devuelve (ruta_video, nombre). Acepta ruta concreta o nombre en el
+    input/ del proyecto."""
     p = Path(arg)
-    if p.suffix and (p.exists() or p.is_absolute() or len(p.parts) > 1):
+    if p.suffix and (p.is_absolute() or len(p.parts) > 1):
         return p.resolve(), p.stem
     nombre = p.stem if p.suffix else arg
-    return (RAIZ / "input" / f"{nombre}.mp4").resolve(), nombre
+    return (Path(input_dir) / f"{nombre}.mp4").resolve(), nombre
 
 
 def cargar_cortes(ruta: Path) -> list[dict]:
@@ -428,26 +435,32 @@ def _render_segmentado(video: Path, inicio, dur, segs, destino, src_h):
         shutil.rmtree(d, ignore_errors=True)
 
 
-def quitar_silencios(origen, destino):
+def quitar_silencios(origen, destino, umbral: str = "6%", margen: str = "0.15s"):
+    """auto-editor: ajuste global 6 % / 0,15 s (o el del proyecto)."""
     run([PY, "-m", "auto_editor", str(origen),
-         "--edit", "audio:threshold=6%", "--margin", "0.15s",
+         "--edit", f"audio:threshold={umbral}", "--margin", margen,
          "-o", str(destino), "--no-open"])
 
 
 def main():
     ap = argparse.ArgumentParser(description="Genera clips verticales 9:16 sin silencios.")
-    ap.add_argument("video", help="Nombre en input/ o ruta al video.")
-    ap.add_argument("--cortes", help="Ruta al cortes.json (por defecto transcripciones/<video>/cortes.json).")
+    ap.add_argument("video", help="Nombre en el input/ del proyecto o ruta al video.")
+    proyecto.add_argumento(ap)
+    ap.add_argument("--cortes", help="Ruta al cortes.json (por defecto "
+                                     "proyectos/<id>/transcripciones/<video>/cortes.json).")
     ap.add_argument("--keep-tmp", action="store_true", help="No borrar intermedios.")
     args = ap.parse_args()
+    p = proyecto.abrir(args.proyecto, "clips")
 
-    video, nombre = resolver_video(args.video)
+    video, nombre = resolver_video(args.video, p.input_dir)
     if not video.exists():
         raise SystemExit(f"[!] No existe el video: {video}")
 
-    salida = RAIZ / "transcripciones" / nombre / "clips"
+    base = p.transcripciones_dir / nombre
+    salida = base / "clips"
     tmp = salida / "_tmp"
-    cortes_path = Path(args.cortes) if args.cortes else (RAIZ / "transcripciones" / nombre / "cortes.json")
+    cortes_path = Path(args.cortes) if args.cortes else (base / "cortes.json")
+    sil = p.silencios
     cortes = cargar_cortes(cortes_path)
 
     salida.mkdir(parents=True, exist_ok=True)
@@ -466,7 +479,7 @@ def main():
         vert = tmp / f"{cn}_vert.mp4"
         final = salida / f"{cn}.mp4"
         cortar_vertical(video, ini, fin, vert, src_w=src_w, src_h=src_h)
-        quitar_silencios(vert, final)
+        quitar_silencios(vert, final, umbral=sil["umbral"], margen=sil["margen"])
         print(f"   OK -> {final.name}  (sin subtitulos; los pone Editor_Sergio)")
 
     if tmp.exists() and not args.keep_tmp:

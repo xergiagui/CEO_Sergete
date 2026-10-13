@@ -1,120 +1,157 @@
-# Transcripción → Clips virales
+# TheEditor: transcripción → clips virales, por proyectos
 
-Flujo local (sin coste ni API de pago) para convertir un vídeo largo en clips
-verticales listos para publicar. **Siempre se trabaja igual**, en 4 pasos.
+Flujo local para convertir vídeo en clips verticales listos para publicar, para
+**varios proyectos** (cuentas o clientes) que no se mezclan. Cada proyecto tiene
+su buzón, sus salidas, sus reglas y su **política de recursos** (banco común o
+recursos propios, con o sin internet).
 
-> Las **reglas de edición** (encuadre, b-roll, subtítulos, silencios…) y las tres
-> vías de trabajo (vídeo largo, batch de clips ya cortados y adaptaciones con
-> avatar) están en [`CLAUDE.md`](CLAUDE.md), que es la fuente de verdad.
+> Las **reglas de edición** generales y las tres vías están en
+> [`CLAUDE.md`](CLAUDE.md); las de cada proyecto, en `proyectos/<id>/reglas.md`.
 
 ## Estructura
 
 ```
-input/                         vídeos/audios de entrada
-transcripciones/
-  └── <nombre>/
-      ├── <nombre>.txt/.srt/.json   Paso 1 (originales)
-      ├── revisadas/                Paso 2 (.txt y .srt revisados)
-      ├── cortes.json               Paso 3 (momentos + titulo + gancho_texto)
-      ├── clips/                    Paso 3 (clips verticales SIN subs)
-      └── finales/                  Paso 4 (reels listos)
-musicas/                       música local para el Paso 4 (git-ignored)
-superposiciones/               vídeos b-roll locales para el Paso 4 (git-ignored)
-whisper/                       whisper.cpp: bin/ + models/ (git-ignored, ~3GB)
+proyecto.py                    proyectos: elegir, validar, crear (CLI)
+proyectos/
+  _plantilla/                  base de los proyectos nuevos (pensada para clipping)
+  <id>/
+    proyecto.json              tipo, idioma, recursos, encuadre, silencios, gancho, frases
+    reglas.md                  reglas de edición del proyecto
+    input/                     buzón: vídeos largos, o clips cortados en subcarpetas
+    transcripciones/<video>/
+      <video>.txt/.srt/.json   Paso 1
+      cortes.json              Paso 3 (momentos + titulo + gancho_texto)
+      clips/                   Paso 3 (9:16 sin subs)
+      finales/                 Paso 4 (reels listos)
+    logs/                      un log por ejecución
+    recursos/broll|musica|sfx  recursos propios (si su política lo dice)
+superposiciones/  musicas/     BANCO COMÚN (git-ignored), solo para quien lo permita
+whisper/                       whisper.cpp: bin/ + models/ (git-ignored, ~3 GB)
 ```
 
-## Paso 1 — Transcribir  (`transcribir.py`)
+Todos los scripts aceptan **`--proyecto <id>`**. Si se omite y solo hay un
+proyecto (sin contar `_plantilla`), se usa ese; si hay varios, error con la lista.
 
-Convierte a **WAV 16 kHz mono** y transcribe con **whisper.cpp large-v3 + DTW**
-(`-dtw large.v3 -nfa`). Genera `.txt`, `.srt` y `.json` en `transcripciones/<nombre>/`.
+## Política de recursos (`proyecto.json → recursos`)
+
+| Clave | Valores | MongeMalo | `_plantilla` (clipping) |
+|---|---|---|---|
+| `broll` | `banco_comun` · `propio` · `ninguno` | `banco_comun` | `propio` |
+| `musica` | `banco_comun` · `propia` · `ninguna` | `banco_comun` | `propia` |
+| `internet` | `true` · `false` | `true` | `false` |
+| `gancho_visual` | `pexels` (exige internet) · `ninguno` | `pexels` | `ninguno` |
+| `gancho_texto` | `true` · `false` | `true` | `true` |
+| `guardar_frases` | `true` · `false` | `true` | `true` |
+
+- `internet: false` es una **guarda en el código** (`pipeline_core`): Pexels,
+  imágenes libres y el catálogo común lanzan `RecursoExternoBloqueado` en vez de
+  salir a la red, y los modelos (Whisper, fastembed) se cargan solo de la caché
+  local (`HF_HUB_OFFLINE`). Guardar frases en `viral_phrases` no es un recurso.
+- Con política propia, el render **nunca** cae al banco común: sin b-roll propio
+  no hay b-roll; sin música propia, sin música (con aviso); el click de entrada
+  del b-roll solo sale de `recursos/sfx/`.
+- Las frases se guardan con la etiqueta **`proyecto:<id>`** en `tags`.
+
+## Paso 1 — Transcribir (`transcribir.py`)
+
+WAV 16 kHz mono + **whisper.cpp large-v3 + DTW** (troceo automático de vídeos de
+más de 35 min).
 
 ```bat
-.venv\Scripts\python.exe transcribir.py                 :: todo input\
-.venv\Scripts\python.exe transcribir.py "input\v.mp4"   :: un archivo
+.venv\Scripts\python.exe transcribir.py --proyecto <id>                 :: todo su input\
+.venv\Scripts\python.exe transcribir.py --proyecto <id> "video.mp4"     :: uno de su input\ (o una ruta)
 ```
 
-Requiere `whisper/bin/whisper-cli.exe` y `whisper/models/ggml-large-v3.bin`.
+## Paso 2 — Limpiar transcripción (`revisar_srt.py` + revisión manual)
 
-## Paso 2 — Limpiar transcripción  (`revisar_srt.py` + revisión manual)
+`revisar_srt.py --proyecto <id> "<video>"` → `revisadas/<video> - revisado.srt`
+con los mismos tiempos (ajusta sus `REEMPLAZOS` a cada vídeo).
 
-- Corrige **puntuación**, quita **muletillas** y **enmascara palabrotas** (`P***`).
-- Produce **dos** ficheros en `transcripciones/<nombre>/revisadas/`:
-  - `<nombre> - revisado.txt` — versión de lectura (párrafos).
-  - `<nombre> - revisado.srt` — subtítulo con los **mismos timestamps** (no se
-    fusionan cues), vía `revisar_srt.py`.
+## Paso 3 — Cortar clips (`clips.py`)
 
-## Paso 3 — Cortar clips  (`clips.py`)
+El editor elige los momentos (≈ 1 cada 3 min, mín. 3 y máx. 6) y los escribe en
+`transcripciones/<video>/cortes.json` (esquema en `cortes.example.json`), con su
+`gancho_texto`. Luego:
 
-- Se eligen los momentos con más **gancho** (≈ **1 cada 3 min** de vídeo, mín. 3
-  y máx. 6) y se escriben en `transcripciones/<nombre>/cortes.json` (esquema en
-  `cortes.example.json`). `clips.py "<nombre>"` lee ese archivo.
-- Cada corte lleva su **`gancho_texto`**: el texto corto (máx. 2 líneas, ~45
-  caracteres, con tildes) que abre un bucle y que el clip cumple. Si falta, el
-  Paso 4 usa el `titulo`.
-- **Duraciones**: ~30 s por defecto; opcionalmente también **60 s y 90 s**
-  (independientes o extendiendo el de 30 s).
-- Por cada uno: **recorte vertical 9:16** con seguimiento de cara y encuadre de
-  busto (ffmpeg + OpenCV) + **quitar silencios** (auto-editor, umbral 6 %,
-  margen 0.15 s).
-- Salida en `transcripciones/<nombre>/clips/` **SIN subtítulos** (se ponen en el
-  Paso 4). Los intermedios (`_tmp/`) se borran siempre.
+```bat
+.venv\Scripts\python.exe clips.py --proyecto <id> "<video>"
+```
 
-## Paso 4 — Edición final  (`editar_clips.py "<nombre>"`, motor de la skill `Editor_Sergio`)
+Recorte 9:16 con seguimiento de cara y encuadre de busto + quitar silencios
+(auto-editor, `silencios` del proyecto; por defecto 6 % / 0,15 s). Salida en
+`clips/` **sin subtítulos**.
 
-Por cada clip, en este orden de capas:
+## Paso 4 — Edición final (`editar_clips.py`, motor de la skill `Editor_Sergio`)
 
-1. **Gancho visual**: un mini-vídeo de stock (Pexels) a pantalla completa los
-   primeros ~2,5 s (fallback: imagen libre de Openverse/Lorem Picsum, ~1,8 s).
-   Debe tener **fuerte gancho visual** y **relación clara** con el clip → se
-   analiza el contenido para elegir bien la búsqueda (`hook_query`, en inglés).
-2. **B-roll** a pantalla completa, sincronizado con la voz y elegido por
-   semántica (`broll_assets` + `match_broll`) desde `superposiciones/` (local).
-3. **Música** desde `musicas/` (local) + **de-click**.
-4. **Gancho de texto** (`gancho_texto` del corte o, si falta, `titulo`) en la
-   franja superior desde el primer fotograma, 2,5 s con salida suave: misma
-   tipografía que los subtítulos, caja oscura semitransparente, máx. 2 líneas.
-5. **Subtítulos palabra a palabra** quemados **una sola vez**, encima de todo.
+```bat
+.venv\Scripts\python.exe editar_clips.py --proyecto <id> "<video>" [--sin-gancho-texto] [--sin-frases]
+```
 
-Salida: `transcripciones/<nombre>/finales/`, listo para publicar. Las frases
-virales se guardan en Supabase (`viral_phrases`) para TheHistoria.
-Opciones: `--sin-gancho-texto` (sin texto de gancho) y `--sin-frases` (no guarda
-en `viral_phrases`; para pruebas o re-render de una corrección).
+Capas: gancho visual (Pexels, solo si el proyecto lo tiene) → b-roll a pantalla
+completa sincronizado con la voz → música + de-click → gancho de texto (2,5 s) →
+subtítulos palabra a palabra, una sola vez. Salida en `finales/`.
 
-## Batch de clips ya cortados  (`procesar_batch_clip.py`)
+## Batch de clips ya cortados (`procesar_batch_clip.py`, vía 2)
 
-`procesar_batch_clip.py [RAIZ] [CARPETA] [MODO]`: reencuadre 9:16 + quitar
-silencios + Fase C para cada MP4 de las subcarpetas de `RAIZ` (por defecto
-`Desktop/Clip`). Modos de encuadre y detalles en `CLAUDE.md`.
-
-Con gancho de texto, en tres pasos:
+Cada subcarpeta de `proyectos/<id>/input/` es un lote. El modo de encuadre sale
+del argumento o de `proyecto.json → encuadre` (por carpeta). En tres pasos:
 
 ```bat
 :: 1) reencuadre + silencios + transcripción (sin render) -> textos/ y _prep/
-.venv\Scripts\python.exe procesar_batch_clip.py "<RAIZ>" "<CARPETA>" follow --solo-transcribir
-:: 2) el editor escribe transcripciones\<CARPETA>\ganchos.json
+.venv\Scripts\python.exe procesar_batch_clip.py --proyecto <id> "<CARPETA>" --solo-transcribir
+:: 2) el editor escribe proyectos\<id>\transcripciones\<CARPETA>\ganchos.json
 ::    {"clip 1.mp4": "¿Texto que abre el bucle?", "clip 2.mp4": "..."}
-:: 3) render reutilizando _prep/ (sin volver a transcribir)
-.venv\Scripts\python.exe procesar_batch_clip.py "<RAIZ>" "<CARPETA>" follow
+:: 3) render reutilizando _prep/
+.venv\Scripts\python.exe procesar_batch_clip.py --proyecto <id> "<CARPETA>"
 ```
 
-Un clip sin texto en `ganchos.json` sale sin gancho y el batch lo avisa.
-`--sin-frases` evita guardar las transcripciones en `viral_phrases`.
+Otra raíz: `procesar_batch_clip.py --proyecto <id> "C:/otra/raiz" "<CARPETA>" <MODO>`.
+No lances dos batch a la vez (comparten `whisper/_edit_batch`).
 
-## Encuadre y zonas seguras (RRSS)
+## B-roll propio: índice semántico local (`indexar_broll.py`)
 
-- El **locutor** debe quedar en la **ZONA ROJA** (banda central segura del 9:16).
-- El vídeo y los **subtítulos** deben quedar **fuera de las ZONAS GRISES** (áreas
-  que cada red social tapa con su UI: barra superior, pie con texto/usuario,
-  botones laterales) para que se vean bien en todas las RRSS.
-- ⏳ **Medidas exactas pendientes** de la imagen de referencia del usuario.
+Para proyectos con `broll: propio`. Mismo modelo que el catálogo común
+(`paraphrase-multilingual-MiniLM-L12-v2`, fastembed), sin Supabase:
 
-## Reglas clave
+```bat
+:: 1) montajes de 3 fotogramas en recursos\broll\_frames\ + plantilla _descripciones.json
+.venv\Scripts\python.exe indexar_broll.py --proyecto <id> --frames
+:: 2) describir cada clip en recursos\broll\_descripciones.json
+::    {"clip.mp4": {"descripcion": "qué se ve", "logical_tags": []}}   (aviso-* = excluir)
+:: 3) embeddings -> recursos\broll\_indice.json
+.venv\Scripts\python.exe indexar_broll.py --proyecto <id>
+```
 
-- **Subtítulos: una sola vez** — solo en el Paso 4 (nunca en el Paso 3).
-- **Recursos locales** en el Paso 4 (b-roll `superposiciones/`, música `musicas/`).
-  El stock de Pexels se descarga a `superposiciones/` (`pexels_<tema>_NN.mp4`) y
-  solo se pide online para el gancho.
-- **Intermedios**: se borran siempre por defecto.
+Sin índice, el b-roll propio va al azar sin repetir dentro del clip.
+
+## Proyecto nuevo
+
+```bat
+.venv\Scripts\python.exe proyecto.py nuevo <id> --nombre "Nombre" [--tipo clipping|largos]
+.venv\Scripts\python.exe proyecto.py ver <id>
+```
+
+Copia `proyectos/_plantilla/` (o lo hace el `nuevo_proyecto.py` del CEO). Después:
+1. `proyecto.json`: `tipo`, `recursos`, `encuadre` (modo por defecto y por carpeta).
+2. `reglas.md`: protagonista, tono, lo que evitar.
+3. Recursos propios: b-roll en `recursos/broll/`, música en `recursos/musica/`
+   (suelta o en subcarpetas por tipología: «motivacion», «epica»…), click opcional
+   en `recursos/sfx/`; y el índice del b-roll.
+4. Vídeos en `input/` (largos sueltos; clips cortados en subcarpetas).
+
+## Banco común
+
+- `superposiciones/`: b-roll + stock de Pexels (`pexels_<tema>_NN.mp4`,
+  verticales, ≤ 10 s). Para bajar más: `https://api.pexels.com/videos/search` con
+  `Authorization: <PEXELS_API_KEY>` **y** `User-Agent: Mozilla/5.0` (sin él, 403).
+  Al añadir clips, reindexar `broll_assets` con
+  `.claude/skills/Editor_Sergio/broll_index/` (idempotente).
+- `musicas/`: subcarpetas por tipología («9. MOTIVACIÓN», «15. ÉPICA»…).
+
+## Vía 3 — avatar IA (skill `Editor_Sergio`)
+
+`phase_c_edit(…, proyecto="<id>")` y `step1b_store_viral_phrases(…, proyecto="<id>")`
+(por defecto `mongemalo`) usan los recursos y la etiqueta del proyecto.
 
 ## Instalación
 
@@ -123,6 +160,6 @@ py -m venv .venv
 .venv\Scripts\python.exe -m pip install faster-whisper auto-editor opencv-python-headless httpx Pillow imageio-ffmpeg fastembed
 ```
 whisper.cpp: binario `whisper-blas-bin-x64.zip` (release de ggml-org/whisper.cpp)
-en `whisper/bin/` y modelo `ggml-large-v3.bin` en `whisper/models/`.
-La skill `Editor_Sergio` trae su propio bootstrap (venv aparte con `httpx`,
-`faster-whisper`, `imageio-ffmpeg`, `Pillow`, `yt-dlp`).
+en `whisper/bin/` y modelo `ggml-large-v3.bin` en `whisper/models/`. Los proyectos
+sin internet necesitan los modelos de Whisper y fastembed ya en la caché local
+(basta con haberlos usado una vez con red).

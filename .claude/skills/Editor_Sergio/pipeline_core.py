@@ -47,6 +47,40 @@ PROJECT_ROOT = SKILL_DIR.parents[2]
 
 
 # ============================================================
+# GUARDA DE RED PARA RECURSOS (proyectos con `internet: false`)
+#
+# Un proyecto de TheEditor puede prohibir los recursos de internet (Pexels,
+# imágenes libres, catálogo común `broll_assets`). No basta con no pedirlos: las
+# funciones que los traen llaman a `_exigir_red_recursos()` y, si la red está
+# bloqueada en este proceso, lanzan `RecursoExternoBloqueado` en vez de salir a
+# internet. El bloqueo es de proceso y no tiene vuelta atrás (un proceso trabaja
+# con un solo proyecto). Guardar frases en `viral_phrases` no es un recurso: no
+# lo cubre esta guarda (se controla con `guardar_frases`).
+# ============================================================
+class RecursoExternoBloqueado(RuntimeError):
+    """Se intentó traer un recurso de internet en un proyecto que lo prohíbe."""
+
+
+_RED_RECURSOS = {"permitida": True, "motivo": ""}
+
+
+def bloquear_red_recursos(motivo: str = "el proyecto no permite internet") -> None:
+    """Prohíbe, para el resto del proceso, traer recursos de internet."""
+    _RED_RECURSOS["permitida"] = False
+    _RED_RECURSOS["motivo"] = motivo
+
+
+def red_recursos_permitida() -> bool:
+    return bool(_RED_RECURSOS["permitida"])
+
+
+def _exigir_red_recursos(que: str) -> None:
+    if not _RED_RECURSOS["permitida"]:
+        raise RecursoExternoBloqueado(
+            f"{que}: bloqueado, {_RED_RECURSOS['motivo'] or 'sin internet'}")
+
+
+# ============================================================
 # ENV (API keys + config)
 # ============================================================
 def load_env() -> dict:
@@ -481,6 +515,7 @@ def heygen_wait_for_env(video_id: str, env: dict, out_path: Path) -> bool:
 def fetch_pexels_clip(query: str, api_key: str, out_path: Path,
                       min_duration: int = 4, max_duration: int = 15) -> Path | None:
     """Descarga un clip vertical de Pexels que matchee `query`. Devuelve path o None."""
+    _exigir_red_recursos("Pexels")
     r = httpx.get(
         "https://api.pexels.com/videos/search",
         headers={"Authorization": api_key},
@@ -552,6 +587,7 @@ def _cap_first_alpha(word: str) -> str:
 
 def _download_image(url: str, out_path: Path, headers: dict) -> bool:
     """Descarga una imagen; True si es un archivo de imagen razonable (>8KB)."""
+    _exigir_red_recursos("imagen de internet")
     try:
         with httpx.stream("GET", url, headers=headers,
                           timeout=60, follow_redirects=True) as resp:
@@ -578,6 +614,7 @@ def fetch_free_image(query: str, out_path: Path) -> Path | None:
       3) Lorem Picsum — fallback aleatorio (sin búsqueda).
     Devuelve Path o None. Sin API key.
     """
+    _exigir_red_recursos("imagen libre (Openverse/Wikimedia/Picsum)")
     headers = {"User-Agent": "viral-pipeline/1.0 (editor local)"}
 
     # 1) Openverse — por relevancia, solo fotografías, uso comercial
@@ -855,6 +892,7 @@ def _broll_avisos(env: dict) -> set:
     """Filenames del catálogo con algún aviso (marca/persona/calidad) → evitar.
     Cacheado por proceso. Set vacío si Supabase no responde."""
     global _broll_aviso_cache
+    _exigir_red_recursos("catálogo común broll_assets")
     if _broll_aviso_cache is not None:
         return _broll_aviso_cache
     out = set()
@@ -881,6 +919,7 @@ def broll_match_filename(phrase: str, env: dict, exclude=(),
     """Filename del b-roll más afín a `phrase` por encima de `threshold`,
     evitando `exclude` y los clips con aviso. None si nada supera el umbral o
     si no hay Supabase/embeddings disponibles (→ el caller usa azar)."""
+    _exigir_red_recursos("catálogo común broll_assets (match_broll)")
     url = (env or {}).get("SUPABASE_URL", "").rstrip("/")
     if not url or not env.get("SUPABASE_ANON_KEY") or not (phrase or "").strip():
         return None
@@ -900,6 +939,92 @@ def broll_match_filename(phrase: str, env: dict, exclude=(),
     except Exception:
         return None
     return None
+
+
+# ------------------------------------------------------------
+# B-ROLL PROPIO DE UN PROYECTO: índice semántico LOCAL
+# (proyectos/<id>/recursos/broll/_indice.json, lo genera indexar_broll.py)
+#
+#   {"modelo": <_EMBED_MODEL_NAME>, "dim": 384,
+#    "archivos": [{"archivo": "<ruta relativa posix>", "descripcion": "...",
+#                  "logical_tags": ["aviso-..."], "embedding": [384 floats]}]}
+#
+# Mismo modelo que el catálogo común, pero sin Supabase: nada sale a la red.
+# Los archivos con una etiqueta `aviso*` no se usan.
+# ------------------------------------------------------------
+INDICE_BROLL = "_indice.json"
+
+
+def _es_oculto(rel: Path) -> bool:
+    """Partes que empiezan por '_' o '.' (índices, _frames/, descartes…)."""
+    return any(part.startswith(("_", ".")) for part in rel.parts)
+
+
+def list_overlays_recursive(overlays_dir: Path) -> dict:
+    """{ruta_relativa_posix: Path} de los vídeos de una carpeta de b-roll propio
+    (con subcarpetas; ignora lo que empieza por '_' o '.')."""
+    d = Path(overlays_dir) if overlays_dir else None
+    if not d or not d.is_dir():
+        return {}
+    out = {}
+    for p in sorted(d.rglob("*")):
+        if p.is_file() and p.suffix.lower() in _OVERLAY_VIDEO_EXTS:
+            rel = p.relative_to(d)
+            if not _es_oculto(rel):
+                out[rel.as_posix()] = p
+    return out
+
+
+class IndiceBrollLocal:
+    """Casación semántica frase → b-roll propio, 100 % local."""
+
+    def __init__(self, path: Path):
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        self.path = Path(path)
+        self.modelo = data.get("modelo")
+        self.vectores, self.avisos = {}, set()
+        for e in data.get("archivos") or []:
+            if not isinstance(e, dict) or not e.get("archivo"):
+                continue
+            rel = str(e["archivo"]).replace("\\", "/")
+            tags = e.get("logical_tags") or []
+            if any(str(t).startswith("aviso") for t in tags):
+                self.avisos.add(rel)
+                continue
+            if isinstance(e.get("embedding"), list) and e["embedding"]:
+                self.vectores[rel] = [float(x) for x in e["embedding"]]
+
+    @classmethod
+    def cargar(cls, path):
+        """Índice o None (no existe, ilegible o hecho con otro modelo)."""
+        if not path or not Path(path).exists():
+            return None
+        try:
+            idx = cls(path)
+        except Exception as e:
+            print(f"  [broll] índice local ilegible ({e}): se usa azar")
+            return None
+        if idx.modelo and idx.modelo != _EMBED_MODEL_NAME:
+            print(f"  [broll] índice local hecho con otro modelo ({idx.modelo}): se usa azar")
+            return None
+        return idx
+
+    def match(self, phrase: str, exclude=(), threshold: float = 0.30):
+        """Ruta relativa del b-roll más afín (≥ umbral, sin repetir) o None."""
+        if not (phrase or "").strip() or not self.vectores:
+            return None
+        try:
+            qv = embed_text(phrase)
+        except Exception:
+            return None
+        best, best_sim = None, -1.0
+        for rel, v in self.vectores.items():
+            if rel in exclude:
+                continue
+            sim = _cosine(qv, v)
+            if sim > best_sim:
+                best, best_sim = rel, sim
+        return best if best is not None and best_sim >= threshold else None
 
 
 # ============================================================
@@ -1116,13 +1241,21 @@ def _detect_platform(url: str) -> str:
     return "otro" if u else None
 
 
+def etiqueta_proyecto(proyecto: str) -> str:
+    """Etiqueta con la que se marca el proyecto en `viral_phrases.tags`."""
+    return f"proyecto:{proyecto}"
+
+
 def store_viral_phrases(env: dict, phrases, source_url: str = None,
-                        lang: str = None, avatar: str = None) -> dict:
+                        lang: str = None, avatar: str = None,
+                        proyecto: str = None) -> dict:
     """Guarda (upsert por phrase_hash) las frases virales en Supabase.
 
     `phrases`: lista de str (solo el texto) o de dict con claves:
         phrase (obligatoria), category, angle, tags (list), virality (int 1..100),
         rationale. Las que aporte el agente al disecar el clip.
+    `proyecto`: id del proyecto de TheEditor; añade la etiqueta
+        `proyecto:<id>` a los `tags` de cada frase (sin quitar las demás).
 
     Devuelve {ok, stored, skipped, reason}. Best-effort: si no hay
     SUPABASE_URL/ANON_KEY, devuelve ok=False sin lanzar (no rompe el pipeline).
@@ -1131,6 +1264,8 @@ def store_viral_phrases(env: dict, phrases, source_url: str = None,
     url = (env or {}).get("SUPABASE_URL", "").rstrip("/")
     if not url or not env.get("SUPABASE_ANON_KEY"):
         return {"ok": False, "stored": 0, "skipped": 0, "reason": "sin Supabase"}
+    if not proyecto:
+        print("  [frases] AVISO: sin proyecto -> las frases no llevan la etiqueta proyecto:<id>")
 
     platform = _detect_platform(source_url)
     rows, seen = [], set()
@@ -1144,6 +1279,9 @@ def store_viral_phrases(env: dict, phrases, source_url: str = None,
         if h in seen:                      # dedup dentro del mismo lote
             continue
         seen.add(h)
+        tags = [str(t) for t in (item.get("tags") or [])]
+        if proyecto and etiqueta_proyecto(proyecto) not in tags:
+            tags.append(etiqueta_proyecto(proyecto))
         row = {
             "phrase": phrase,
             "phrase_hash": h,
@@ -1153,7 +1291,7 @@ def store_viral_phrases(env: dict, phrases, source_url: str = None,
             "avatar_name": avatar,
             "category": item.get("category"),
             "angle": item.get("angle"),
-            "tags": item.get("tags") or [],
+            "tags": tags,
             "virality": item.get("virality"),
             "rationale": item.get("rationale"),
         }
@@ -1197,8 +1335,18 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
                         clip_text: str = None,
                         words: list = None,
                         hook_text: str = None,
-                        hook_text_dur: float = None) -> Path:
+                        hook_text_dur: float = None,
+                        recursos: dict = None) -> Path:
     """Render final: gancho + B-roll + música + de-click + subs ASS karaoke.
+
+    `recursos` = política de recursos del PROYECTO (ver `_politica_recursos`).
+    None → comportamiento de siempre (banco común + internet: MongeMalo, vía 3).
+    Con una política, el render solo usa lo que el proyecto permite:
+      broll  banco_comun | propio (solo `overlays_dir`, índice local, sin
+             repetir) | ninguno;
+      musica banco_comun | propia (solo `music_dir`) | ninguna;
+      internet False → ni Pexels, ni imágenes libres, ni catálogo común
+             (además se bloquea la red de recursos del proceso).
 
     Gancho inicial: si `hook_query` no es None, descarga un MINI-VIDEO de Pexels
     (necesita `env['PEXELS_API_KEY']`) y lo superpone a pantalla completa los
@@ -1221,15 +1369,31 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
     """
     import random
     ff = get_ffmpeg_exe()
+    pol = _politica_recursos(recursos)
+    legacy = pol["legacy"]
+    # Red para RECURSOS: la del proyecto y, además, la guarda del proceso.
+    net_ok = pol["internet"] and red_recursos_permitida()
+    banco_broll = pol["broll"] == "banco_comun"
 
     # Selección de música en DOS PASOS: tipología (por contenido del clip) +
     # audio por defecto dentro de esa tipología. `music_dir` sigue siendo la
     # RAÍZ musicas/ (para _parse_music_offset y _find_broll_sfx en parent/sfx).
-    music, music_log = select_music(music_dir, typology=music_typology,
-                                    clip_text=clip_text, env=env)
-    if not music:
-        raise RuntimeError(f"No hay MP3 en {music_dir} ({music_log})")
-    print(f"  [música] {music_log}")
+    music = None
+    if pol["musica"] == "ninguna":
+        print("  [música] el proyecto no lleva música")
+    elif music_dir is None:
+        if legacy or pol["musica"] == "banco_comun":
+            raise RuntimeError("No hay carpeta de música")
+        print("  [música] AVISO: el proyecto no tiene carpeta de música -> sin música")
+    else:
+        music, music_log = select_music(music_dir, typology=music_typology,
+                                        clip_text=clip_text, env=env)
+        if not music:
+            if legacy or pol["musica"] == "banco_comun":
+                raise RuntimeError(f"No hay MP3 en {music_dir} ({music_log})")
+            print(f"  [música] AVISO: {music_log} -> sin música")
+        else:
+            print(f"  [música] {music_log}")
 
     # PASO 0: word-timestamps del avatar. El audio es idéntico en toda la
     # composición (hook y b-roll son overlays de vídeo: no tocan audio ni
@@ -1255,13 +1419,63 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
 
     # B-roll a pantalla completa. Prioridad: superposiciones LOCALES; Pexels
     # solo como fallback.
-    if overlays_dir is None:
-        overlays_dir = (env or {}).get("OVERLAYS_DIR") or (PROJECT_ROOT / "superposiciones")
-    overlays_dir = Path(overlays_dir)
-    overlays = _list_overlay_videos(overlays_dir)
-
     clips = []
     windows = []
+    if pol["broll"] == "propio":
+        # SOLO el b-roll del proyecto: índice semántico local o azar SIN repetir
+        # dentro del clip. Nunca el catálogo común ni Pexels.
+        by_rel = list_overlays_recursive(overlays_dir) if overlays_dir else {}
+        indice = IndiceBrollLocal.cargar(pol["broll_indice"])
+        avisos = indice.avisos if indice else set()
+        used = set()
+        n_sem = 0
+        if by_rel and windows_full:
+            for (s, e, text) in windows_full:
+                rel = indice.match(text, exclude=used) if (indice and text) else None
+                if rel and rel in by_rel:
+                    src = "sem-local"; n_sem += 1
+                else:
+                    pool = [r for r in by_rel if r not in used and r not in avisos]
+                    if not pool:
+                        print(f"  [broll] {s:.1f}-{e:.1f}s -> sin b-roll propio sin repetir (se omite)")
+                        continue
+                    rel = random.choice(pool); src = "azar"
+                used.add(rel)
+                clips.append(by_rel[rel]); windows.append((s, e))
+                print(f"  [broll] {s:.1f}-{e:.1f}s -> {rel} ({src})")
+            print(f"  [broll] {len(clips)} cortes propios sinc. con la voz "
+                  f"({n_sem} por índice local{'' if indice else '; sin índice'})")
+        elif by_rel:
+            n = max(1, int(duration // 6))
+            pool = [r for r in by_rel if r not in avisos]
+            random.shuffle(pool)
+            clips = [by_rel[r] for r in pool[:n]]
+            print(f"  [broll] {len(clips)} b-roll propios (intervalos, sin frases)")
+        else:
+            print(f"  [broll] el proyecto no tiene b-roll propio en {overlays_dir} -> sin b-roll")
+        overlays = []
+    elif pol["broll"] == "ninguno":
+        print("  [broll] el proyecto no lleva b-roll")
+        overlays = []
+    else:
+        if overlays_dir is None:
+            overlays_dir = (env or {}).get("OVERLAYS_DIR") or (PROJECT_ROOT / "superposiciones")
+        overlays_dir = Path(overlays_dir)
+        overlays = _list_overlay_videos(overlays_dir)
+        if overlays and not net_ok:
+            # Banco común SIN internet: nada de catálogo (Supabase) ni de clips
+            # que vinieron de internet (pexels_*); azar local sin repetir.
+            overlays = [o for o in overlays if not o.name.lower().startswith("pexels_")]
+            used = set()
+            for (s, e, text) in windows_full:
+                pool = [o for o in overlays if o.name not in used]
+                if not pool:
+                    break
+                clip = random.choice(pool); used.add(clip.name)
+                clips.append(clip); windows.append((s, e))
+                print(f"  [broll] {s:.1f}-{e:.1f}s -> {clip.name} (azar, sin internet)")
+            overlays = []
+
     if overlays and windows_full:
         # SELECCIÓN SEMÁNTICA: por cada ventana (=frase) pedimos a Supabase
         # (match_broll) el b-roll más afín; si no supera umbral o no hay
@@ -1290,7 +1504,7 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
         random.shuffle(pool)
         clips = (pool * (n // len(pool) + 1))[:n]
         print(f"  [broll] {len(clips)} superposiciones locales (intervalos, sin frases)")
-    else:
+    elif banco_broll and net_ok and not clips:
         pexels_key = (env or {}).get("PEXELS_API_KEY", "").strip()
         if pexels_key and broll_keywords:
             print(f"  [broll] (fallback Pexels) descargando {len(broll_keywords)} clips...")
@@ -1315,6 +1529,11 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
 
     # PASO 0b: GANCHO — mini-video de Pexels a pantalla completa al inicio
     # (~2.5s). Si no hay PEXELS_API_KEY, cae a una imagen libre online.
+    # Sin internet (política del proyecto o guarda del proceso) no hay gancho
+    # visual: ni Pexels ni imágenes libres.
+    if hook_query and not net_ok:
+        print(f"  [hook] sin internet para recursos: se omite el gancho visual '{hook_query}'")
+        hook_query = None
     if hook_query:
         hooked = heygen_mp4.parent / "with_hook.mp4"
         pexels_key = (env or {}).get("PEXELS_API_KEY", "").strip()
@@ -1344,41 +1563,49 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
     ass_path = base_video.with_suffix(".ass")
     _generate_ass_karaoke(words, ass_path)
 
-    music_offset = _parse_music_offset(music.name)
+    music_offset = _parse_music_offset(music.name) if music else 0
 
-    # SFX de transición: un click al ENTRAR cada b-roll (si hay sfx + ventanas)
-    sfx_path = _find_broll_sfx(music_dir)
+    # SFX de transición: un click al ENTRAR cada b-roll (si hay sfx + ventanas).
+    # Con política de proyecto, solo se busca en las carpetas que permite.
+    if pol["sfx_dirs"] is None:
+        sfx_path = _find_broll_sfx(music_dir) if music_dir is not None else None
+    else:
+        sfx_path = _find_sfx_in(pol["sfx_dirs"])
     sfx_chain = ""
     sfx_mix = ""
     extra_inputs = []
     use_sfx = bool(sfx_path and broll_starts)
+    sfx_idx = 2 if music else 1          # índice de entrada del sfx en ffmpeg
     if use_sfx:
         nfx = len(broll_starts)
         splits = "".join(f"[k{i}]" for i in range(nfx))
-        sfx_chain = f"[2:a]asplit={nfx}{splits};"
+        sfx_chain = f"[{sfx_idx}:a]asplit={nfx}{splits};"
         for i, t in enumerate(broll_starts):
             ms = int(max(t, 0.0) * 1000)
             sfx_chain += f"[k{i}]adelay={ms}|{ms},volume=0.8[sfx{i}];"
             sfx_mix += f"[sfx{i}]"
         extra_inputs = ["-i", str(sfx_path)]
         print(f"  [sfx] click en {nfx} entradas de b-roll ({sfx_path.name})")
-    total_mix = 2 + (len(broll_starts) if use_sfx else 0)
+    total_mix = (2 if music else 1) + (len(broll_starts) if use_sfx else 0)
 
     # volume=0.253 — música de fondo (~-12 dBFS)
+    mus_chain = (f"[1:a]atrim=start={music_offset},asetpts=PTS-STARTPTS,volume=0.253[mus];"
+                 if music else "")
     filt = (
         f"[0:a]aresample=async=1:first_pts=0,"
         f"adeclick=window=55:overlap=75:arorder=2:threshold=2:burst=2:method=add,"
         f"dynaudnorm=f=200:g=11[voz];"
-        f"[1:a]atrim=start={music_offset},asetpts=PTS-STARTPTS,volume=0.253[mus];"
+        f"{mus_chain}"
         f"{sfx_chain}"
-        f"[voz][mus]{sfx_mix}amix=inputs={total_mix}:duration=first:dropout_transition=0:normalize=0[a]"
+        f"[voz]{'[mus]' if music else ''}{sfx_mix}amix=inputs={total_mix}:duration=first:dropout_transition=0:normalize=0[a]"
     )
     dur = _get_duration(base_video, ff)
 
     # Pass 1: mix audio
     pass1 = base_video.parent / f"{base_video.stem}_mix.mp4"
+    music_inputs = ["-stream_loop", "-1", "-i", str(music)] if music else []
     subprocess.run([
-        ff, "-y", "-i", str(base_video), "-stream_loop", "-1", "-i", str(music),
+        ff, "-y", "-i", str(base_video), *music_inputs,
         *extra_inputs,
         "-filter_complex", filt,
         "-map", "0:v", "-map", "[a]",
@@ -1464,6 +1691,42 @@ def _find_broll_sfx(music_dir: Path):
             if p.exists():
                 cands.append(p)
     return cands[0] if cands else None
+
+
+def _find_sfx_in(dirs) -> Path | None:
+    """Primer click (*.mp3|*.wav) en las carpetas dadas (política de proyecto)."""
+    for d in dirs or []:
+        d = Path(d)
+        if d.is_dir():
+            cands = sorted(d.glob("*.mp3")) + sorted(d.glob("*.wav"))
+            if cands:
+                return cands[0]
+    return None
+
+
+def _politica_recursos(recursos: dict | None) -> dict:
+    """Normaliza la política de recursos que pasa el proyecto al render.
+
+    None → `legacy`: banco común + internet, exactamente como siempre.
+    Claves: broll (banco_comun|propio|ninguno), musica (banco_comun|propia|
+    ninguna), internet (bool), broll_indice (Path del _indice.json o None),
+    sfx_dirs (None = búsqueda de siempre; lista = solo esas carpetas).
+    Con internet=False bloquea además la red de recursos de todo el proceso.
+    """
+    pol = {"broll": "banco_comun", "musica": "banco_comun", "internet": True,
+           "broll_indice": None, "sfx_dirs": None, "legacy": recursos is None}
+    if recursos:
+        for k in ("broll", "musica", "internet", "broll_indice", "sfx_dirs"):
+            if k in recursos:
+                pol[k] = recursos[k]
+    if pol["broll"] not in ("banco_comun", "propio", "ninguno"):
+        raise ValueError(f"política de b-roll no válida: {pol['broll']}")
+    if pol["musica"] not in ("banco_comun", "propia", "ninguna"):
+        raise ValueError(f"política de música no válida: {pol['musica']}")
+    pol["internet"] = bool(pol["internet"])
+    if not pol["internet"]:
+        bloquear_red_recursos("el proyecto tiene internet=false")
+    return pol
 
 
 def _get_duration(file_path: Path, ff: str) -> float:

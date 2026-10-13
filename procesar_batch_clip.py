@@ -1,18 +1,21 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Batch — reels 9:16 a partir de clips YA cortados (carpeta externa).
+Batch — reels 9:16 a partir de clips YA cortados (vía 2).
 
-Recorre subcarpetas de una raíz (por defecto C:/Users/ico858/Desktop/Clip),
-trata cada subcarpeta como un "vídeo" (slug = nombre de la carpeta) y por cada
-.mp4 hace el FLUJO COMPLETO de reel:
-  1) reencuadre 9:16 vertical (1080x1920) siguiendo al hablante (bust-crop
-     adaptativo anti-piernas, clips.cortar_vertical)
-  2) quita silencios (auto-editor, clips.quitar_silencios)
-  3) edición final Fase C: b-roll local + música local + de-click + subtítulos
-     palabra a palabra (pipeline_core.burn_subs_and_music). Sin gancho visual;
-     con GANCHO DE TEXTO en la franja superior (~2,5 s) si el clip tiene texto
-     en ganchos.json.
+Trabaja por PROYECTO (`--proyecto <id>`, ver proyecto.py). Recorre las
+subcarpetas de una raíz (por defecto el buzón del proyecto,
+proyectos/<id>/input/), trata cada subcarpeta como un "vídeo" (slug = nombre de
+la carpeta) y por cada .mp4 hace el FLUJO COMPLETO de reel:
+  1) reencuadre 9:16 vertical (1080x1920) según el MODO (argumento o, si no se
+     da, el de la carpeta en proyecto.json → encuadre)
+  2) quita silencios (auto-editor con los `silencios` del proyecto)
+  3) edición final Fase C: b-roll + música + de-click + subtítulos palabra a
+     palabra (pipeline_core.burn_subs_and_music) SOLO con los recursos que
+     permite el proyecto (banco común o propios; sin internet si así lo dice).
+     Sin gancho visual; con GANCHO DE TEXTO en la franja superior (~2,5 s) si el
+     clip tiene texto en ganchos.json (y el proyecto lleva gancho_texto).
+Salida en proyectos/<id>/transcripciones/<carpeta>/finales/.
 
 Gancho de texto (lo escribe el editor/LLM, nunca se genera mecánicamente):
     1) `--solo-transcribir`: hace reencuadre + silencios + transcripción de cada
@@ -27,7 +30,8 @@ Gancho de texto (lo escribe el editor/LLM, nunca se genera mecánicamente):
        avisa. Al terminar cada clip se borran sus intermedios de _prep/.
 
 Además guarda en Supabase (viral_phrases) la transcripción verbatim de cada clip
-como frase viral (best-effort, dedup por hash). `--sin-frases` lo desactiva.
+como frase viral, con la etiqueta `proyecto:<id>` (best-effort, dedup por hash),
+si el proyecto tiene guardar_frases. `--sin-frases` lo desactiva.
 
 Eficiencia: transcribe cada clip UNA sola vez (sobre el 9:16 ya desilenciado) y
 reutiliza esos word-timestamps para subtítulos + b-roll (words= a burn_subs).
@@ -35,11 +39,12 @@ reutiliza esos word-timestamps para subtítulos + b-roll (words= a burn_subs).
 Resumible/idempotente: si ya existe finales/<name>.mp4 Y es vertical (h>w), salta
 el clip. Los finales antiguos en 16:9 se REPROCESAN automáticamente.
 
-Uso:
-    python procesar_batch_clip.py                       # todas las carpetas
-    python procesar_batch_clip.py "C:/ruta/a/Clip"      # otra raíz
-    python procesar_batch_clip.py "C:/ruta/a/Clip" "Largo 1 Extractos"  # una sola
-    python procesar_batch_clip.py "C:/ruta/a/Clip" "Largo 1 Extractos" right --solo-transcribir
+Uso ([RAIZ] es opcional: si el primer argumento no es una ruta, es la CARPETA):
+    python procesar_batch_clip.py --proyecto x                      # todas las carpetas de su input/
+    python procesar_batch_clip.py --proyecto x "Carpeta"            # una sola (modo del proyecto)
+    python procesar_batch_clip.py --proyecto x "Carpeta" follow --solo-transcribir
+    python procesar_batch_clip.py --proyecto x "C:/otra/raiz" "Carpeta" right   # otra raíz
+Si solo hay un proyecto, --proyecto se puede omitir.
 """
 import argparse
 import sys
@@ -60,31 +65,60 @@ sys.path.insert(0, str(RAIZ / ".claude" / "skills" / "Editor_Sergio"))
 import pipeline_core as pc  # noqa: E402
 from editar_clips import resolver_env_supabase  # noqa: E402
 import clips as C  # noqa: E402  (reencuadre 9:16 + quitar silencios)
+import proyecto  # noqa: E402
 
-MUSIC = RAIZ / "musicas"
-OVERLAYS = RAIZ / "superposiciones"
+# Recursos del proyecto en curso (los fija main() a partir de proyecto.json).
+MUSIC = None
+OVERLAYS = None
 WORKROOT = RAIZ / "whisper" / "_edit_batch"
 
-CLIP_ROOT_DEFAULT = r"C:/Users/ico858/Desktop/Clip"
 GANCHOS_JSON = "ganchos.json"   # {"<clip>.mp4": "texto del gancho"} por carpeta
 PREP_DIR = "_prep"              # 9:16 desilenciado + words de --solo-transcribir
 
 
 def parse_args():
     ap = argparse.ArgumentParser(description="Reels 9:16 a partir de clips ya cortados.")
-    ap.add_argument("raiz", nargs="?", default=CLIP_ROOT_DEFAULT,
-                    help="Carpeta con subcarpetas de clips (por defecto Desktop/Clip).")
-    ap.add_argument("carpeta", nargs="?", default=None,
-                    help="Procesar solo esta subcarpeta.")
-    # Lado del plano donde está el protagonista (Luis Monge).
-    ap.add_argument("modo", nargs="?", default="right",
-                    help="Encuadre: right|left|center|auto|auto-right|follow|<fracción>.")
+    ap.add_argument("posicionales", nargs="*", metavar="[RAIZ] [CARPETA] [MODO]",
+                    help="RAIZ (opcional; por defecto proyectos/<id>/input/), CARPETA (solo esa "
+                         "subcarpeta) y MODO de encuadre: right|left|center|auto|auto-right|"
+                         "follow|<fracción> (por defecto, el de la carpeta en proyecto.json).")
+    proyecto.add_argumento(ap)
+    ap.add_argument("--raiz", default=None, help="Raíz con subcarpetas de clips (alternativa al posicional).")
     ap.add_argument("--solo-transcribir", action="store_true",
                     help="Reencuadre + silencios + transcripción (textos/ y _prep/), sin renderizar. "
                          "Sirve para escribir ganchos.json antes del render.")
     ap.add_argument("--sin-frases", action="store_true",
                     help="No guarda las transcripciones en viral_phrases.")
     return ap.parse_args()
+
+
+def repartir_posicionales(pos: list, input_dir: Path, raiz_opt: str | None):
+    """(raiz, carpeta, modo) a partir de [RAIZ] [CARPETA] [MODO].
+
+    El primer argumento es RAIZ si es una ruta (absoluta, con separadores o una
+    carpeta existente) y no una subcarpeta del input/ del proyecto; si no, es la
+    CARPETA. Compatible con la forma antigua «RAIZ CARPETA MODO».
+    """
+    pos = list(pos or [])
+    if len(pos) > 3:
+        raise SystemExit("[!] Sobran argumentos: [RAIZ] [CARPETA] [MODO].")
+    raiz = None
+    if pos and not raiz_opt:
+        a = pos[0]
+        es_sub = (not Path(a).is_absolute() and len(Path(a).parts) == 1
+                  and (Path(input_dir) / a).is_dir())
+        parece_ruta = Path(a).is_absolute() or "/" in a or "\\" in a or Path(a).is_dir()
+        if parece_ruta and not es_sub:
+            raiz = Path(pos.pop(0))
+        elif len(pos) == 3:
+            raise SystemExit(f"[!] «{a}» no es una carpeta: usa [RAIZ] [CARPETA] [MODO].")
+    carpeta = pos.pop(0) if pos else None
+    modo = pos.pop(0) if pos else None
+    if pos:
+        raise SystemExit("[!] Sobran argumentos: [RAIZ] [CARPETA] [MODO].")
+    if raiz_opt:
+        raiz = Path(raiz_opt)
+    return (raiz or Path(input_dir)), carpeta, modo
 
 
 def cargar_ganchos(base: Path, carpeta: Path):
@@ -383,7 +417,10 @@ def cargar_env() -> dict:
     for k in ("SUPABASE_URL", "SUPABASE_ANON_KEY"):
         if sup.get(k) and not env.get(k):
             env[k] = sup[k]
-    env.update({"MUSIC_DIR": str(MUSIC), "OVERLAYS_DIR": str(OVERLAYS)})
+    if MUSIC:
+        env["MUSIC_DIR"] = str(MUSIC)
+    if OVERLAYS:
+        env["OVERLAYS_DIR"] = str(OVERLAYS)
     return env
 
 
@@ -430,21 +467,31 @@ def transcribir_words_y_texto(mp4: Path, lang: str = "es"):
 
 
 def main():
+    global MUSIC, OVERLAYS
     args = parse_args()
-    clip_root = Path(args.raiz)
-    solo_carpeta = args.carpeta or None
-    lado = (args.modo or "right").lower()
+    p = proyecto.abrir(args.proyecto, "batch")
+    MUSIC, OVERLAYS = p.music_dir, p.overlays_dir
+    recursos = p.politica_render()          # None = lo de siempre (banco común + internet)
+    sil = p.silencios
+    lang = p.idioma
+    clip_root, solo_carpeta, modo_arg = repartir_posicionales(args.posicionales, p.input_dir, args.raiz)
+    modo_arg = modo_arg.lower() if modo_arg else None
     solo_transcribir = args.solo_transcribir
     if not clip_root.exists():
         raise SystemExit(f"[!] No existe la raíz de clips: {clip_root}")
 
     env = cargar_env()
     tiene_supabase = bool(env.get("SUPABASE_URL") and env.get("SUPABASE_ANON_KEY"))
-    guardar_frases = tiene_supabase and not args.sin_frases and not solo_transcribir
+    guardar_frases = (tiene_supabase and not args.sin_frases and not solo_transcribir
+                      and p.guardar_frases)
     print(f"Raíz: {clip_root}")
-    print(f"Encuadre 9:16 (cara): {'ON' if C._CV2_OK else 'OpenCV NO -> centrado'}  modo={lado}")
+    print(f"Encuadre 9:16 (cara): {'ON' if C._CV2_OK else 'OpenCV NO -> centrado'}  "
+          f"modo={modo_arg or 'el de cada carpeta (proyecto.json)'}")
+    print(f"Silencios: umbral {sil['umbral']} · margen {sil['margen']}")
     print(f"Supabase: {'sí' if tiene_supabase else 'NO'}"
           + ("  (frases desactivadas)" if tiene_supabase and not guardar_frases else ""))
+    if not p.gancho_texto:
+        print("Gancho de texto: el proyecto no lo lleva.")
     if solo_transcribir:
         print("Modo --solo-transcribir: reencuadre + silencios + transcripción, SIN render.")
     sys.stdout.flush()
@@ -471,18 +518,20 @@ def main():
 
     for carpeta in subcarpetas:
         slug = carpeta.name
-        base = RAIZ / "transcripciones" / slug
+        base = p.transcripciones_dir / slug
         out = base / "finales"
         textos = base / "textos"
         prep = base / PREP_DIR
         out.mkdir(parents=True, exist_ok=True)
         textos.mkdir(parents=True, exist_ok=True)
+        lado = modo_arg or p.modo_encuadre(slug)
 
         cls = sorted(carpeta.glob("*.mp4"))
-        print(f"\n########## {slug}  ({len(cls)} clips) ##########", flush=True)
+        print(f"\n########## {slug}  ({len(cls)} clips, encuadre {lado}) ##########", flush=True)
         frases_carpeta = []
-        ganchos, ganchos_path = ({}, None) if solo_transcribir else cargar_ganchos(base, carpeta)
-        if not solo_transcribir:
+        sin_ganchos = solo_transcribir or not p.gancho_texto
+        ganchos, ganchos_path = ({}, None) if sin_ganchos else cargar_ganchos(base, carpeta)
+        if not sin_ganchos:
             if ganchos_path:
                 print(f"   [gancho texto] {len(ganchos)} texto(s) en {ganchos_path}", flush=True)
             else:
@@ -557,12 +606,12 @@ def main():
                     # 2) quitar silencios
                     desil = work / "desil.mp4"
                     try:
-                        C.quitar_silencios(vert, desil)
+                        C.quitar_silencios(vert, desil, umbral=sil["umbral"], margen=sil["margen"])
                     except Exception as e:
                         print(f"   [silencios] fallo ({e}); uso el clip sin recortar", flush=True)
                         desil = vert
                     # 3) transcribir el 9:16 desilenciado (una vez)
-                    words, texto = transcribir_words_y_texto(desil, lang="es")
+                    words, texto = transcribir_words_y_texto(desil, lang=lang)
                     txt_path.write_text(texto, encoding="utf-8")
                     if solo_transcribir:
                         # Deja el 9:16 + words para el render (sin repetir nada).
@@ -576,21 +625,22 @@ def main():
                 if texto:
                     frases_carpeta.append({"phrase": texto})
                 # 4) Fase C (+ gancho de texto si el editor lo escribió)
-                gancho = ganchos.get(name)
+                gancho = ganchos.get(name) if p.gancho_texto else None
                 if gancho:
                     print(f"   [gancho texto] «{gancho}»", flush=True)
-                else:
+                elif p.gancho_texto:
                     sin_gancho.append(f"{slug}/{name}")
                     print(f"   [gancho texto] AVISO: {name} no tiene texto en {GANCHOS_JSON} "
                           f"-> se renderiza SIN gancho", flush=True)
                 out_tmp = work / "out.mp4"
                 pc.burn_subs_and_music(
                     desil, MUSIC, out_tmp,
-                    lang="es", env=env, overlays_dir=OVERLAYS,
+                    lang=lang, env=env, overlays_dir=OVERLAYS,
                     hook_query=None,
                     clip_text=texto or None,
                     words=words,
-                    hook_text=gancho,
+                    hook_text=gancho, hook_text_dur=p.gancho_duracion,
+                    recursos=recursos,
                 )
                 shutil.move(str(out_tmp), str(final_path))
                 hechos += 1
@@ -612,11 +662,13 @@ def main():
                   f'({{"<clip>.mp4": "texto"}}) y relanza sin --solo-transcribir.', flush=True)
 
         if guardar_frases and frases_carpeta:
-            phrases = [{"phrase": f["phrase"], "category": "clip", "angle": slug}
+            phrases = [{"phrase": f["phrase"], "category": "clip", "angle": slug,
+                        "tags": p.etiquetas_frases()}
                        for f in frases_carpeta if f["phrase"]]
             try:
                 res = pc.store_viral_phrases(
-                    env, phrases, source_url=str(carpeta), lang="es", avatar=slug)
+                    env, phrases, source_url=str(carpeta), lang=lang, avatar=slug,
+                    proyecto=p.id)
                 if res.get("ok"):
                     print(f"   [frases] {res['stored']} guardadas en Supabase ({slug}).", flush=True)
                 else:

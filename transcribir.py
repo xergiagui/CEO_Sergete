@@ -6,7 +6,8 @@ Paso 1 del flujo — Transcripcion.
 Convierte el audio a WAV 16 kHz mono y lo transcribe con whisper.cpp usando el
 modelo large-v3 con DTW activado (-dtw large.v3 -nfa). 100% local.
 
-Por cada archivo genera en transcripciones/<nombre>/:
+Trabaja por PROYECTO (`--proyecto <id>`, ver proyecto.py): lee del buzón
+proyectos/<id>/input/ y escribe en proyectos/<id>/transcripciones/<nombre>/:
     - <nombre>.txt   -> texto plano
     - <nombre>.srt   -> subtitulos con marcas de tiempo (DTW)
     - <nombre>.json  -> JSON completo (tokens/tiempos)
@@ -19,9 +20,11 @@ para elegir cortes) y luego se FUSIONAN los tres formatos aplicando el offset de
 tiempo de cada fragmento. La salida es idéntica en formato a la de un vídeo corto.
 
 Uso:
-    python transcribir.py                      -> todo lo que haya en input/
-    python transcribir.py "input/video.mp4"    -> un archivo concreto
-    python transcribir.py "input/largo.mp4" --umbral-min 35 --chunk-min 10
+    python transcribir.py --proyecto mongemalo              -> todo su input/
+    python transcribir.py --proyecto mongemalo "video.mp4"  -> uno de su input/
+    python transcribir.py --proyecto mongemalo "C:/ruta/v.mp4"   (cualquier ruta)
+    python transcribir.py --proyecto x "largo.mp4" --umbral-min 35 --chunk-min 10
+Si solo hay un proyecto, --proyecto se puede omitir.
 """
 import argparse
 import json
@@ -33,9 +36,9 @@ import sys
 import tempfile
 from pathlib import Path
 
+import proyecto
+
 RAIZ = Path(__file__).resolve().parent
-ENTRADA = RAIZ / "input"
-SALIDA = RAIZ / "transcripciones"
 EXTENSIONES = {".mp4", ".mkv", ".mov", ".avi", ".webm", ".m4a", ".mp3", ".wav", ".flac", ".ogg", ".aac"}
 
 FFMPEG = r"C:\Users\ico858\AppData\Local\Microsoft\WinGet\Packages\yt-dlp.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-N-125875-g5d4d3bdc61-win64-gpl\bin\ffmpeg.exe"
@@ -129,9 +132,13 @@ def escribir_txt(destino: Path, segmentos: list):
 def transcribir(origen: Path, idioma: str = "es",
                 umbral_seg: float = UMBRAL_TROCEO_MIN * 60,
                 chunk_seg: float = CHUNK_MIN * 60,
-                work_dir: Path | None = None):
+                work_dir: Path | None = None,
+                salida: Path | None = None):
+    """Transcribe `origen` en <salida>/<stem>/ (salida = transcripciones/ del proyecto)."""
+    if salida is None:
+        raise ValueError("falta la carpeta de salida (transcripciones/ del proyecto)")
     print(f"\n=> Paso 1 — Transcribiendo: {origen.name}")
-    base = SALIDA / origen.stem
+    base = Path(salida) / origen.stem
     base.mkdir(parents=True, exist_ok=True)
 
     # whisper-cli usa fopen ANSI: las tildes de la ruta ('Transcripción',
@@ -223,8 +230,11 @@ def transcribir(origen: Path, idioma: str = "es",
 
 def main():
     parser = argparse.ArgumentParser(description="Paso 1 — Transcripcion con whisper.cpp large-v3 + DTW")
-    parser.add_argument("archivo", nargs="?", help="Archivo concreto (opcional)")
-    parser.add_argument("--idioma", default="es", help="Codigo de idioma (def: es)")
+    parser.add_argument("archivo", nargs="?",
+                        help="Archivo concreto (opcional): nombre en el input/ del proyecto o ruta")
+    proyecto.add_argumento(parser)
+    parser.add_argument("--idioma", default=None,
+                        help="Codigo de idioma (def: el del proyecto, si no 'es')")
     parser.add_argument("--umbral-min", type=float, default=UMBRAL_TROCEO_MIN,
                         help=f"Duracion (min) a partir de la cual se trocea (def: {UMBRAL_TROCEO_MIN})")
     parser.add_argument("--chunk-min", type=float, default=CHUNK_MIN,
@@ -234,6 +244,9 @@ def main():
                              "Por defecto se crea uno UNICO por ejecucion (seguro "
                              "para transcripciones en paralelo).")
     args = parser.parse_args()
+    p = proyecto.abrir(args.proyecto, "transcribir")
+    entrada, salida = p.input_dir, p.transcripciones_dir
+    idioma = args.idioma or p.idioma
 
     if not WHISPER_CLI.exists():
         raise SystemExit(f"[!] No existe whisper-cli: {WHISPER_CLI}")
@@ -241,13 +254,16 @@ def main():
         raise SystemExit(f"[!] No existe el modelo: {MODELO}")
 
     if args.archivo:
-        objetivos = [Path(args.archivo)]
+        a = Path(args.archivo)
+        # nombre suelto -> del buzón del proyecto; si no, la ruta tal cual
+        objetivos = [entrada / a if (not a.is_absolute() and len(a.parts) == 1
+                                     and (entrada / a).exists()) else a]
     else:
-        ENTRADA.mkdir(exist_ok=True)
-        objetivos = sorted(p for p in ENTRADA.iterdir()
-                           if p.is_file() and p.suffix.lower() in EXTENSIONES)
+        entrada.mkdir(parents=True, exist_ok=True)
+        objetivos = sorted(f for f in entrada.iterdir()
+                           if f.is_file() and f.suffix.lower() in EXTENSIONES)
     if not objetivos:
-        raise SystemExit(f"[!] No hay archivos para transcribir en {ENTRADA}")
+        raise SystemExit(f"[!] No hay archivos para transcribir en {entrada}")
 
     umbral_seg = args.umbral_min * 60
     chunk_seg = args.chunk_min * 60
@@ -256,9 +272,9 @@ def main():
         if not ruta.exists():
             print(f"[!] No existe: {ruta}")
             continue
-        transcribir(ruta, args.idioma, umbral_seg, chunk_seg, work_dir)
+        transcribir(ruta, idioma, umbral_seg, chunk_seg, work_dir, salida=salida)
 
-    print(f"\nListo. Transcripciones en: {SALIDA}")
+    print(f"\nListo. Transcripciones en: {salida}")
 
 
 if __name__ == "__main__":

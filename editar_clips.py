@@ -7,22 +7,28 @@ GENERICO: funciona con cualquier video. La imagen-gancho de cada clip se toma
 del `hook_query` del cortes.json (el mismo que uso clips.py); si un clip no lo
 trae, se deriva del nombre. Asi el flujo es 100% automatico sin tocar codigo.
 
-Por cada clip de transcripciones/<video>/clips/ aplica:
-  gancho visual (mini-video de Pexels / imagen libre) + gancho de TEXTO en la
-  franja superior los primeros ~2,5 s (`gancho_texto` del cortes.json; si falta,
-  el `titulo`) + b-roll local (superposiciones/) + musica local (musicas/) +
-  de-click + subtitulos palabra a palabra (una sola vez, enmascarando palabrotas).
+Trabaja por PROYECTO (`--proyecto <id>`, ver proyecto.py) y SOLO con los
+recursos que permite su `proyecto.json → recursos`.
+
+Por cada clip de proyectos/<id>/transcripciones/<video>/clips/ aplica:
+  gancho visual (mini-video de Pexels / imagen libre; solo si el proyecto tiene
+  gancho_visual=pexels e internet) + gancho de TEXTO en la franja superior los
+  primeros ~2,5 s (`gancho_texto` del cortes.json; si falta, el `titulo`) +
+  b-roll (banco común superposiciones/ o el propio del proyecto) + música (banco
+  común musicas/ o la propia) + de-click + subtitulos palabra a palabra (una sola
+  vez, enmascarando palabrotas).
 
 Trabaja en una carpeta ASCII ÚNICA por proceso (whisper/_edit_XXXX via mkdtemp)
 para evitar problemas de rutas con tildes en el filtro de subtitulos de ffmpeg y
-para no pisar ediciones en paralelo. Salida en transcripciones/<video>/finales/.
+para no pisar ediciones en paralelo. Salida en
+proyectos/<id>/transcripciones/<video>/finales/.
 
 Uso:
-    python editar_clips.py "Mi Adicción"
-    python editar_clips.py "input/video.mp4"
-    python editar_clips.py "video" --cortes cortes.json
-    python editar_clips.py "video" --sin-gancho-texto   # sin texto de gancho
-    python editar_clips.py "video" --sin-frases         # no guarda en viral_phrases
+    python editar_clips.py --proyecto mongemalo "Mi Adicción"
+    python editar_clips.py --proyecto mongemalo "video" --cortes cortes.json
+    python editar_clips.py --proyecto x "video" --sin-gancho-texto   # sin texto de gancho
+    python editar_clips.py --proyecto x "video" --sin-frases         # no guarda en viral_phrases
+Si solo hay un proyecto, --proyecto se puede omitir.
 """
 import argparse
 import json
@@ -45,9 +51,8 @@ for _s in (sys.stdout, sys.stderr):
 RAIZ = Path(__file__).resolve().parent
 sys.path.insert(0, str(RAIZ / ".claude" / "skills" / "Editor_Sergio"))
 import pipeline_core as pc  # noqa: E402
+import proyecto  # noqa: E402
 
-MUSIC = RAIZ / "musicas"
-OVERLAYS = RAIZ / "superposiciones"
 # Raíz ASCII bajo la que se crea el work dir ÚNICO por ejecución (ver main()).
 # whisper-cli/ffmpeg abren rutas ANSI, así que el intermedio va bajo whisper/
 # con nombre ASCII garantizado.
@@ -92,12 +97,14 @@ def resolver_env_supabase() -> dict:
 
 
 def guardar_frases_virales(nombre: str, cortes_path: Path,
-                           source_url: str = None, env: dict = None) -> dict:
+                           source_url: str = None, env: dict = None,
+                           proyecto_obj=None) -> dict:
     """Lee cortes.json y guarda las frases virales en Supabase (best-effort).
 
     Por cada corte usa `frase_viral` (texto verbatim); si falta, cae al `titulo`
     y, en ultimo caso, al `hook_query`. Pasa tambien angle/virality/category/
     rationale/tags si el corte los trae. avatar_name = slug del video (nombre).
+    Con `proyecto_obj`, cada frase lleva la etiqueta `proyecto:<id>`.
     Nunca lanza: si no hay env/Supabase o falla la red, avisa y continua. El
     dedup por phrase_hash en store_viral_phrases evita duplicados al re-ejecutar.
     """
@@ -126,7 +133,8 @@ def guardar_frases_virales(nombre: str, cortes_path: Path,
             "angle": c.get("angle"),
             "virality": c.get("virality"),
             "rationale": c.get("rationale"),
-            "tags": c.get("tags") or [],
+            "tags": (proyecto_obj.etiquetas_frases(c.get("tags")) if proyecto_obj
+                     else (c.get("tags") or [])),
         })
     if not phrases:
         print("   [frases] ningun corte trae frase_viral/titulo; nada que guardar.", flush=True)
@@ -134,7 +142,9 @@ def guardar_frases_virales(nombre: str, cortes_path: Path,
 
     try:
         res = pc.store_viral_phrases(env, phrases, source_url=source_url,
-                                     lang="es", avatar=nombre)
+                                     lang=(proyecto_obj.idioma if proyecto_obj else "es"),
+                                     avatar=nombre,
+                                     proyecto=(proyecto_obj.id if proyecto_obj else None))
     except Exception as e:  # blindaje extra: jamas rompe el pipeline
         print(f"   [frases] guardado fallo (ignorado): {e}", flush=True)
         return {"ok": False, "reason": str(e)}
@@ -179,8 +189,10 @@ def cargar_cortes_meta(cortes_path: Path) -> dict:
 
 def main():
     ap = argparse.ArgumentParser(description="Edicion final (Fase C) de los clips de un video.")
-    ap.add_argument("video", help="Nombre en input/ o ruta al video.")
-    ap.add_argument("--cortes", help="Ruta al cortes.json (por defecto transcripciones/<video>/cortes.json).")
+    ap.add_argument("video", help="Nombre del video (o ruta) cuyos clips se editan.")
+    proyecto.add_argumento(ap)
+    ap.add_argument("--cortes", help="Ruta al cortes.json (por defecto "
+                                     "proyectos/<id>/transcripciones/<video>/cortes.json).")
     ap.add_argument("--work-dir", help="Work dir ASCII para intermedios (por defecto uno único por proceso bajo whisper/). "
                                        "Si se suministra, NO se borra al terminar.")
     ap.add_argument("--sin-gancho-texto", action="store_true",
@@ -188,11 +200,17 @@ def main():
     ap.add_argument("--sin-frases", action="store_true",
                     help="No guarda las frases en viral_phrases (pruebas o re-render de correcciones).")
     args = ap.parse_args()
+    p = proyecto.abrir(args.proyecto, "editar_clips")
+    MUSIC, OVERLAYS = p.music_dir, p.overlays_dir
+    recursos = p.politica_render()          # None = lo de siempre (banco común + internet)
+    sin_gancho_texto = args.sin_gancho_texto or not p.gancho_texto
+    sin_frases = args.sin_frases or not p.guardar_frases
 
     nombre = resolver_nombre(args.video)
-    clips_dir = RAIZ / "transcripciones" / nombre / "clips"
-    out = RAIZ / "transcripciones" / nombre / "finales"
-    cortes_path = Path(args.cortes) if args.cortes else (RAIZ / "transcripciones" / nombre / "cortes.json")
+    base = p.transcripciones_dir / nombre
+    clips_dir = base / "clips"
+    out = base / "finales"
+    cortes_path = Path(args.cortes) if args.cortes else (base / "cortes.json")
     hooks = cargar_hooks(cortes_path)
     cortes_meta = cargar_cortes_meta(cortes_path)
 
@@ -206,7 +224,10 @@ def main():
             env = json.loads(pc.ENV_PATH.read_text())
     except Exception:
         env = {}
-    env.update({"MUSIC_DIR": str(MUSIC), "OVERLAYS_DIR": str(OVERLAYS)})
+    if MUSIC:
+        env["MUSIC_DIR"] = str(MUSIC)
+    if OVERLAYS:
+        env["OVERLAYS_DIR"] = str(OVERLAYS)
     out.mkdir(parents=True, exist_ok=True)
 
     # CONCURRENCIA: el work dir debe ser ÚNICO por ejecución. Antes se usaba un
@@ -231,6 +252,8 @@ def main():
     for clip in clips:
         name = clip.stem
         hook = hooks.get(name) or name.split("_", 1)[-1].replace("_", " ")
+        if not p.usa_gancho_visual:
+            hook = None                      # proyecto sin gancho visual (o sin internet)
         corte = cortes_meta.get(name, {})
         # Tipología de música explícita (mood) y texto del clip para inferirla.
         music_typology = corte.get("tipologia_musica")
@@ -238,11 +261,11 @@ def main():
                      or hook or "").strip() or None
         # Gancho de TEXTO en pantalla: gancho_texto del corte; si falta, el titulo.
         gancho_texto = None
-        if not args.sin_gancho_texto:
+        if not sin_gancho_texto:
             gancho_texto = (corte.get("gancho_texto") or corte.get("titulo") or "").strip() or None
         print(f"=== {name}   gancho='{hook}'"
               + (f"   mood='{music_typology}'" if music_typology else ""), flush=True)
-        if args.sin_gancho_texto:
+        if sin_gancho_texto:
             pass
         elif not gancho_texto:
             print("   [gancho texto] AVISO: el corte no trae gancho_texto ni titulo -> sin texto de gancho",
@@ -257,9 +280,10 @@ def main():
         try:
             pc.burn_subs_and_music(
                 ascii_in, MUSIC, out_tmp,
-                lang="es", env=env, overlays_dir=OVERLAYS, hook_query=hook,
+                lang=p.idioma, env=env, overlays_dir=OVERLAYS, hook_query=hook,
                 music_typology=music_typology, clip_text=clip_text,
-                hook_text=gancho_texto,
+                hook_text=gancho_texto, hook_text_dur=p.gancho_duracion,
+                recursos=recursos,
             )
             shutil.move(str(out_tmp), str(out / f"{name}.mp4"))
             print(f"   OK -> finales/{name}.mp4", flush=True)
@@ -274,12 +298,13 @@ def main():
     # --- Banco de frases virales (Supabase, best-effort) ---------------------
     # Al terminar la edicion guardamos las frases virales de este video en la
     # tabla viral_phrases para reutilizarlas mas adelante (historias, hooks...).
-    if args.sin_frases:
-        print("   [frases] --sin-frases: no se guardan en viral_phrases.", flush=True)
+    if sin_frases:
+        motivo = "--sin-frases" if args.sin_frases else "el proyecto tiene guardar_frases=false"
+        print(f"   [frases] {motivo}: no se guardan en viral_phrases.", flush=True)
         return
-    inp = RAIZ / "input" / f"{nombre}.mp4"
+    inp = p.input_dir / f"{nombre}.mp4"
     source_url = str(inp) if inp.exists() else str(args.video)
-    guardar_frases_virales(nombre, cortes_path, source_url=source_url)
+    guardar_frases_virales(nombre, cortes_path, source_url=source_url, proyecto_obj=p)
 
 
 if __name__ == "__main__":

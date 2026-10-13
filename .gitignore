@@ -1,13 +1,25 @@
-# Recursos locales para edición — NO sincronizar con git
+# Recursos locales del banco común — NO sincronizar con git
 musicas/
 superposiciones/
+_musicas_eliminadas/
 
 # whisper.cpp (binario + modelo ~3GB) — NO sincronizar
 whisper/
 
-# Entradas y salidas de trabajo
-input/
-transcripciones/
+# Proyectos: se versiona su configuración (proyecto.json, reglas.md) y la
+# estructura (.gitkeep); NO los vídeos, la música, el trabajo ni los logs.
+proyectos/*/input/*
+proyectos/*/transcripciones/*
+proyectos/*/logs/*
+proyectos/*/recursos/*/*
+!proyectos/*/**/.gitkeep
+# …salvo las descripciones del b-roll propio (texto, se escriben a mano)
+!proyectos/*/recursos/broll/_descripciones.json
+
+# Entradas y salidas antiguas (antes de los proyectos)
+/input/
+/transcripciones/
+/logs/
 
 # Python
 .venv/
