@@ -52,7 +52,8 @@ pone TheCopy al dar OK) y **SÍ entran en el calendario de publicación**.
      (`cortes.json` + `.srt`/`.txt`);
    - **artículo:** `..\TheTextos\textos\<fecha>_<slug>\articulo.md`;
    - **tema o notas** de Sergio.
-   **No toques nada de `_Historico`**: solo se lee.
+   **No toques nada de `_Historico`**: solo se lee. Si la portada lleva foto de
+   un vídeo, elige el fotograma con `--candidatos-portada` (ver Diseño).
 2. `carruseles.py --plan <plan.json> --solo-validar` hasta que no haya errores
    (y revisa los avisos y la auditoría).
 3. `carruseles.py --plan <plan.json>` valida, audita, renderiza y hace el QC.
@@ -94,8 +95,8 @@ pone TheCopy al dar OK) y **SÍ entran en el calendario de publicación**.
 - **ERROR (no renderiza):** menos de 2 o más de 10 slides; la primera no es
   `gancho`, la última no es `cierre` o una intermedia no es `valor`; texto que no
   cabe ni al tamaño mínimo; campos obligatorios vacíos; `formula`, `objetivo`,
-  `pilar` o `fuente.tipo` fuera de sus valores; `**` sin cerrar; emojis;
-  `portada_fondo` inexistente.
+  `pilar`, `fuente.tipo` o `portada_texto` fuera de sus valores; `**` sin
+  cerrar; emojis; `portada_fondo` inexistente.
 - **AVISO:** menos de 4 slides; títulos/textos por encima de las longitudes
   orientativas; más de una palabra destacada; minúscula al empezar o tras punto;
   mayúsculas sostenidas; falta «¿»/«¡»; primera persona; fórmula poco afín al
@@ -113,12 +114,28 @@ pone TheCopy al dar OK) y **SÍ entran en el calendario de publicación**.
   palabra destacada). Montserrat Bold (títulos y números) y SemiBold (texto).
 - Margen lateral 110 px (≥ 100): nada importante en los ~45 px de cada lado, que
   la cuadrícula del perfil recorta a 3:4.
-- Slide 1: título grande centrado; `portada_fondo` opcional (imagen, o vídeo +
-  `segundo`, con `foco_y` 0–1 para el encuadre vertical) oscurecido al 60 %;
-  «desliza →» en dorado abajo a la derecha.
+- **Centro óptico:** los bloques se centran a ~46 % de la altura
+  (`centro_optico`), un poco por encima del centro.
+- Slide 1: título grande centrado en horizontal y «desliza →» en dorado abajo a
+  la derecha. `portada_fondo` es opcional (imagen, o vídeo + `segundo`; `foco_y`
+  0–1 elige la franja vertical, 0 = arriba). Con foto, `portada_texto`:
+  - `"abajo"` (por defecto): texto en la mitad inferior (desde ~55 %, pegado
+    abajo sobre «desliza») con un degradado oscuro que sube desde abajo, para que
+    la cara se vea arriba;
+  - `"centro"`: texto en el centro óptico con oscurecido plano al 60 %.
+  Sin foto, siempre en el centro óptico.
+- **Fotograma de portada:** nunca a ojo. Lanza
+  `carruseles.py --candidatos-portada <video.mp4>`: ordena por nitidez (varianza
+  del laplaciano en la zona de la cara) y saca una hoja. Elige el más nítido con
+  **gesto natural**, sin rótulos ni subtítulos quemados, y con la cara en la
+  mitad superior (en verticales de busto, `foco_y` 0).
 - Valor: número grande dorado (`01`, `02`… o `numero` en la slide; `false` lo
-  oculta), título, barra y texto; contador «n/N». Todas las slides de valor
-  comparten tamaño de letra y altura para que nada salte al deslizar.
+  oculta), título, barra y texto; contador «n/N» arriba. Todas comparten tamaño
+  de letra y caja: se centra la caja de la slide de valor más alta en el centro
+  óptico y cada una se alinea arriba dentro de ella, así el número queda a la
+  misma altura y nada salta al deslizar (`valor_referencia: "mediana"` centra la
+  mediana en su lugar, sin que la más alta se salga). Cierre: centrado a su
+  altura.
 - `handle` (arroba) **vacío** hasta que Sergio lo dé; si está vacío no se pinta.
 
 ### Contrato de la salida (lo lee TheCopy: no lo cambies)
@@ -130,7 +147,8 @@ salidas\carrusel_<AAAAMMDD-HHMM>_<slug>\
 ```
 `carrusel.json` = `tipo` («carrusel»), `proyecto`, `slug`, `tema`, `formula`,
 `objetivo`, `pilar`, `fuente {tipo, ruta, credito}`, `slides [{n, rol, titulo,
-texto, …}]`, `creado`, más los extras opcionales del plan (`portada_fondo`, y en
+texto, …}]`, `creado`, más los extras opcionales del plan (`portada_fondo`,
+`portada_texto`, y en
 las slides `numero`, `puntos`, `peticion`). Los textos conservan el marcado
 `**…**` de la palabra destacada.
 

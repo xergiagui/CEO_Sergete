@@ -14,6 +14,8 @@ Uso:
   python carruseles.py --plan carruseles/planes/<slug>.json
   python carruseles.py --plan <plan.json> --solo-validar
   python carruseles.py --plan <plan.json> --no-auditar
+  python carruseles.py --candidatos-portada <video.mp4> [--n 8] [--hoja ruta.jpg]
+      (fotogramas más nítidos para `portada_fondo`; tú eliges el gesto)
 
 Ejecuta con el .venv de TheEditor (Pillow + imageio-ffmpeg). No instala nada.
 Códigos de salida: 0 OK · 1 errores de validación/QC · 2 uso o fichero ilegible.
@@ -31,20 +33,62 @@ from PIL import Image
 import config
 from lib import carrusel_auditoria as auditoria
 from lib.carrusel_plan import Hallazgo, plan_para_json, validar_plan
-from lib.carrusel_render import (Maquetador, NoCabe, cargar_estilo, guardar_jpg,
-                                 hoja_contacto, perfil_srgb, preparar_portada)
+from lib.carrusel_render import (Maquetador, NoCabe, candidatos_portada, cargar_estilo,
+                                 guardar_jpg, hoja_contacto, perfil_srgb,
+                                 preparar_portada)
 
 
 def _args(argv=None):
     p = argparse.ArgumentParser(description="Genera un CARRUSEL de Instagram (4:5) desde un plan.json.")
-    p.add_argument("--plan", required=True, help="ruta del plan.json")
+    p.add_argument("--plan", help="ruta del plan.json")
     p.add_argument("--estilo", default=str(config.CARRUSEL_ESTILO),
                    help="estilo.json (def. carruseles/estilo.json)")
     p.add_argument("--auditar", action=argparse.BooleanOptionalAction, default=None,
                    help="auditar el estilo con TheCopy (def.: sí, si TheCopy está)")
     p.add_argument("--solo-validar", action="store_true",
                    help="valida, comprueba que el texto cabe y audita; no escribe nada")
-    return p.parse_args(argv)
+    p.add_argument("--candidatos-portada", metavar="VIDEO",
+                   help="lista los fotogramas más nítidos (cara en la mitad superior) "
+                        "para elegir `portada_fondo.segundo`; no necesita plan")
+    p.add_argument("--n", type=int, default=8, help="nº de candidatos (def. 8)")
+    p.add_argument("--hoja", help="dónde guardar la hoja de candidatos (def. carpeta temporal)")
+    a = p.parse_args(argv)
+    if not a.plan and not a.candidatos_portada:
+        p.error("falta --plan (o --candidatos-portada VIDEO)")
+    return a
+
+
+def _candidatos(args) -> int:
+    import tempfile
+    from PIL import ImageDraw
+    video = Path(args.candidatos_portada)
+    if not video.exists():
+        print(f"[!] No existe el vídeo: {video}")
+        return 2
+    cands = candidatos_portada(video, n=max(1, args.n))
+    if not cands:
+        print("[!] No se pudo leer ningún fotograma.")
+        return 2
+    print(f"[i] {video.name}: {len(cands)} fotogramas más nítidos (varianza del laplaciano "
+          f"en la zona de la cara):")
+    for seg, nit, _ in cands:
+        print(f"    segundo {seg:>6.1f} · nitidez {nit:7.1f}")
+    miniaturas = []
+    for seg, nit, im in cands:
+        th = im.resize((270, round(270 * im.height / im.width)))
+        ImageDraw.Draw(th).text((8, 8), f"s={seg:g}  n={nit:.0f}", fill=(255, 210, 0))
+        miniaturas.append(th)
+    hoja = Image.new("RGB", (len(miniaturas) * 280, max(m.height for m in miniaturas) + 10),
+                     (20, 20, 20))
+    for i, m in enumerate(miniaturas):
+        hoja.paste(m, (5 + i * 280, 5))
+    destino = Path(args.hoja) if args.hoja else \
+        Path(tempfile.gettempdir()) / f"candidatos_{video.stem}.jpg"
+    hoja.save(destino, "JPEG", quality=85)
+    print(f"[i] Hoja: {destino}")
+    print("    Elige el de gesto natural y ponlo en `portada_fondo.segundo` "
+          "(ajusta `foco_y` para dejar la cara en la mitad superior).")
+    return 0
 
 
 def _imprimir(hallazgos: list[Hallazgo]):
@@ -151,6 +195,8 @@ def main(argv=None) -> int:
         except Exception:
             pass
     args = _args(argv)
+    if args.candidatos_portada:
+        return _candidatos(args)
 
     plan_path = Path(args.plan).resolve()
     try:
@@ -170,6 +216,9 @@ def main(argv=None) -> int:
 
     plan, hallazgos = validar_plan(plan_raw, estilo, plan_path.parent)
     maq = Maquetador(estilo)
+    # Con foto, el texto del gancho va abajo (def.) o en el centro; sin foto, centro.
+    maq.configurar_portada(bool(plan.get("portada_fondo")),
+                           plan.get("portada_texto") or estilo.get("portada_texto"))
     hallazgos += _comprobar_ajuste(plan, maq)
     hallazgos.sort(key=lambda h: (h.slide or 0))
     n_slides = len(plan.get("slides") or [])
@@ -194,12 +243,13 @@ def main(argv=None) -> int:
     portada = None
     if plan.get("portada_fondo"):
         try:
-            portada = preparar_portada(plan["portada_fondo"], plan_path.parent, estilo)
+            portada = preparar_portada(plan["portada_fondo"], plan_path.parent, estilo,
+                                       modo=maq.modo_portada)
         except Exception as e:
             print(f"\n[X] Portada: {e}")
             return 1
     credito = ((plan.get("fuente") or {}).get("credito") or "").strip()
-    ajustes = maq.ajustes(plan["slides"])       # valor: misma escala y misma altura
+    ajustes = maq.ajustes(plan["slides"])       # valor: misma escala y misma caja
     imgs = []
     for s in plan["slides"]:
         t, y_top, idx_valor = ajustes[s["n"]]

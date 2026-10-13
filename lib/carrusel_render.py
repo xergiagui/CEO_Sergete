@@ -8,13 +8,21 @@ de su rango [max, min] de `estilo.json`. Si ni al mínimo cabe (en alto, o hay
 una palabra más ancha que la columna), la slide lanza `NoCabe` → ERROR.
 
 Roles:
-  gancho  título grande centrado (+ línea del bucle abierto), fondo opcional
-          (imagen o fotograma de vídeo, oscurecido) y «desliza →» abajo a la
-          derecha.
+  gancho  título grande centrado (+ línea del bucle abierto) y «desliza →»
+          abajo a la derecha. Con foto (`portada_fondo`) y `portada_texto` =
+          "abajo" (def.), el texto va en la mitad inferior (alineado abajo, por
+          encima de «desliza») sobre un degradado oscuro que sube desde abajo,
+          para que la cara se vea arriba; con
+          "centro", texto en el centro óptico y oscurecido plano.
   valor   número grande en dorado, título, barra de acento y texto; contador
           «n/N» arriba a la derecha.
   cierre  título, lista-resumen opcional (`puntos`), texto, la petición en
           dorado y el crédito de la fuente en pequeño.
+
+Posición vertical: los bloques se centran en el CENTRO ÓPTICO (`centro_optico`,
+~46 % de la altura). Las slides de valor comparten escala y caja: se centra la
+caja de la más alta y el contenido de cada una va alineado arriba dentro de esa
+caja, así el número grande queda a la misma altura en todas.
 
 `**palabra**` pinta ese tramo en el color de acento. La arroba (`handle`) solo
 se pinta si está rellena en estilo.json.
@@ -23,6 +31,7 @@ from __future__ import annotations
 
 import io
 import json
+import statistics
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -264,6 +273,24 @@ class Maquetador:
         self.tam = estilo["tamanos"]
         self.il = estilo.get("interlineado") or {}
         self.barra = estilo.get("barra_acento") or [96, 8]
+        self.centro = self.H * float(estilo.get("centro_optico", 0.46))
+        self.modo_portada = "centro"
+        self.zona_gancho = (self.top, self.bottom)
+
+    def configurar_portada(self, con_foto: bool, modo: str | None = None):
+        """Con foto y modo "abajo", el gancho vive en la mitad inferior
+        [portada_texto_desde·H .. margen inferior]; si no, en el centro óptico."""
+        modo = (modo or self.e.get("portada_texto") or "abajo") if con_foto else "centro"
+        self.modo_portada = modo
+        if modo == "abajo":
+            desde = round(self.H * float(self.e.get("portada_texto_desde", 0.55)))
+            self.zona_gancho = (desde, self.bottom)
+        else:
+            self.zona_gancho = (self.top, self.bottom)
+
+    def _y_centrado(self, alto: float) -> float:
+        """Arriba de un bloque de `alto` centrado en el centro óptico, sin salirse."""
+        return min(max(self.centro - alto / 2, self.top), self.bottom - alto)
 
     # -- pila de elementos para una t dada; None si algo no cabe en ancho
     def _pila(self, slide: dict, idx_valor: int | None, t: float):
@@ -344,7 +371,8 @@ class Maquetador:
     def maquetar(self, slide: dict, idx_valor: int | None = None, t_max: float = 1.0):
         """Busca la mayor escala (≤ t_max) con la que todo cabe.
         Devuelve (pila, align, t, alto)."""
-        zona = self.bottom - self.top
+        z0, z1 = self.zona_gancho if slide["rol"] == "gancho" else (self.top, self.bottom)
+        zona = z1 - z0
         exceso = None
         for t in _PASOS:
             if t > t_max + 1e-9:
@@ -366,10 +394,11 @@ class Maquetador:
         """Ajuste de TODO el carrusel → {n: (t, y_top, idx_valor)}.
 
         Las slides de valor comparten escala (la menor que necesite cualquiera) y
-        posición vertical (centrada para el alto medio, sin que la más alta se
-        salga), para que número, título y texto no cambien de tamaño ni de sitio
-        al deslizar. Gancho y cierre se ajustan y centran por su cuenta. Lanza
-        NoCabe si alguna no cabe.
+        caja: la de la más alta (o la mediana, con `valor_referencia` = "mediana"),
+        centrada en el centro óptico; el contenido de cada una va alineado arriba
+        dentro de esa caja, para que número, título y texto
+        no cambien de tamaño ni de sitio al deslizar. Gancho y cierre se ajustan y
+        centran por su cuenta. Lanza NoCabe si alguna no cabe.
         """
         out, valor, idx = {}, [], 0
         for s in slides:
@@ -386,11 +415,13 @@ class Maquetador:
             for s, i, _ in valor:
                 _, _, t, alto = self.maquetar(s, i, t_comun)
                 altos[s["n"]] = (t, i, alto)
-            # Centrada para el alto MEDIO, sin que la más alta se salga de la zona.
-            alturas = [a for _, _, a in altos.values()]
-            medio = sum(alturas) / len(alturas)
-            y_top = min(self.top + (self.bottom - self.top - medio) / 2,
-                        self.bottom - max(alturas))
+            alturas = sorted(a for _, _, a in altos.values())
+            # Caja de referencia: la más alta (def.) o la mediana (`valor_referencia`).
+            if self.e.get("valor_referencia", "mas_alta") == "mediana":
+                ref = statistics.median(alturas)
+            else:
+                ref = alturas[-1]
+            y_top = min(self._y_centrado(ref), self.bottom - alturas[-1])
             for n, (t, i, _) in altos.items():
                 out[n] = (t, y_top, i)
         return out
@@ -406,7 +437,12 @@ class Maquetador:
             img = Image.new("RGB", (self.W, self.H), self.c_fondo)
         d = ImageDraw.Draw(img)
 
-        y = self.top + (self.bottom - self.top - alto) / 2 if y_top is None else y_top
+        if y_top is not None:
+            y = y_top
+        elif slide["rol"] == "gancho" and self.modo_portada == "abajo":
+            y = self.zona_gancho[1] - alto      # pegado abajo: la cara queda libre arriba
+        else:
+            y = self._y_centrado(alto)
         for x in pila:
             if isinstance(x, int):
                 y += x
@@ -480,8 +516,15 @@ def fotograma(video: Path, segundo: float) -> Image.Image:
     return Image.open(io.BytesIO(r.stdout)).convert("RGB")
 
 
-def preparar_portada(valor, plan_dir: Path | None, estilo: dict) -> Image.Image | None:
-    """Imagen o fotograma de vídeo → cover 1080x1350 oscurecido."""
+def preparar_portada(valor, plan_dir: Path | None, estilo: dict,
+                     modo: str = "abajo") -> Image.Image | None:
+    """Imagen o fotograma de vídeo → cover 1080x1350 oscurecido.
+
+    modo "abajo": degradado del color de fondo que sube desde abajo
+    (`portada_degradado`: `base` arriba, sube entre `desde` y `hasta` y se queda
+    en `max`), para que la cara se vea arriba y el texto se lea abajo.
+    modo "centro": oscurecido plano (`portada_oscurecer`, ~0,6).
+    """
     port = normalizar_portada(valor, plan_dir)
     if not port or "_error" in port:
         return None
@@ -498,9 +541,59 @@ def preparar_portada(valor, plan_dir: Path | None, estilo: dict) -> Image.Image 
     x = (img.width - W) // 2
     y = round((img.height - H) * min(1.0, max(0.0, foco)))
     img = img.crop((x, y, x + W, y + H))
-    oscuro = float(estilo.get("portada_oscurecer", 0.6))
     capa = Image.new("RGB", (W, H), _rgb(estilo["colores"]["fondo"]))
-    return Image.blend(img, capa, max(0.0, min(1.0, oscuro)))
+    if modo != "abajo":
+        oscuro = float(estilo.get("portada_oscurecer", 0.6))
+        return Image.blend(img, capa, max(0.0, min(1.0, oscuro)))
+    g = estilo.get("portada_degradado") or {}
+    base, maximo = float(g.get("base", 0.12)), float(g.get("max", 0.93))
+    desde, hasta = float(g.get("desde", 0.35)), float(g.get("hasta", 0.70))
+    filas = []
+    for fy in range(H):
+        u = min(1.0, max(0.0, (fy / H - desde) / max(1e-6, hasta - desde)))
+        u = u * u * (3 - 2 * u)                                  # smoothstep
+        filas.append(round(255 * (base + (maximo - base) * u)))
+    mascara = Image.new("L", (1, H))
+    mascara.putdata(filas)
+    return Image.composite(capa, img, mascara.resize((W, H)))
+
+
+def nitidez(img: Image.Image, caja: tuple = (0.32, 0.10, 0.68, 0.42)) -> float:
+    """Varianza del laplaciano (en gris) dentro de `caja` (fracciones x0, y0, x1, y1)."""
+    from PIL import ImageFilter, ImageStat
+    w, h = img.size
+    x0, y0, x1, y1 = caja
+    zona = img.convert("L").crop((round(w * x0), round(h * y0), round(w * x1), round(h * y1)))
+    lap = zona.filter(ImageFilter.Kernel((3, 3), [0, 1, 0, 1, -4, 1, 0, 1, 0], scale=1,
+                                         offset=128))
+    return ImageStat.Stat(lap).var[0]
+
+
+def candidatos_portada(video: Path, paso: float = 0.5, n: int = 8,
+                       caja: tuple = (0.32, 0.10, 0.68, 0.42),
+                       separacion: float = 1.0) -> list[tuple[float, float, Image.Image]]:
+    """Fotogramas más NÍTIDOS del vídeo: varianza del laplaciano en `caja` (por
+    defecto la zona de la cara en un vertical de busto: centro, mitad superior;
+    así no puntúan las estanterías del fondo ni los rótulos). Devuelve
+    hasta `n` (segundo, nitidez, imagen) separados al menos `separacion` s. El
+    gesto se elige mirando la hoja (`carruseles.py --candidatos-portada`)."""
+    cmd = [_ffmpeg(), "-v", "error", "-i", str(video), "-vf", f"fps={1 / paso:g}",
+           "-f", "image2pipe", "-vcodec", "bmp", "-"]
+    r = subprocess.run(cmd, capture_output=True)
+    datos, i, frames = r.stdout, 0, []
+    while i + 6 <= len(datos) and datos[i:i + 2] == b"BM":
+        tam = int.from_bytes(datos[i + 2:i + 6], "little")
+        frames.append(Image.open(io.BytesIO(datos[i:i + tam])).convert("RGB"))
+        i += tam
+    puntuados = sorted(((k * paso, nitidez(f, caja), f) for k, f in enumerate(frames)),
+                       key=lambda x: -x[1])
+    elegidos: list = []
+    for seg, nit, f in puntuados:
+        if all(abs(seg - s2) >= separacion for s2, _, _ in elegidos):
+            elegidos.append((seg, nit, f))
+        if len(elegidos) >= n:
+            break
+    return elegidos
 
 
 # ------------------------------------------------------------------ salida

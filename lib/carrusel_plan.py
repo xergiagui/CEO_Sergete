@@ -17,7 +17,7 @@ Niveles:
 Esquema (resumen; detalle en README.md):
   tipo, proyecto, slug, tema, formula, objetivo, pilar,
   fuente {tipo, ruta, credito}, slides [{n, rol, titulo, texto, ...}],
-  portada_fondo (opcional)
+  portada_fondo y portada_texto ("abajo" | "centro") (opcionales)
 Extras opcionales por slide: `numero` (valor: número a mostrar o false),
 `puntos` (cierre: lista-resumen) y `peticion` (cierre: la única petición).
 """
@@ -35,6 +35,7 @@ OBJETIVOS = ("guardados", "compartidos", "comentarios", "seguidores")
 PILARES = ("educativo", "historia", "interaccion", "promocion")
 FUENTE_TIPOS = ("clip", "video", "articulo", "tema")
 ROLES = ("gancho", "valor", "cierre")
+PORTADA_TEXTO = ("abajo", "centro")       # dónde va el texto del gancho con foto
 
 # Objetivo(s) para los que rinde cada fórmula (si no casa, AVISO).
 OBJETIVOS_POR_FORMULA = {
@@ -245,6 +246,9 @@ def validar_plan(plan, estilo: dict, plan_dir: Path | None = None
         aviso("fuente de vídeo sin `fuente.credito` (p. ej. «Ideas de Luis Monge»).")
 
     # --- portada opcional
+    pt = p.get("portada_texto")
+    if not _vacio(pt) and pt not in PORTADA_TEXTO:
+        err(f"`portada_texto` = «{pt}» no vale ({' | '.join(PORTADA_TEXTO)}).", 1)
     if "portada_fondo" in p:
         port = normalizar_portada(p.get("portada_fondo"), plan_dir)
         if port and "_error" in port:

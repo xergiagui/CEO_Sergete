@@ -140,6 +140,8 @@ cd C:\Users\ico858\Desktop\PruebasIA\TheHistoria
 | `--solo-validar` | valida, comprueba que el texto cabe y audita; no escribe nada |
 | `--auditar` / `--no-auditar` | auditoría de estilo con TheCopy (def.: sí, si TheCopy existe) |
 | `--estilo RUTA` | otro `estilo.json` (def. `carruseles/estilo.json`) |
+| `--candidatos-portada VIDEO` | sin plan: lista los fotogramas más nítidos del vídeo (varianza del laplaciano en la zona de la cara) y guarda una hoja para elegir `portada_fondo.segundo` |
+| `--n N` / `--hoja RUTA` | nº de candidatos (def. 8) / dónde guardar la hoja (def. carpeta temporal) |
 
 Códigos de salida: `0` OK · `1` errores de validación o QC · `2` fichero ilegible.
 
@@ -155,7 +157,8 @@ Códigos de salida: `0` OK · `1` errores de validación o QC · `2` fichero ile
   "objetivo": "guardados | compartidos | comentarios | seguidores",
   "pilar": "educativo | historia | interaccion | promocion",
   "fuente": {"tipo": "clip | video | articulo | tema", "ruta": "...", "credito": "Ideas de Luis Monge"},
-  "portada_fondo": {"ruta": "...mp4 o .jpg", "segundo": 16, "foco_y": 0.1},
+  "portada_fondo": {"ruta": "...mp4 o .jpg", "segundo": 6.5, "foco_y": 0.0},
+  "portada_texto": "abajo | centro",
   "slides": [
     {"n": 1, "rol": "gancho", "titulo": "8 filtros contra **clientes tóxicos**", "texto": "Casi nadie se atreve con el segundo"},
     {"n": 2, "rol": "valor", "titulo": "Sube los precios", "texto": "..."},
@@ -171,7 +174,9 @@ Códigos de salida: `0` OK · `1` errores de validación o QC · `2` fichero ile
   valor, y `texto` o `puntos` en el cierre. `proyecto` y `slug` se completan
   solos si faltan.
 - Opcionales: `portada_fondo` (ruta a imagen, o vídeo + `segundo`; `foco_y` 0–1
-  elige qué franja vertical se ve), `numero` en una slide de valor (otro número o
+  elige qué franja vertical se ve), `portada_texto` (`abajo`: texto en la mitad
+  inferior con degradado y la cara arriba, por defecto con foto; `centro`: centro
+  óptico con oscurecido plano), `numero` en una slide de valor (otro número o
   `false` para ocultarlo), `puntos` y `peticion` en el cierre.
 - `**palabra**` = destacada en dorado (máx. una por slide). `\n` = salto de línea.
 
@@ -191,8 +196,16 @@ Al dar OK, el CEO mueve la carpeta entera a
 
 `carruseles/estilo.json`: colores (fondo `#14171f`, blanco, dorado `#f59e0b`),
 fuentes, márgenes (110 px a los lados), rangos de tamaño `[max, min]` del ajuste
-automático, oscurecido de la portada (0,6), calidad JPEG, longitudes
-orientativas y `handle` (vacío = no se pinta).
+automático, calidad JPEG, longitudes orientativas y `handle` (vacío = no se
+pinta). Posición y portada:
+
+- `centro_optico` (0,46): altura a la que se centran los bloques. Las slides de
+  valor comparten caja (la de la más alta, o la mediana con
+  `valor_referencia: "mediana"`) y van alineadas arriba dentro de ella, así el
+  número no salta al deslizar.
+- `portada_texto` (`abajo` por defecto con foto), `portada_texto_desde` (0,55),
+  `portada_degradado` (`base`, `desde`, `hasta`, `max`) y `portada_oscurecer`
+  (0,6, solo en modo `centro`).
 
 ## Credenciales
 

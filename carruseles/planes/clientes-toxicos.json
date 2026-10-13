@@ -12,10 +12,11 @@
     "credito": "Ideas de Luis Monge"
   },
   "portada_fondo": {
-    "ruta": "C:\\Users\\ico858\\Desktop\\PruebasIA\\_Historico\\Cómo Dejar de Atraer a Clientes Tóxicos\\clips\\01_mas_clientes_buenos.mp4",
-    "segundo": 16,
-    "foco_y": 0.1
+    "ruta": "C:\\Users\\ico858\\Desktop\\PruebasIA\\_Historico\\Cómo Dejar de Atraer a Clientes Tóxicos\\clips\\03_99_clientes_de_mierda.mp4",
+    "segundo": 6.5,
+    "foco_y": 0.0
   },
+  "portada_texto": "abajo",
   "slides": [
     {"n": 1, "rol": "gancho",
      "titulo": "8 filtros contra **clientes tóxicos**",
