@@ -35,19 +35,25 @@ if /I "%MODE%"=="best" goto best
 goto quality
 
 :audio
-"%YTDLP%" -x --audio-format mp3 --audio-quality 0 -o "%OUT%\%%(title)s.%%(ext)s" --no-playlist "%URL%"
+"%YTDLP%" -x --audio-format mp3 --audio-quality 0 -o "%OUT%\%%(title)s.%%(ext)s" --no-playlist --print after_move:filepath "%URL%"
+set "RC=!ERRORLEVEL!"
 goto done
 
 :best
-"%YTDLP%" -f "bv*+ba/b" --merge-output-format mp4 -o "%OUT%\%%(title)s.%%(ext)s" --no-playlist "%URL%"
+"%YTDLP%" -f "bv*+ba/b" --merge-output-format mp4 -o "%OUT%\%%(title)s.%%(ext)s" --no-playlist --print after_move:filepath "%URL%"
+set "RC=!ERRORLEVEL!"
 goto done
 
 :quality
 set "H=%MODE:p=%"
-"%YTDLP%" -f "bv*[height<=!H!]+ba/b[height<=!H!]" --merge-output-format mp4 -o "%OUT%\%%(title)s.%%(ext)s" --no-playlist "%URL%"
+"%YTDLP%" -f "bv*[height<=!H!]+ba/b[height<=!H!]" --merge-output-format mp4 -o "%OUT%\%%(title)s.%%(ext)s" --no-playlist --print after_move:filepath "%URL%"
+set "RC=!ERRORLEVEL!"
 goto done
 
+REM --print after_move:filepath: en silencio y solo imprime la ruta final del archivo.
 :done
-echo.
-echo Guardado en: %OUT%
-endlocal
+if not "%RC%"=="0" (
+  echo [ERROR] yt-dlp termino con codigo %RC%.
+  endlocal & exit /b %RC%
+)
+endlocal & exit /b 0

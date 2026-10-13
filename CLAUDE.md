@@ -18,8 +18,10 @@ local. Lo dirige CEO_Sergete con el subagente `descarga`. Uso detallado en
 - Contenido privado o que pide login: `--cookies-from-browser chrome`.
 - El aviso de «JavaScript runtime» es normal. Si falla una web que antes iba,
   actualiza primero: `tools\yt-dlp.exe -U`.
+- **Lo normal:** `descargar.bat "URL" [modo] <proyecto>`. Va en silencio, imprime **solo la
+  ruta final** del archivo y sale con código ≠ 0 si falla (no hace falta listar la carpeta).
 
 ## Handoff con TheEditor
 Lo que se baja aquí se trata después en TheEditor. Devuelve la **ruta exacta** del
-archivo en `descargas\<proyecto>\`: el subagente `editor` lo lleva a su buzón
-`TheEditor\proyectos\<proyecto>\input\`. No lo copies tú.
+archivo en `descargas\<proyecto>\`: el subagente `editor` lo **mueve** (no copia: son
+vídeos de varios GB) a su buzón `TheEditor\proyectos\<proyecto>\input\`. No lo muevas tú.
