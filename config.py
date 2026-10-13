@@ -39,3 +39,8 @@ EXT_VIDEO = {".mp4", ".mov", ".m4v"}
 
 # Estados posibles de una fila del registro.
 ESTADOS = ["Pendiente", "Publicado", "Descartado", "No encontrado"]
+
+# Rotación de hashtags: aviso si el conjunto de temáticos de un clip es igual al
+# de alguno de los N últimos registrados en esa plataforma (o de otro clip de la
+# misma tanda). Se puede cambiar por plataforma con hashtags.rotacion_ultimos.
+ROTACION_ULTIMOS = 5

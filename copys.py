@@ -3,9 +3,11 @@ TheCopy — copys y hashtags de los clips, relacionados en un registro.
 
 Flujo normal (lo lleva el subagente `copy` de CEO_Sergete):
   1. copys.py pendientes            → tanda JSON con los clips sin copy + su contexto
-  2. (el subagente rellena la tanda: tema, oferta, copy y hashtags temáticos)
-  3. copys.py registrar --entrada <tanda>   → valida → Excel + <clip>.txt junto al MP4
-  4. copys.py sincronizar           → Estado/ruta según la carpeta donde esté cada MP4
+  2. (el subagente rellena la tanda: tema, oferta, copy y hashtags temáticos;
+      `copys.py hashtags` enseña el banco por tamaño y los últimos conjuntos usados)
+  3. copys.py auditar --entrada <tanda>     → informe de estilo (se corrige reescribiendo)
+  4. copys.py registrar --entrada <tanda>   → valida + audita → Excel + <clip>.txt junto al MP4
+  5. copys.py sincronizar           → Estado/ruta según la carpeta donde esté cada MP4
 
 Ejecuta con el entorno propio:  .venv\\Scripts\\python.exe copys.py <orden> ...
 (El script NO se llama copy.py: chocaría con el módulo `copy` de Python.)
@@ -18,6 +20,7 @@ import sys
 from pathlib import Path
 
 import config
+from lib import auditoria as audit
 from lib import proyecto as proy
 from lib import tanda as tnd
 from lib import txt
@@ -46,6 +49,16 @@ def _pid_de_nombre(p: proy.Proyecto, nombre: str | None) -> str | None:
 
 def _filas_de_clip(reg: Registro, clip: str) -> list[dict]:
     return [d for _, d in reg.filas() if str(d.get("Clip") or "").lower() == clip.lower()]
+
+
+def _hashtags_recientes(p: proy.Proyecto, reg: Registro | None) -> dict[str, list[tuple[str, frozenset[str]]]]:
+    """{plataforma: [(clip, temáticos), ...]} en el orden del registro (para la rotación)."""
+    out: dict[str, list[tuple[str, frozenset[str]]]] = {}
+    for _, d in (reg.filas() if reg else []):
+        pid = _pid_de_nombre(p, d.get("Plataforma"))
+        if pid and d.get("Hashtags"):
+            out.setdefault(pid, []).append((str(d.get("Clip") or ""), tnd.tematicos_de(p, pid, str(d["Hashtags"]))))
+    return out
 
 
 def _clips_en(carpeta: Path, recursivo: bool = False) -> list[Path]:
@@ -137,7 +150,7 @@ def cmd_registrar(args) -> int:
         if pid and d.get("Copy"):
             existentes.setdefault(pid, {})[normalizar(str(d["Copy"]))] = str(d.get("Clip"))
 
-    errores, avisos = tnd.validar(p, tanda, existentes)
+    errores, avisos = tnd.validar(p, tanda, existentes, _hashtags_recientes(p, reg))
     if not args.reemplazar:
         for c in tanda.get("clips") or []:
             for pid in c.get("plataformas") or {}:
@@ -327,6 +340,93 @@ def cmd_banco(args) -> int:
     return 0
 
 
+def cmd_auditar(args) -> int:
+    """Solo informe: no reescribe nada. Checklist en referencias/auditoria_copy.md."""
+    if sum(bool(x) for x in (args.entrada, args.texto, args.banco)) != 1:
+        print("[!] Usa una (y solo una) de: --entrada <tanda>, --texto \"...\" o --banco.")
+        return 1
+    items = []  # (etiqueta, copy, conf_plataforma, nombre_plataforma, contexto)
+    if args.entrada:
+        tanda = leer_json(Path(args.entrada))
+        p = _proyecto(tanda.get("proyecto"))
+        for c in tanda.get("clips") or []:
+            for pid, b in (c.get("plataformas") or {}).items():
+                if pid in (p.conf.get("plataformas") or {}):
+                    nombre = p.nombre_plataforma(pid)
+                    items.append((f"{c.get('clip')} · {nombre}", b.get("copy") or "", p.plataforma(pid),
+                                  nombre, c.get("contexto")))
+    else:
+        p = _proyecto(args.proyecto)
+        pid = args.plataforma or p.plataformas_activas()[0]
+        conf, nombre = p.plataforma(pid), p.nombre_plataforma(pid)
+        if args.texto:
+            items.append(("texto", args.texto, conf, nombre, None))
+        else:
+            grupos = {"genericos": p.banco.get("genericos") or []}
+            grupos.update(p.banco.get("por_oferta") or {})
+            for grupo, copys in grupos.items():
+                for i, copy in enumerate(copys, 1):
+                    items.append((f"{grupo} {i}", copy, conf, nombre, None))
+
+    print(f"Auditoría · {p.nombre} · checklist: referencias/auditoria_copy.md")
+    n_err = n_av = n_ok = 0
+    for etiqueta, copy, conf, nombre, ctx in items:
+        hs = audit.auditar(copy, conf, ctx, nombre)
+        errores = [h for h in hs if h.nivel == "error"]
+        avisos = [h for h in hs if h.nivel == "aviso"]
+        n_err += bool(errores)
+        n_av += bool(avisos) and not errores
+        n_ok += not errores and not avisos
+        if args.banco and not hs:
+            continue  # en el banco solo se enseña lo marcado
+        estado = "ERROR" if errores else ("AVISO" if avisos else "OK")
+        print(f"\n[{estado}] {etiqueta}\n  {copy}")
+        for h in hs:
+            print(f"    {h.nivel.upper():<8}{h.mensaje}")
+    print(f"\n{len(items)} copy(s): {n_err} con error · {n_av} con avisos de estilo · {n_ok} limpios.")
+    if n_err or n_av:
+        print("Corrige reescribiendo: los errores bloquean el registro y los avisos de estilo se arreglan antes "
+              "de registrar (solo se dejan si la frase es literal del clip).")
+    return 1 if n_err else 0
+
+
+def cmd_hashtags(args) -> int:
+    """Banco temático por tamaño, reglas de la plataforma y últimos conjuntos usados."""
+    p = _proyecto(args.proyecto)
+    pid = args.plataforma or p.plataformas_activas()[0]
+    nombre, reglas = p.nombre_plataforma(pid), (p.plataforma(pid).get("hashtags") or {})
+    fijos = p.fijos(pid)
+    fijos_txt = " ".join(f"{t} ({p.tamano_hashtag(t) or '?'})" for t in fijos) or "(ninguno)"
+    partes = [f"fijos: {fijos_txt}",
+              f"temáticos {reglas.get('tematicos_min', 0)}–{reglas.get('tematicos_max', '…')}"]
+    tmax = reglas.get("total_max") or reglas.get("max_total")
+    if reglas.get("total_min") or tmax:
+        partes.append(f"total {reglas.get('total_min', 0)}–{tmax or '…'} con los fijos")
+    if "nicho_min" in reglas:
+        partes.append(f"mín. {reglas['nicho_min']} de nicho")
+    if "amplios_max" in reglas:
+        partes.append(f"máx. {reglas['amplios_max']} amplio(s)")
+    print(f"{p.nombre} · {nombre}: " + " · ".join(partes))
+    if p.hashtags.get("_tamanos"):
+        print(f"Tamaños: {p.hashtags['_tamanos']}")
+    for tema, g in p.banco_por_tamano().items():
+        if args.tema and tema != args.tema:
+            continue
+        print(f"\n[{tema}]")
+        for tam in ("nicho", "medio", "amplio", "sin_tamano"):
+            if g[tam]:
+                print(f"  {tam:<10} {' '.join(g[tam])}")
+    excel = Path(args.excel) if args.excel else p.registro_path
+    if excel.exists():
+        n = int(reglas.get("rotacion_ultimos", config.ROTACION_ULTIMOS) or 0)
+        ult = _hashtags_recientes(p, Registro(excel, p)).get(pid, [])[-n:] if n else []
+        if ult:
+            print(f"\nÚltimos {len(ult)} conjuntos de temáticos en {nombre} (no repetirlos):")
+            for clip, s in ult:
+                print(f"  {clip}: {' '.join(sorted(s)) or '(sin temáticos)'}")
+    return 0
+
+
 def cmd_nuevo_proyecto(args) -> int:
     destino = proy.crear(args.id, args.nombre, args.prefijo)
     print(f"[OK] Proyecto creado en {destino}")
@@ -373,6 +473,19 @@ def main() -> int:
     s.add_argument("--proyecto")
     s.add_argument("--oferta")
 
+    s = sub.add_parser("auditar", help="Audita copys (gancho, cebos, estilo). Solo informe, no reescribe.")
+    s.add_argument("--entrada", help="Tanda JSON (usa el contexto del clip para las frases literales).")
+    s.add_argument("--texto", help="Un copy suelto.")
+    s.add_argument("--banco", action="store_true", help="Audita banco_copys.json del proyecto.")
+    s.add_argument("--proyecto")
+    s.add_argument("--plataforma", help="Reglas de esta plataforma para --texto/--banco (def. la 1.ª activa).")
+
+    s = sub.add_parser("hashtags", help="Banco de hashtags por tamaño, reglas y últimos conjuntos usados.")
+    s.add_argument("--proyecto")
+    s.add_argument("--plataforma", help="Def. la 1.ª activa.")
+    s.add_argument("--tema", help="Solo este tema del banco.")
+    s.add_argument("--excel", help="Registro alternativo (pruebas).")
+
     s = sub.add_parser("nuevo-proyecto", help="Da de alta un proyecto desde la plantilla.")
     s.add_argument("id")
     s.add_argument("--nombre", required=True)
@@ -381,7 +494,7 @@ def main() -> int:
     args = ap.parse_args()
     ordenes = {"proyectos": cmd_proyectos, "pendientes": cmd_pendientes, "registrar": cmd_registrar,
                "sincronizar": cmd_sincronizar, "ver": cmd_ver, "banco": cmd_banco,
-               "nuevo-proyecto": cmd_nuevo_proyecto}
+               "auditar": cmd_auditar, "hashtags": cmd_hashtags, "nuevo-proyecto": cmd_nuevo_proyecto}
     try:
         return ordenes[args.orden](args)
     except proy.ErrorProyecto as e:

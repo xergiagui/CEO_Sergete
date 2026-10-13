@@ -15,8 +15,11 @@
 
   "tono": "Cómo habla la marca: persona (tú/usted), registro, emojis sí/no, longitud.",
   "reglas_copy": [
-    "La primera frase es el gancho y conecta con lo que se dice en el clip.",
-    "Termina con el CTA del proyecto."
+    "La primera frase es el gancho y conecta con lo que se dice en el clip. Máx. gancho_max caracteres (Instagram: 125, lo que se lee antes del «más»).",
+    "Termina con el CTA del proyecto.",
+    "Sin paralelismos negativos ('No necesitas X. Necesitas Y.', 'no es X, es Y'), revelaciones ('¿El resultado?'), anuncios de sinceridad, cebos de interacción ('comenta SÍ', 'etiqueta a…') ni cierres vacíos ('¿qué opinas?').",
+    "Antes de registrar: copys.py auditar --entrada <tanda> (referencias/auditoria_copy.md). Los avisos de estilo se corrigen reescribiendo; solo se dejan si la frase es literal del clip.",
+    "Hashtags: los temáticos del banco por tamaño de hashtags.json, acordes al tema y rotados (no repetir el mismo conjunto)."
   ],
 
   "campos_extra": [
@@ -34,9 +37,12 @@
       "cta_obligatorio": true,
       "cta_patrones": ["\\bbio\\b"],
       "cta_ejemplo": "Link en bio.",
-      "hashtags": {"tematicos_min": 1, "tematicos_max": 2, "max_total": 30},
+      "gancho_max": 125,
+      "emojis_max": 3,
+      "_ayuda": "gancho_max = máx. de caracteres de la 1.ª frase/línea · emojis_max = máx. de emojis (0 si el tono es sin emojis) · hashtags: total_min/total_max cuentan los fijos; amplios_max (error) y nicho_min (aviso) según los tamaños de hashtags.json.",
+      "hashtags": {"tematicos_min": 3, "tematicos_max": 5, "total_min": 3, "total_max": 5, "nicho_min": 2, "amplios_max": 1},
       "formato_texto": "{copy}\n\n{hashtags}",
-      "guia": "Caption de Reel: gancho + idea + CTA."
+      "guia": "Caption de Reel: gancho (≤ 125 caracteres) + idea + CTA. Hashtags al final: 3–5 (2–3 de nicho, 1–2 medios, máx. 1 amplio)."
     },
     "tiktok": {
       "activa": false,

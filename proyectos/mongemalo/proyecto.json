@@ -18,14 +18,17 @@
 
   "tono": "Directo, contundente y en segunda persona (tú). Frases cortas. Español de España. Sin emojis. Habla de ventas, dinero, copywriting y mentalidad sin rodeos; puede provocar, nunca suena a gurú vacío.",
   "reglas_copy": [
-    "La PRIMERA frase es el gancho: tiene que conectar con lo que se dice en el clip (usa contexto.frase_viral / contexto.transcripcion), no un genérico.",
+    "La PRIMERA frase es el gancho: tiene que conectar con lo que se dice en el clip (usa contexto.frase_viral / contexto.transcripcion), no un genérico. Máx. 125 caracteres (gancho_max): es lo que se lee antes del «más» y tiene que entenderse sola.",
     "1–3 frases en total. Sin paja ni relleno.",
     "Termina SIEMPRE con CTA a la bio: 'Link en bio.', 'Bio.' o 'Todo en el link de la bio.'.",
     "Si el tema encaja con una oferta, menciónala por su nombre (ver ofertas.json → cuando_usarla). Si no encaja ninguna, oferta = 'generico' y CTA genérico.",
     "No pongas precios salvo que el ángulo del clip vaya de dinero/inversión y sume.",
     "No inventes datos ni cifras que no salgan del clip.",
     "No repitas un copy ya registrado; usa banco_copys.json solo como referencia de tono (o de reserva si el clip no tiene contexto).",
-    "Hashtags: SOLO 1–2 temáticos según el tema del clip (los 4 fijos se añaden solos). Preferiblemente del banco temático de hashtags.json."
+    "Sin paralelismos negativos ('No necesitas X. Necesitas Y.', 'no es X, es Y', 'no va de X, va de Y', 'El problema no es X, es Y', 'Sin X. Sin Y. Solo Z.'): dilo en positivo. Tampoco revelaciones ('¿El resultado?', '¿Por qué? Porque…'), anuncios de sinceridad ('te voy a ser sincero', 'la verdad es que…') ni vocabulario de IA (potenciar, transformar, llevar al siguiente nivel…).",
+    "Nada de cebos de interacción ('comenta SÍ', 'etiqueta a…', 'dale like', 'comparte si…') ni cierres vacíos ('¿qué opinas?', '¿estás de acuerdo?'): el cierre es el CTA a la bio. Sin emojis.",
+    "Antes de registrar: copys.py auditar --entrada <tanda> (checklist en referencias/auditoria_copy.md). Los errores bloquean; los avisos de estilo se corrigen reescribiendo y solo se dejan si la frase es literal del clip.",
+    "Hashtags (Instagram): 3–5 en total contando el fijo #grupoalfa, que pone el script (escribe solo 2–4 temáticos): 2–3 de nicho (#grupoalfa ya cuenta como uno), 1–2 medios y como mucho 1 amplio. Del banco por tamaño de hashtags.json y acordes al tema del clip. Rota: no repitas el conjunto de temáticos de otro clip de la tanda ni de los 5 últimos registrados (copys.py hashtags)."
   ],
 
   "campos_extra": [
@@ -43,9 +46,11 @@
       "cta_obligatorio": true,
       "cta_patrones": ["\\bbio\\b"],
       "cta_ejemplo": "Link en bio.",
-      "hashtags": {"tematicos_min": 1, "tematicos_max": 2, "max_total": 30},
+      "gancho_max": 125,
+      "emojis_max": 0,
+      "hashtags": {"tematicos_min": 2, "tematicos_max": 4, "total_min": 3, "total_max": 5, "nicho_min": 2, "amplios_max": 1},
       "formato_texto": "{copy}\n\n{hashtags}",
-      "guia": "Caption de Reel: gancho + idea + CTA a la bio. Los hashtags van al final, separados por una línea en blanco."
+      "guia": "Caption de Reel: gancho (≤ 125 caracteres) + idea + CTA a la bio. Los hashtags van al final, separados por una línea en blanco: 3–5 contando #grupoalfa (2–3 de nicho, 1–2 medios, máx. 1 amplio), rotados por tema."
     },
     "tiktok": {
       "activa": false,
@@ -57,6 +62,7 @@
       "cta_obligatorio": true,
       "cta_patrones": ["\\bbio\\b", "perfil"],
       "cta_ejemplo": "Link en bio.",
+      "emojis_max": 0,
       "hashtags": {"tematicos_min": 1, "tematicos_max": 2, "max_total": 8},
       "formato_texto": "{copy}\n\n{hashtags}",
       "guia": "Más corto que en IG: una frase gancho + CTA al perfil/bio. El gancho manda."
@@ -73,6 +79,7 @@
       "cta_obligatorio": true,
       "cta_patrones": ["\\bbio\\b", "canal", "descripci[oó]n", "enlace", "link"],
       "cta_ejemplo": "Link en la descripción del canal.",
+      "emojis_max": 0,
       "hashtags": {"tematicos_min": 1, "tematicos_max": 2, "max_total": 15},
       "formato_texto": "{copy}\n\n{hashtags}",
       "guia": "Título (≤100 car.) con el gancho del clip. Descripción breve + CTA. Los 3 primeros hashtags salen sobre el título."
