@@ -3,6 +3,10 @@
 Flujo local (sin coste ni API de pago) para convertir un vídeo largo en clips
 verticales listos para publicar. **Siempre se trabaja igual**, en 4 pasos.
 
+> Las **reglas de edición** (encuadre, b-roll, subtítulos, silencios…) y las tres
+> vías de trabajo (vídeo largo, batch de clips ya cortados y adaptaciones con
+> avatar) están en [`CLAUDE.md`](CLAUDE.md), que es la fuente de verdad.
+
 ## Estructura
 
 ```
@@ -39,28 +43,38 @@ Requiere `whisper/bin/whisper-cli.exe` y `whisper/models/ggml-large-v3.bin`.
 
 ## Paso 3 — Cortar clips  (`clips.py`)
 
-- Se eligen los momentos con más **gancho** (≈ **1 cada 3 min** de vídeo; si
-  salen menos, no se fuerza), con inicio/fin en segundos.
+- Se eligen los momentos con más **gancho** (≈ **1 cada 3 min** de vídeo, mín. 3
+  y máx. 6) y se escriben en `transcripciones/<nombre>/cortes.json` (esquema en
+  `cortes.example.json`). `clips.py "<nombre>"` lee ese archivo.
 - **Duraciones**: ~30 s por defecto; opcionalmente también **60 s y 90 s**
   (independientes o extendiendo el de 30 s).
-- Por cada uno: **recorte vertical 9:16** (ffmpeg) + **quitar silencios**
-  (auto-editor, umbral 8 %, margen 0.1 s).
+- Por cada uno: **recorte vertical 9:16** con seguimiento de cara y encuadre de
+  busto (ffmpeg + OpenCV) + **quitar silencios** (auto-editor, umbral 6 %,
+  margen 0.15 s).
 - Salida en `transcripciones/<nombre>/clips/` **SIN subtítulos** (se ponen en el
   Paso 4). Los intermedios (`_tmp/`) se borran siempre.
 
-## Paso 4 — Edición final  (skill `Editor_Sergio`)
+## Paso 4 — Edición final  (`editar_clips.py "<nombre>"`, motor de la skill `Editor_Sergio`)
 
 Por cada clip, en este orden de capas:
 
-1. **Gancho**: una **imagen libre** de stock online (Openverse, CC, sin API key;
-   fallback Lorem Picsum) superpuesta a pantalla completa los primeros ~1.8 s.
+1. **Gancho**: un mini-vídeo o imagen de stock (Pexels; fallback Openverse/Lorem
+   Picsum) a pantalla completa los primeros ~1.8 s.
    La imagen debe tener **fuerte gancho visual** y **relación clara** con el
    clip → se analiza el contenido para elegir bien la búsqueda (query en inglés).
-2. **B-roll** a pantalla completa a intervalos, desde `superposiciones/` (local).
+2. **B-roll** a pantalla completa, sincronizado con la voz y elegido por
+   semántica (`broll_assets` + `match_broll`) desde `superposiciones/` (local).
 3. **Música** desde `musicas/` (local) + **de-click**.
 4. **Subtítulos palabra a palabra** quemados **una sola vez**, encima de todo.
 
-Salida: vídeo final local, listo para publicar.
+Salida: `transcripciones/<nombre>/finales/`, listo para publicar. Las frases
+virales se guardan en Supabase (`viral_phrases`) para TheHistoria.
+
+## Batch de clips ya cortados  (`procesar_batch_clip.py`)
+
+`procesar_batch_clip.py [RAIZ] [CARPETA] [MODO]`: reencuadre 9:16 + quitar
+silencios + Fase C para cada MP4 de las subcarpetas de `RAIZ` (por defecto
+`Desktop/Clip`). Modos de encuadre y detalles en `CLAUDE.md`.
 
 ## Encuadre y zonas seguras (RRSS)
 
@@ -73,15 +87,16 @@ Salida: vídeo final local, listo para publicar.
 ## Reglas clave
 
 - **Subtítulos: una sola vez** — solo en el Paso 4 (nunca en el Paso 3).
-- **Recursos locales** en el Paso 4 (b-roll `superposiciones/`, música `musicas/`);
-  no se usa Pexels.
+- **Recursos locales** en el Paso 4 (b-roll `superposiciones/`, música `musicas/`).
+  El stock de Pexels se descarga a `superposiciones/` (`pexels_<tema>_NN.mp4`) y
+  solo se pide online para el gancho.
 - **Intermedios**: se borran siempre por defecto.
 
 ## Instalación
 
 ```bat
-python -m venv .venv
-.venv\Scripts\python.exe -m pip install faster-whisper auto-editor
+py -m venv .venv
+.venv\Scripts\python.exe -m pip install faster-whisper auto-editor opencv-python-headless httpx Pillow imageio-ffmpeg fastembed
 ```
 whisper.cpp: binario `whisper-blas-bin-x64.zip` (release de ggml-org/whisper.cpp)
 en `whisper/bin/` y modelo `ggml-large-v3.bin` en `whisper/models/`.
