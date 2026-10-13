@@ -1194,7 +1194,8 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
                         overlays_dir: Path = None,
                         hook_query: str = None,
                         music_typology: str = None,
-                        clip_text: str = None) -> Path:
+                        clip_text: str = None,
+                        words: list = None) -> Path:
     """Render final: gancho + B-roll + música + de-click + subs ASS karaoke.
 
     Gancho inicial: si `hook_query` no es None, descarga un MINI-VIDEO de Pexels
@@ -1230,11 +1231,14 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
     broll_starts = []  # instantes de entrada de cada b-roll (para el SFX)
     duration = _get_duration(heygen_mp4, ff)
 
-    from faster_whisper import WhisperModel
-    model = WhisperModel("large-v3", device="cpu", compute_type="int8")
-    segs, _info = model.transcribe(str(heygen_mp4), language=lang, word_timestamps=True)
-    words = [{"word": _mask_profanidad(w.word.strip()), "start": w.start, "end": w.end}
-             for s in segs for w in s.words]
+    # Si el llamador ya transcribió (batch), reutilizamos sus `words` para no
+    # correr whisper large-v3 dos veces por clip; si no, transcribimos aquí.
+    if words is None:
+        from faster_whisper import WhisperModel
+        model = WhisperModel("large-v3", device="cpu", compute_type="int8")
+        segs, _info = model.transcribe(str(heygen_mp4), language=lang, word_timestamps=True)
+        words = [{"word": _mask_profanidad(w.word.strip()), "start": w.start, "end": w.end}
+                 for s in segs for w in s.words]
 
     # Ventanas de b-roll SINCRONIZADAS con la voz: (start, end, texto-de-frase).
     # Si no hay frases → intervalos (legacy).

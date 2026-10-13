@@ -22,3 +22,9 @@ desktop.ini
 .claude/*
 # …excepto la skill Editor_Sergio (código versionado; sin secretos dentro)
 !.claude/skills/
+
+# Credenciales locales
+.env
+
+# Logs de ejecuciones (batch, fixes)
+*.log
