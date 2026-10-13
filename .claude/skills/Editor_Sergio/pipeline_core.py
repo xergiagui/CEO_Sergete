@@ -1195,12 +1195,20 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
                         hook_query: str = None,
                         music_typology: str = None,
                         clip_text: str = None,
-                        words: list = None) -> Path:
+                        words: list = None,
+                        hook_text: str = None,
+                        hook_text_dur: float = None) -> Path:
     """Render final: gancho + B-roll + música + de-click + subs ASS karaoke.
 
     Gancho inicial: si `hook_query` no es None, descarga un MINI-VIDEO de Pexels
     (necesita `env['PEXELS_API_KEY']`) y lo superpone a pantalla completa los
     primeros ~2.5s como gancho. Si no hay key, cae a una imagen libre (Openverse).
+
+    Gancho de TEXTO (opcional, DESACTIVADO por defecto): si `hook_text` trae
+    texto, se quema en la franja superior desde el primer fotograma durante
+    `hook_text_dur` s (salida suave de 0,2 s), encima del gancho visual y debajo
+    de los subtítulos (ver `render_hook_text_png`). La vía del avatar no lo pasa,
+    así que su render no cambia.
 
     B-roll a pantalla completa SINCRONIZADO con la voz: cada corte entra al
     arrancar una frase y sale en la pausa siguiente (se transcribe el avatar
@@ -1383,13 +1391,35 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
     # para el ':' de la unidad (C:), o el parser del filtergraph falla.
     ass_ff = str(ass_path).replace("\\", "/").replace(":", "\\:")
     fonts_ff = str(FONTS_DIR).replace("\\", "/").replace(":", "\\:")
-    subprocess.run([
-        ff, "-y", "-i", str(pass1),
-        "-vf", f"ass='{ass_ff}':fontsdir='{fonts_ff}'",
-        "-c:v", "libx264", "-preset", "medium", "-crf", "18",
-        "-c:a", "copy", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
-        str(out_mp4),
-    ], check=True, capture_output=True)
+    vf_subs = f"ass='{ass_ff}':fontsdir='{fonts_ff}'"
+    enc = ["-c:v", "libx264", "-preset", "medium", "-crf", "18",
+           "-c:a", "copy", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+           str(out_mp4)]
+    if hook_text and hook_text.strip():
+        # Gancho de texto: PNG transparente superpuesto desde t=0, con fundido de
+        # salida, y los subtítulos quemados ENCIMA (mismo pase: sin reencode extra).
+        hook_png = base_video.parent / "hook_text.png"
+        info = render_hook_text_png(hook_text, hook_png)
+        hk_dur = max(0.5, min(float(hook_text_dur or HOOK_TEXT_DUR), dur - 0.05))
+        fade_st = max(0.0, hk_dur - HOOK_TEXT_FADE)
+        print(f"  [gancho texto] «{' / '.join(info['lines'])}» "
+              f"({info['font_size']} px, 0-{hk_dur:.1f}s)")
+        filt2 = (
+            f"[1:v]format=rgba,fade=t=out:st={fade_st:.3f}:d={HOOK_TEXT_FADE}:alpha=1[hk];"
+            f"[0:v][hk]overlay=x=0:y=0:eof_action=pass:format=auto[hv];"
+            f"[hv]{vf_subs}[v]"
+        )
+        subprocess.run([
+            ff, "-y", "-i", str(pass1),
+            "-loop", "1", "-framerate", "30", "-t", f"{hk_dur:.3f}", "-i", str(hook_png),
+            "-filter_complex", filt2,
+            "-map", "[v]", "-map", "0:a", *enc,
+        ], check=True, capture_output=True)
+    else:
+        subprocess.run([
+            ff, "-y", "-i", str(pass1),
+            "-vf", vf_subs, *enc,
+        ], check=True, capture_output=True)
     pass1.unlink(missing_ok=True)
     return out_mp4
 
@@ -1558,6 +1588,191 @@ def _generate_ass_karaoke(words, ass_path: Path):
     for c in chunks:
         lines.append(f"Dialogue: 0,{fmt(c['start'])},{fmt(c['end'])},Default,,0,0,0,,{c['text']}")
     ass_path.write_text("\n".join(lines), encoding="utf-8")
+
+
+# ============================================================
+# 8d. GANCHO DE TEXTO EN PANTALLA (primeros ~2.5 s)
+#
+# Texto corto que abre un bucle, visible desde el PRIMER fotograma (mucha gente
+# ve los Reels sin sonido). Se dibuja con Pillow en un PNG transparente de
+# 1080x1920 (misma Montserrat Bold que los subtítulos) y se superpone en el
+# mismo pase en el que se queman los subtítulos, con salida suave. Mismas
+# reglas de texto que los subtítulos: minúsculas + mayúscula al inicio y tras
+# . ? ! …, palabrotas enmascaradas y números de miles sin partir.
+# Opcional: burn_subs_and_music(hook_text=None) por defecto -> la vía del
+# avatar (generate_from_link) no cambia.
+# ============================================================
+HOOK_TEXT_DUR = 2.5          # s en pantalla desde el primer fotograma
+HOOK_TEXT_FADE = 0.2         # salida suave al final
+_HOOK_W, _HOOK_H = 1080, 1920
+_HOOK_TOP_FRAC = 0.125       # la caja empieza bajo el 12,5 % superior (barra de IG/TikTok)
+_HOOK_SIDE = 120             # px libres a cada lado (aire en el borde derecho)
+_HOOK_PAD_X, _HOOK_PAD_Y = 34, 26
+_HOOK_MAX_FONT, _HOOK_MIN_FONT = 74, 50
+_HOOK_LINE = 1.16            # interlineado (múltiplo del tamaño de letra)
+_HOOK_SUBS_TOP = 1150        # los subtítulos ocupan ~1185-1280 px (MarginV 640): no bajar de aquí
+# Palabras que no deben quedar colgando al final de la 1ª línea.
+_HOOK_WEAK = {
+    "a", "al", "ante", "con", "contra", "de", "del", "desde", "en", "entre",
+    "hacia", "hasta", "para", "por", "sin", "sobre", "tras", "el", "la", "los",
+    "las", "lo", "un", "una", "unos", "unas", "y", "e", "o", "u", "ni", "que",
+    "se", "te", "me", "le", "les", "su", "sus", "tu", "tus", "mi", "mis", "no",
+    "es", "más", "muy", "qué", "cómo",
+}
+_HOOK_OPEN_ONLY = re.compile(r"^[¿¡«\"'(\[]+$")
+_HOOK_CLOSE_ONLY = re.compile(r"^[%€$£?!.,;:»\"')\]…]+$")
+
+
+def format_hook_text(text: str) -> str:
+    """Normaliza el texto del gancho con las MISMAS reglas que los subtítulos.
+
+    Minúsculas, mayúscula en la 1ª letra y tras . ? ! …, palabrotas enmascaradas
+    (`_mask_profanidad`) y números con separador reunidos ("10 .000" -> "10.000").
+    """
+    t = re.sub(r"\s+", " ", (text or "")).strip()
+    t = re.sub(r"(?<=\d)\s+(?=[.,]\d)|(?<=\d[.,])\s+(?=\d)", "", t)
+    out, cap_next = [], True
+    for raw in t.split(" "):
+        if not raw:
+            continue
+        disp = _mask_profanidad(raw).lower()
+        if cap_next:
+            disp = _cap_first_alpha(disp)
+        out.append(disp)
+        if any(ch.isalnum() for ch in raw) or _SUBS_SENT_END_RE.search(raw):
+            cap_next = bool(_SUBS_SENT_END_RE.search(raw))
+    return " ".join(out)
+
+
+def _hook_tokens(disp: str) -> list[str]:
+    """Unidades que NUNCA se parten entre líneas: cada palabra, con los signos
+    sueltos pegados a su vecina ("1.500 €", "50 %", "¿ por" -> "¿por")."""
+    toks: list[str] = []
+    pend_open = ""
+    for w in disp.split(" "):
+        if _HOOK_OPEN_ONLY.match(w):
+            pend_open += w
+            continue
+        w = pend_open + w
+        pend_open = ""
+        if toks and _HOOK_CLOSE_ONLY.match(w):
+            toks[-1] = f"{toks[-1]} {w}" if w[0] in "%€$£" else toks[-1] + w
+            continue
+        toks.append(w)
+    if pend_open:
+        toks.append(pend_open)
+    return toks
+
+
+def _hook_font(size: int):
+    from PIL import ImageFont
+    return ImageFont.truetype(str(FONTS_DIR / "Montserrat-Bold.ttf"), size)
+
+
+def _hook_layout(tokens: list[str], max_w: int):
+    """Elige tamaño de letra y reparto en líneas.
+
+    Prioridad: la letra más grande posible en 1 línea o, si no cabe, en 2 líneas
+    equilibradas (sin dejar artículo/preposición colgando al final de la 1ª).
+    Si ni con la letra mínima cabe en 2 líneas, reparte en más (y se avisa).
+    Devuelve (font, stroke, lines).
+    """
+    def width(font, s, stroke):
+        l, _t, r, _b = font.getbbox(s, stroke_width=stroke)
+        return r - l
+
+    for size in range(_HOOK_MAX_FONT, _HOOK_MIN_FONT - 1, -2):
+        font = _hook_font(size)
+        stroke = max(3, round(size * 0.06))
+        one = " ".join(tokens)
+        if width(font, one, stroke) <= max_w:
+            return font, stroke, [one]
+        best = None
+        for k in range(1, len(tokens)):
+            l1, l2 = " ".join(tokens[:k]), " ".join(tokens[k:])
+            w1, w2 = width(font, l1, stroke), width(font, l2, stroke)
+            if max(w1, w2) > max_w:
+                continue
+            last = tokens[k - 1].lower().strip("¿¡,;:\"'«»()")
+            cost = max(w1, w2) + (0.4 * max_w if last in _HOOK_WEAK else 0)
+            # mejor partir donde ya hay pausa: fin de frase o coma/dos puntos
+            if _SUBS_SENT_END_RE.search(tokens[k - 1]):
+                cost -= 0.2 * max_w
+            elif tokens[k - 1].endswith((",", ":", ";")):
+                cost -= 0.1 * max_w
+            if best is None or cost < best[0]:
+                best = (cost, [l1, l2])
+        if best:
+            return font, stroke, best[1]
+
+    # No cabe en 2 líneas ni con la letra mínima -> reparto voraz en N líneas.
+    font = _hook_font(_HOOK_MIN_FONT)
+    stroke = max(3, round(_HOOK_MIN_FONT * 0.06))
+    lines, cur = [], ""
+    for t in tokens:
+        cand = f"{cur} {t}".strip()
+        if cur and width(font, cand, stroke) > max_w:
+            lines.append(cur)
+            cur = t
+        else:
+            cur = cand
+    if cur:
+        lines.append(cur)
+    return font, stroke, lines
+
+
+def render_hook_text_png(text: str, out_png: Path,
+                         width: int = _HOOK_W, height: int = _HOOK_H) -> dict:
+    """Dibuja el gancho de texto en un PNG transparente a tamaño de fotograma.
+
+    Franja SUPERIOR dentro de la zona segura: la caja empieza bajo el 12,5 %
+    superior (barra de IG/TikTok), deja 120 px a cada lado y queda muy por
+    encima de los subtítulos (~1185-1280 px). Texto blanco Montserrat Bold con
+    reseguido negro sobre una caja oscura semitransparente con esquinas
+    redondeadas (legible sobre cualquier fondo en un móvil).
+    Devuelve {"text", "lines", "font_size", "box"}.
+    """
+    from PIL import Image, ImageDraw
+
+    disp = format_hook_text(text)
+    if not disp:
+        raise ValueError("gancho de texto vacío")
+    max_w = width - 2 * _HOOK_SIDE - 2 * _HOOK_PAD_X
+    font, stroke, lines = _hook_layout(_hook_tokens(disp), max_w)
+    size = font.size
+
+    img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    cx = width // 2
+    step = round(size * _HOOK_LINE)
+    # Cajas de tinta de cada línea relativas a su línea base (anchor "ms").
+    bbs = [draw.textbbox((cx, i * step), ln, font=font, anchor="ms", stroke_width=stroke)
+           for i, ln in enumerate(lines)]
+    # Altura de "cap" uniforme (no depende de si la línea lleva tildes o ¿):
+    asc = font.getbbox("ÁÉÍ¿", anchor="ls")[1]      # negativo: por encima de la base
+    desc = font.getbbox("gjpqy", anchor="ls")[3]
+    ink_top = min(min(b[1] for b in bbs), asc - stroke)
+    ink_bot = max(max(b[3] for b in bbs), (len(lines) - 1) * step + desc + stroke)
+    ink_l = min(b[0] for b in bbs)
+    ink_r = max(b[2] for b in bbs)
+
+    box_top = round(height * _HOOK_TOP_FRAC)
+    dy = box_top + _HOOK_PAD_Y - ink_top
+    box = (ink_l - _HOOK_PAD_X, box_top, ink_r + _HOOK_PAD_X,
+           ink_bot + dy + _HOOK_PAD_Y)
+    draw.rounded_rectangle(box, radius=26, fill=(0, 0, 0, 150))
+    for i, ln in enumerate(lines):
+        draw.text((cx, i * step + dy), ln, font=font, anchor="ms",
+                  fill=(255, 255, 255, 255), stroke_width=stroke,
+                  stroke_fill=(0, 0, 0, 255))
+    img.save(out_png)
+
+    if box[3] > _HOOK_SUBS_TOP:
+        print(f"  [gancho texto] AVISO: la caja baja hasta y={box[3]} y podría tocar los subtítulos")
+    if len(lines) > 2:
+        print(f"  [gancho texto] AVISO: texto largo ({len(disp)} car.) -> {len(lines)} líneas; "
+              f"conviene acortarlo (máx. 2 líneas, ~45 car.)")
+    return {"text": disp, "lines": lines, "font_size": size, "box": box}
 
 
 # ============================================================

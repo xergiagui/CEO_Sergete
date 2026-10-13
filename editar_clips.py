@@ -8,9 +8,10 @@ del `hook_query` del cortes.json (el mismo que uso clips.py); si un clip no lo
 trae, se deriva del nombre. Asi el flujo es 100% automatico sin tocar codigo.
 
 Por cada clip de transcripciones/<video>/clips/ aplica:
-  gancho (imagen libre online) + b-roll local (superposiciones/) + musica local
-  (musicas/) + de-click + subtitulos palabra a palabra (una sola vez, enmascarando
-  palabrotas).
+  gancho visual (mini-video de Pexels / imagen libre) + gancho de TEXTO en la
+  franja superior los primeros ~2,5 s (`gancho_texto` del cortes.json; si falta,
+  el `titulo`) + b-roll local (superposiciones/) + musica local (musicas/) +
+  de-click + subtitulos palabra a palabra (una sola vez, enmascarando palabrotas).
 
 Trabaja en una carpeta ASCII ÚNICA por proceso (whisper/_edit_XXXX via mkdtemp)
 para evitar problemas de rutas con tildes en el filtro de subtitulos de ffmpeg y
@@ -20,6 +21,8 @@ Uso:
     python editar_clips.py "Mi Adicción"
     python editar_clips.py "input/video.mp4"
     python editar_clips.py "video" --cortes cortes.json
+    python editar_clips.py "video" --sin-gancho-texto   # sin texto de gancho
+    python editar_clips.py "video" --sin-frases         # no guarda en viral_phrases
 """
 import argparse
 import json
@@ -180,6 +183,10 @@ def main():
     ap.add_argument("--cortes", help="Ruta al cortes.json (por defecto transcripciones/<video>/cortes.json).")
     ap.add_argument("--work-dir", help="Work dir ASCII para intermedios (por defecto uno único por proceso bajo whisper/). "
                                        "Si se suministra, NO se borra al terminar.")
+    ap.add_argument("--sin-gancho-texto", action="store_true",
+                    help="No quema el texto de gancho (gancho_texto/titulo) al inicio.")
+    ap.add_argument("--sin-frases", action="store_true",
+                    help="No guarda las frases en viral_phrases (pruebas o re-render de correcciones).")
     args = ap.parse_args()
 
     nombre = resolver_nombre(args.video)
@@ -229,8 +236,19 @@ def main():
         music_typology = corte.get("tipologia_musica")
         clip_text = (corte.get("frase_viral") or corte.get("titulo")
                      or hook or "").strip() or None
+        # Gancho de TEXTO en pantalla: gancho_texto del corte; si falta, el titulo.
+        gancho_texto = None
+        if not args.sin_gancho_texto:
+            gancho_texto = (corte.get("gancho_texto") or corte.get("titulo") or "").strip() or None
         print(f"=== {name}   gancho='{hook}'"
               + (f"   mood='{music_typology}'" if music_typology else ""), flush=True)
+        if args.sin_gancho_texto:
+            pass
+        elif not gancho_texto:
+            print("   [gancho texto] AVISO: el corte no trae gancho_texto ni titulo -> sin texto de gancho",
+                  flush=True)
+        elif not (corte.get("gancho_texto") or "").strip():
+            print("   [gancho texto] sin gancho_texto: uso el titulo", flush=True)
         work = workroot / name
         work.mkdir(parents=True, exist_ok=True)
         ascii_in = work / "in.mp4"
@@ -241,6 +259,7 @@ def main():
                 ascii_in, MUSIC, out_tmp,
                 lang="es", env=env, overlays_dir=OVERLAYS, hook_query=hook,
                 music_typology=music_typology, clip_text=clip_text,
+                hook_text=gancho_texto,
             )
             shutil.move(str(out_tmp), str(out / f"{name}.mp4"))
             print(f"   OK -> finales/{name}.mp4", flush=True)
@@ -255,6 +274,9 @@ def main():
     # --- Banco de frases virales (Supabase, best-effort) ---------------------
     # Al terminar la edicion guardamos las frases virales de este video en la
     # tabla viral_phrases para reutilizarlas mas adelante (historias, hooks...).
+    if args.sin_frases:
+        print("   [frases] --sin-frases: no se guardan en viral_phrases.", flush=True)
+        return
     inp = RAIZ / "input" / f"{nombre}.mp4"
     source_url = str(inp) if inp.exists() else str(args.video)
     guardar_frases_virales(nombre, cortes_path, source_url=source_url)

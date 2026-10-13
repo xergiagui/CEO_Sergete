@@ -10,10 +10,24 @@ trata cada subcarpeta como un "vídeo" (slug = nombre de la carpeta) y por cada
      adaptativo anti-piernas, clips.cortar_vertical)
   2) quita silencios (auto-editor, clips.quitar_silencios)
   3) edición final Fase C: b-roll local + música local + de-click + subtítulos
-     palabra a palabra (pipeline_core.burn_subs_and_music). SIN gancho.
+     palabra a palabra (pipeline_core.burn_subs_and_music). Sin gancho visual;
+     con GANCHO DE TEXTO en la franja superior (~2,5 s) si el clip tiene texto
+     en ganchos.json.
+
+Gancho de texto (lo escribe el editor/LLM, nunca se genera mecánicamente):
+    1) `--solo-transcribir`: hace reencuadre + silencios + transcripción de cada
+       clip, guarda el texto en transcripciones/<carpeta>/textos/<clip>.txt y deja
+       el 9:16 desilenciado + los word-timestamps en transcripciones/<carpeta>/_prep/.
+       No renderiza.
+    2) El editor lee los textos y escribe transcripciones/<carpeta>/ganchos.json:
+       {"<clip>.mp4": "¿Texto que abre el bucle?", ...}
+       (también vale un ganchos.json dentro de la carpeta de origen).
+    3) Sin el flag: renderiza reutilizando _prep/ (ni reencuadra ni transcribe otra
+       vez) y quema el gancho de cada clip. Clip sin texto -> sale SIN gancho y se
+       avisa. Al terminar cada clip se borran sus intermedios de _prep/.
 
 Además guarda en Supabase (viral_phrases) la transcripción verbatim de cada clip
-como frase viral (best-effort, dedup por hash).
+como frase viral (best-effort, dedup por hash). `--sin-frases` lo desactiva.
 
 Eficiencia: transcribe cada clip UNA sola vez (sobre el 9:16 ya desilenciado) y
 reutiliza esos word-timestamps para subtítulos + b-roll (words= a burn_subs).
@@ -25,7 +39,9 @@ Uso:
     python procesar_batch_clip.py                       # todas las carpetas
     python procesar_batch_clip.py "C:/ruta/a/Clip"      # otra raíz
     python procesar_batch_clip.py "C:/ruta/a/Clip" "Largo 1 Extractos"  # una sola
+    python procesar_batch_clip.py "C:/ruta/a/Clip" "Largo 1 Extractos" right --solo-transcribir
 """
+import argparse
 import sys
 import shutil
 import json
@@ -49,10 +65,54 @@ MUSIC = RAIZ / "musicas"
 OVERLAYS = RAIZ / "superposiciones"
 WORKROOT = RAIZ / "whisper" / "_edit_batch"
 
-CLIP_ROOT = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(r"C:/Users/ico858/Desktop/Clip")
-SOLO_CARPETA = sys.argv[2] if len(sys.argv) > 2 else None
-# Lado del plano donde está el protagonista (Luis Monge). "right" | "left" | "auto".
-LADO = (sys.argv[3] if len(sys.argv) > 3 else "right").lower()
+CLIP_ROOT_DEFAULT = r"C:/Users/ico858/Desktop/Clip"
+GANCHOS_JSON = "ganchos.json"   # {"<clip>.mp4": "texto del gancho"} por carpeta
+PREP_DIR = "_prep"              # 9:16 desilenciado + words de --solo-transcribir
+
+
+def parse_args():
+    ap = argparse.ArgumentParser(description="Reels 9:16 a partir de clips ya cortados.")
+    ap.add_argument("raiz", nargs="?", default=CLIP_ROOT_DEFAULT,
+                    help="Carpeta con subcarpetas de clips (por defecto Desktop/Clip).")
+    ap.add_argument("carpeta", nargs="?", default=None,
+                    help="Procesar solo esta subcarpeta.")
+    # Lado del plano donde está el protagonista (Luis Monge).
+    ap.add_argument("modo", nargs="?", default="right",
+                    help="Encuadre: right|left|center|auto|auto-right|follow|<fracción>.")
+    ap.add_argument("--solo-transcribir", action="store_true",
+                    help="Reencuadre + silencios + transcripción (textos/ y _prep/), sin renderizar. "
+                         "Sirve para escribir ganchos.json antes del render.")
+    ap.add_argument("--sin-frases", action="store_true",
+                    help="No guarda las transcripciones en viral_phrases.")
+    return ap.parse_args()
+
+
+def cargar_ganchos(base: Path, carpeta: Path):
+    """Textos de gancho por clip: ({nombre_clip: texto}, ruta usada o None).
+
+    Busca transcripciones/<carpeta>/ganchos.json y, si no está, el de la carpeta
+    de origen. Claves "<clip>.mp4" (o el nombre sin extensión). Valores vacíos =
+    sin gancho. Nunca inventa texto: lo que no esté aquí sale sin gancho.
+    """
+    for p in (base / GANCHOS_JSON, carpeta / GANCHOS_JSON):
+        if not p.exists():
+            continue
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+        except Exception as e:
+            print(f"   [gancho texto] AVISO: no pude leer {p} ({e}) -> sin ganchos.", flush=True)
+            return {}, p
+        ganchos = {}
+        for k, v in (data.items() if isinstance(data, dict) else []):
+            if isinstance(v, dict):
+                v = v.get("gancho_texto") or v.get("texto")
+            key = str(k).strip()
+            if key.lower().endswith(".mp4"):
+                key = key[:-4].strip()
+            if isinstance(v, str) and v.strip():
+                ganchos[key] = v.strip()
+        return ganchos, p
+    return {}, None
 
 
 def reencuadre_persona(mp4: Path, sw: int, sh: int, dur: float, dest: Path, lado: str = "right"):
@@ -370,43 +430,72 @@ def transcribir_words_y_texto(mp4: Path, lang: str = "es"):
 
 
 def main():
-    if not CLIP_ROOT.exists():
-        raise SystemExit(f"[!] No existe la raíz de clips: {CLIP_ROOT}")
+    args = parse_args()
+    clip_root = Path(args.raiz)
+    solo_carpeta = args.carpeta or None
+    lado = (args.modo or "right").lower()
+    solo_transcribir = args.solo_transcribir
+    if not clip_root.exists():
+        raise SystemExit(f"[!] No existe la raíz de clips: {clip_root}")
 
     env = cargar_env()
     tiene_supabase = bool(env.get("SUPABASE_URL") and env.get("SUPABASE_ANON_KEY"))
-    print(f"Raíz: {CLIP_ROOT}")
-    print(f"Encuadre 9:16 (cara): {'ON' if C._CV2_OK else 'OpenCV NO -> centrado'}")
-    print(f"Supabase: {'sí' if tiene_supabase else 'NO'}", flush=True)
+    guardar_frases = tiene_supabase and not args.sin_frases and not solo_transcribir
+    print(f"Raíz: {clip_root}")
+    print(f"Encuadre 9:16 (cara): {'ON' if C._CV2_OK else 'OpenCV NO -> centrado'}  modo={lado}")
+    print(f"Supabase: {'sí' if tiene_supabase else 'NO'}"
+          + ("  (frases desactivadas)" if tiene_supabase and not guardar_frases else ""))
+    if solo_transcribir:
+        print("Modo --solo-transcribir: reencuadre + silencios + transcripción, SIN render.")
+    sys.stdout.flush()
 
     if WORKROOT.exists():
         shutil.rmtree(WORKROOT, ignore_errors=True)
 
-    subcarpetas = sorted([d for d in CLIP_ROOT.iterdir() if d.is_dir()])
-    if SOLO_CARPETA:
-        subcarpetas = [d for d in subcarpetas if d.name == SOLO_CARPETA]
+    subcarpetas = sorted([d for d in clip_root.iterdir() if d.is_dir()])
+    if solo_carpeta:
+        subcarpetas = [d for d in subcarpetas if d.name == solo_carpeta]
         if not subcarpetas:
-            raise SystemExit(f"[!] No hay subcarpeta '{SOLO_CARPETA}' en {CLIP_ROOT}")
+            raise SystemExit(f"[!] No hay subcarpeta '{solo_carpeta}' en {clip_root}")
     print(f"{len(subcarpetas)} carpeta(s) a procesar.\n", flush=True)
 
-    hechos = fallos = saltados = 0
+    hechos = fallos = saltados = preparados = 0
+    sin_gancho = []   # "<carpeta>/<clip>" renderizados sin texto de gancho
+
+    def _es_num(v):
+        try:
+            float(v)
+            return True
+        except ValueError:
+            return False
 
     for carpeta in subcarpetas:
         slug = carpeta.name
         base = RAIZ / "transcripciones" / slug
         out = base / "finales"
         textos = base / "textos"
+        prep = base / PREP_DIR
         out.mkdir(parents=True, exist_ok=True)
         textos.mkdir(parents=True, exist_ok=True)
 
         cls = sorted(carpeta.glob("*.mp4"))
         print(f"\n########## {slug}  ({len(cls)} clips) ##########", flush=True)
         frases_carpeta = []
+        ganchos, ganchos_path = ({}, None) if solo_transcribir else cargar_ganchos(base, carpeta)
+        if not solo_transcribir:
+            if ganchos_path:
+                print(f"   [gancho texto] {len(ganchos)} texto(s) en {ganchos_path}", flush=True)
+            else:
+                print(f"   [gancho texto] AVISO: no hay {GANCHOS_JSON} en {base} ni en la carpeta "
+                      f"de origen -> los clips nuevos salen SIN gancho de texto", flush=True)
 
         for mp4 in cls:
             name = mp4.stem.strip()
             final_path = out / f"{name}.mp4"
             txt_path = textos / f"{name}.txt"
+            prep_mp4 = prep / f"{name}.mp4"
+            prep_words = prep / f"{name}.words.json"
+            hay_prep = prep_mp4.exists() and prep_words.exists()
 
             # Idempotente: salta solo si ya es VERTICAL (h>w)
             if final_path.exists():
@@ -418,55 +507,82 @@ def main():
                         frases_carpeta.append({"phrase": texto})
                     print(f"= {name}: ya 9:16 -> salto", flush=True)
                     continue
+            if solo_transcribir and hay_prep and txt_path.exists():
+                preparados += 1
+                print(f"= {name}: ya preparado (_prep/) -> salto", flush=True)
+                continue
 
             print(f"=== {name}", flush=True)
             work = WORKROOT / slug / name
             work.mkdir(parents=True, exist_ok=True)
             try:
-                sw, sh = dims(mp4)
-                dur = duracion(mp4)
-                # 1) reencuadre 9:16
-                vert = work / "vert.mp4"
-                def _es_num(s):
-                    try:
-                        float(s); return True
-                    except ValueError:
-                        return False
-                if LADO in ("left", "izq"):
-                    # Multicam con Luis a la IZQUIERDA: recorte por plano en la
-                    # cara más a la izquierda, altura completa (sin regazo/piernas).
-                    reencuadre_izq_por_plano(mp4, sw, sh, dur, vert, sel="left")
-                elif LADO in ("center", "centro"):
-                    # Multicam sin lado fijo: centra la cara dominante de cada plano
-                    # (entrevistado y entrevistador), altura completa.
-                    reencuadre_izq_por_plano(mp4, sw, sh, dur, vert, sel="center")
-                elif LADO == "auto":
-                    # Híbrido (Largo 4): primer plano -> centra la cara dominante;
-                    # plano general -> la de la izquierda (Luis). Un recorte por plano.
-                    reencuadre_izq_por_plano(mp4, sw, sh, dur, vert, sel="auto")
-                elif LADO in ("auto-right", "auto-derecha"):
-                    # Híbrido (Largo 5): primer plano -> cara dominante; plano
-                    # general -> la de la DERECHA (Luis). Un recorte por plano.
-                    reencuadre_izq_por_plano(mp4, sw, sh, dur, vert, sel="auto-right")
-                elif LADO == "right" or _es_num(LADO):
-                    # Plano a dos estático / centro fijo: BLOQUEA en el protagonista
-                    reencuadre_persona(mp4, sw, sh, dur, vert, lado=LADO)
+                if hay_prep and not solo_transcribir:
+                    # Reutiliza lo hecho con --solo-transcribir: ni reencuadre ni
+                    # quitar silencios ni Whisper otra vez.
+                    desil = work / "desil.mp4"
+                    shutil.copy(str(prep_mp4), str(desil))
+                    data = json.loads(prep_words.read_text(encoding="utf-8"))
+                    words = data.get("words") or []
+                    texto = (data.get("texto") or "").strip()
+                    if not txt_path.exists():
+                        txt_path.write_text(texto, encoding="utf-8")
+                    print("   [prep] reutilizo reencuadre + silencios + transcripción de _prep/", flush=True)
                 else:
-                    # Plano de una sola persona: seguimiento de cara centrado
-                    C.cortar_vertical(mp4, 0, dur, vert, src_w=sw, src_h=sh)
-                # 2) quitar silencios
-                desil = work / "desil.mp4"
-                try:
-                    C.quitar_silencios(vert, desil)
-                except Exception as e:
-                    print(f"   [silencios] fallo ({e}); uso el clip sin recortar", flush=True)
-                    desil = vert
-                # 3) transcribir el 9:16 desilenciado (una vez)
-                words, texto = transcribir_words_y_texto(desil, lang="es")
-                txt_path.write_text(texto, encoding="utf-8")
+                    sw, sh = dims(mp4)
+                    dur = duracion(mp4)
+                    # 1) reencuadre 9:16
+                    vert = work / "vert.mp4"
+                    if lado in ("left", "izq"):
+                        # Multicam con Luis a la IZQUIERDA: recorte por plano en la
+                        # cara más a la izquierda, altura completa (sin regazo/piernas).
+                        reencuadre_izq_por_plano(mp4, sw, sh, dur, vert, sel="left")
+                    elif lado in ("center", "centro"):
+                        # Multicam sin lado fijo: centra la cara dominante de cada plano
+                        # (entrevistado y entrevistador), altura completa.
+                        reencuadre_izq_por_plano(mp4, sw, sh, dur, vert, sel="center")
+                    elif lado == "auto":
+                        # Híbrido (Largo 4): primer plano -> centra la cara dominante;
+                        # plano general -> la de la izquierda (Luis). Un recorte por plano.
+                        reencuadre_izq_por_plano(mp4, sw, sh, dur, vert, sel="auto")
+                    elif lado in ("auto-right", "auto-derecha"):
+                        # Híbrido (Largo 5): primer plano -> cara dominante; plano
+                        # general -> la de la DERECHA (Luis). Un recorte por plano.
+                        reencuadre_izq_por_plano(mp4, sw, sh, dur, vert, sel="auto-right")
+                    elif lado == "right" or _es_num(lado):
+                        # Plano a dos estático / centro fijo: BLOQUEA en el protagonista
+                        reencuadre_persona(mp4, sw, sh, dur, vert, lado=lado)
+                    else:
+                        # Plano de una sola persona: seguimiento de cara centrado
+                        C.cortar_vertical(mp4, 0, dur, vert, src_w=sw, src_h=sh)
+                    # 2) quitar silencios
+                    desil = work / "desil.mp4"
+                    try:
+                        C.quitar_silencios(vert, desil)
+                    except Exception as e:
+                        print(f"   [silencios] fallo ({e}); uso el clip sin recortar", flush=True)
+                        desil = vert
+                    # 3) transcribir el 9:16 desilenciado (una vez)
+                    words, texto = transcribir_words_y_texto(desil, lang="es")
+                    txt_path.write_text(texto, encoding="utf-8")
+                    if solo_transcribir:
+                        # Deja el 9:16 + words para el render (sin repetir nada).
+                        prep.mkdir(parents=True, exist_ok=True)
+                        shutil.copy(str(desil), str(prep_mp4))
+                        prep_words.write_text(json.dumps({"texto": texto, "words": words},
+                                                         ensure_ascii=False), encoding="utf-8")
+                        preparados += 1
+                        print(f"   preparado -> textos/{name}.txt (+ {PREP_DIR}/)", flush=True)
+                        continue
                 if texto:
                     frases_carpeta.append({"phrase": texto})
-                # 4) Fase C
+                # 4) Fase C (+ gancho de texto si el editor lo escribió)
+                gancho = ganchos.get(name)
+                if gancho:
+                    print(f"   [gancho texto] «{gancho}»", flush=True)
+                else:
+                    sin_gancho.append(f"{slug}/{name}")
+                    print(f"   [gancho texto] AVISO: {name} no tiene texto en {GANCHOS_JSON} "
+                          f"-> se renderiza SIN gancho", flush=True)
                 out_tmp = work / "out.mp4"
                 pc.burn_subs_and_music(
                     desil, MUSIC, out_tmp,
@@ -474,10 +590,14 @@ def main():
                     hook_query=None,
                     clip_text=texto or None,
                     words=words,
+                    hook_text=gancho,
                 )
                 shutil.move(str(out_tmp), str(final_path))
                 hechos += 1
                 print(f"   OK -> {final_path}", flush=True)
+                # intermedios de _prep/ de este clip: ya no hacen falta
+                prep_mp4.unlink(missing_ok=True)
+                prep_words.unlink(missing_ok=True)
             except Exception as e:
                 fallos += 1
                 traceback.print_exc()
@@ -485,7 +605,13 @@ def main():
             finally:
                 shutil.rmtree(work, ignore_errors=True)
 
-        if tiene_supabase and frases_carpeta:
+        if prep.exists() and not any(prep.iterdir()):
+            prep.rmdir()
+        if solo_transcribir:
+            print(f"   [gancho texto] textos en {textos}. Escribe {base / GANCHOS_JSON} "
+                  f'({{"<clip>.mp4": "texto"}}) y relanza sin --solo-transcribir.', flush=True)
+
+        if guardar_frases and frases_carpeta:
             phrases = [{"phrase": f["phrase"], "category": "clip", "angle": slug}
                        for f in frases_carpeta if f["phrase"]]
             try:
@@ -499,8 +625,13 @@ def main():
                 print(f"   [frases] error (ignorado): {e}", flush=True)
 
     shutil.rmtree(WORKROOT, ignore_errors=True)
-    print(f"\n==================== RESUMEN ====================", flush=True)
-    print(f"OK/nuevos: {hechos}   saltados(ya 9:16): {saltados}   fallos: {fallos}", flush=True)
+    print("\n==================== RESUMEN ====================", flush=True)
+    if solo_transcribir:
+        print(f"preparados: {preparados}   saltados(ya 9:16): {saltados}   fallos: {fallos}", flush=True)
+    else:
+        print(f"OK/nuevos: {hechos}   saltados(ya 9:16): {saltados}   fallos: {fallos}", flush=True)
+        if sin_gancho:
+            print(f"AVISO sin gancho de texto ({len(sin_gancho)}): " + ", ".join(sin_gancho), flush=True)
 
 
 if __name__ == "__main__":

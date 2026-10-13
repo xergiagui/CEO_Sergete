@@ -28,33 +28,60 @@ Buzón de entrada: `input/`. Todo automático; no se edita código por vídeo.
 1. `transcribir.py "input/<video>.mp4"` → `transcripciones/<video>/<video>.{txt,srt,json}`.
 2. **Generar `cortes.json`** (el único paso con criterio): leer la transcripción
    con tiempos y elegir los momentos con gancho (ver «Recorte y hook»). Esquema
-   en `cortes.example.json`: `[{"nombre","inicio","fin","titulo","hook_query"}]`.
-   Nº de clips por defecto: ~1 por cada 3 min, mínimo 3 y máximo 6.
+   en `cortes.example.json`:
+   `[{"nombre","inicio","fin","titulo","gancho_texto","hook_query"}]`.
+   Escribe un **`gancho_texto`** por corte (ver «Gancho de texto en pantalla»);
+   si falta, se usa el `titulo`. Nº de clips por defecto: ~1 por cada 3 min,
+   mínimo 3 y máximo 6.
 3. `clips.py "<video>"` → recorte 9:16 + quitar silencios → `…/clips/`.
-4. `editar_clips.py "<video>"` → Fase C (b-roll + gancho + música + subs) →
-   `…/finales/`. Guarda frases en `viral_phrases` (best-effort).
+4. `editar_clips.py "<video>"` → Fase C (gancho visual + gancho de texto + b-roll
+   + música + subs) → `…/finales/`. Guarda frases en `viral_phrases`
+   (best-effort). `--sin-gancho-texto` lo desactiva y `--sin-frases` no guarda
+   frases (pruebas o re-render de una corrección).
 
 `transcribir.py` y `editar_clips.py` usan una carpeta de trabajo **única por
 proceso**: se pueden lanzar en paralelo para vídeos distintos.
 
 ### 2. Clips ya cortados → reels (batch)
-`procesar_batch_clip.py [RAIZ] [CARPETA] [MODO]`
+`procesar_batch_clip.py [RAIZ] [CARPETA] [MODO] [--solo-transcribir] [--sin-frases]`
 - `RAIZ`: carpeta con subcarpetas de clips (por defecto `C:\Users\ico858\Desktop\Clip`).
 - `CARPETA`: procesar solo esa subcarpeta (opcional).
 - `MODO` de encuadre: `right` (por defecto) · `left` · `center` · `auto` ·
   `auto-right` · `follow` · `<fracción>` (p. ej. `0.81`).
-- Por cada MP4: reencuadre 9:16 → quitar silencios → Fase C sin gancho → guarda la
-  transcripción en `viral_phrases`. Transcribe una sola vez y reutiliza los
-  tiempos (`words=` en `burn_subs_and_music`). Es reanudable: salta los finales que
-  ya existen en vertical.
-- Usa `whisper/_edit_batch` **compartido**: **no lances dos batch a la vez**.
+- Por cada MP4: reencuadre 9:16 → quitar silencios → Fase C sin gancho visual y
+  con **gancho de texto** → guarda la transcripción en `viral_phrases`
+  (`--sin-frases` lo desactiva). Transcribe una sola vez y reutiliza los tiempos
+  (`words=` en `burn_subs_and_music`). Es reanudable: salta los finales que ya
+  existen en vertical.
+- **Flujo con gancho de texto** (siempre en este orden, en tres pasos):
+  1. `procesar_batch_clip.py "<RAIZ>" "<CARPETA>" <MODO> --solo-transcribir` →
+     reencuadre + silencios + transcripción; deja el texto en
+     `transcripciones/<CARPETA>/textos/<clip>.txt` y el 9:16 + los tiempos en
+     `transcripciones/<CARPETA>/_prep/`. No renderiza.
+  2. El editor (LLM) lee cada `textos/<clip>.txt` y escribe
+     `transcripciones/<CARPETA>/ganchos.json`:
+     `{"<clip>.mp4": "¿Texto que abre el bucle?", ...}` (reglas en «Gancho de
+     texto en pantalla»). También vale un `ganchos.json` en la carpeta de origen.
+  3. `procesar_batch_clip.py "<RAIZ>" "<CARPETA>" <MODO>` → renderiza
+     reutilizando `_prep/` (no reencuadra ni transcribe otra vez) y quema el
+     gancho de cada clip. Al acabar cada clip borra su `_prep/`.
+  - Un clip **sin texto** en `ganchos.json` sale **sin gancho** y el batch lo
+    avisa (por clip y en el resumen). **Nunca** rellenes un gancho mecánico (la
+    primera frase, el nombre del archivo…): si no hay un buen gancho, déjalo sin
+    texto y díselo al CEO.
+  - Si cambias el `MODO` de encuadre tras el paso 1, borra antes
+    `_prep/<clip>.*` (si no, se reutiliza el encuadre anterior).
+- Usa `whisper/_edit_batch` **compartido**: **no lances dos batch a la vez**
+  (tampoco un `--solo-transcribir` con otro batch en marcha).
 
 ### 3. Adaptaciones con avatar IA (skill `Editor_Sergio`)
 Parte del **link** del viral (se descarga sola), con popups y gates por fases
 (audio → HeyGen → edición). Se lanza desde el **hilo principal** del CEO, no desde
 el subagente. Código en `.claude/skills/Editor_Sergio/` (`generate_from_link.py`,
 `pipeline_core.py`). Salida en `~/Desktop/viral_pipeline_output/<Avatar>/<slug>/`.
-Al analizar un viral guarda 2–6 frases en `viral_phrases`.
+Al analizar un viral guarda 2–6 frases en `viral_phrases`. **No lleva gancho de
+texto**: el parámetro `hook_text` de `burn_subs_and_music` está desactivado por
+defecto y esta vía no lo pasa.
 
 ---
 
@@ -93,6 +120,38 @@ Al analizar un viral guarda 2–6 frases en `viral_phrases`.
 - Unidad de sentido: 3 palabras por defecto, pero agrupar por idea si mejora la
   lectura; no dejar artículos o preposiciones sueltos al final.
 - Idea pendiente (no implementada): resaltar en color 1 palabra clave por bloque.
+
+### Gancho de texto en pantalla
+En Reels los primeros 1–3 s deciden el alcance y mucha gente ve sin sonido: el
+**primer fotograma ya lleva un texto que abre un bucle** y el clip lo cumple.
+- **Texto** (lo escribe el editor, LLM; nunca uno mecánico):
+  - corto: **2 líneas como máximo**, ~45 caracteres orientativos;
+  - **ortografía correcta, con tildes, ñ y signos de apertura** (`¿`, `¡`);
+  - abre un bucle o una pregunta **sin dar la respuesta**;
+  - **se cumple dentro del clip** (regla «el hook debe cumplirse»): nada de
+    cifras, promesas o datos que el clip no dé;
+  - no repite literal la primera frase hablada (eso ya lo dan los subtítulos);
+  - sin emojis (la tipografía no los tiene).
+- **Dónde se escribe:** vía 1 → `gancho_texto` de cada corte en `cortes.json` (si
+  falta, se usa el `titulo`, con aviso); vía 2 → `ganchos.json` de la carpeta;
+  vía 3 → no lleva.
+- **Cuándo:** desde el **primer fotograma**, **2,5 s**, con salida suave de 0,2 s.
+  Coincide con el gancho visual de la vía 1 (va encima del minivídeo) y con el
+  tramo en el que el b-roll no entra.
+- **Dónde va:** franja **superior** dentro de la zona segura: la caja empieza bajo
+  el 12,5 % superior (barra de IG/TikTok), deja 120 px a cada lado y queda muy
+  por encima de los subtítulos (que van a ~1185–1280 px).
+- **Estilo:** la **misma tipografía** que los subtítulos (Montserrat Bold), texto
+  blanco con reseguido negro sobre una caja oscura semitransparente; la letra se
+  ajusta sola (74→50 px) para caber en 1–2 líneas sin dejar artículos ni
+  preposiciones colgando y partiendo, si puede, en un signo de puntuación.
+- **Mismas reglas de texto que los subtítulos:** minúsculas con mayúscula en la
+  primera letra y tras `.`, `?`, `!` y `…`; palabrotas enmascaradas (`m***`);
+  números de miles sin partir («10.000», «1.500 €»). Ojo: como en los
+  subtítulos, las marcas y los nombres propios quedan en minúscula salvo al
+  inicio de frase.
+- Código: `render_hook_text_png` + `burn_subs_and_music(hook_text=…)` en
+  `pipeline_core.py`. Los clips ya renderizados no se tocan.
 
 ### Silencios
 - Ajuste global de `clips.quitar_silencios`: `auto-editor` con umbral **6 %** y

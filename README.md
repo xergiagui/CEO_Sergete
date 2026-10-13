@@ -15,7 +15,9 @@ transcripciones/
   └── <nombre>/
       ├── <nombre>.txt/.srt/.json   Paso 1 (originales)
       ├── revisadas/                Paso 2 (.txt y .srt revisados)
-      └── clips/                    Paso 3 (clips verticales SIN subs)
+      ├── cortes.json               Paso 3 (momentos + titulo + gancho_texto)
+      ├── clips/                    Paso 3 (clips verticales SIN subs)
+      └── finales/                  Paso 4 (reels listos)
 musicas/                       música local para el Paso 4 (git-ignored)
 superposiciones/               vídeos b-roll locales para el Paso 4 (git-ignored)
 whisper/                       whisper.cpp: bin/ + models/ (git-ignored, ~3GB)
@@ -46,6 +48,9 @@ Requiere `whisper/bin/whisper-cli.exe` y `whisper/models/ggml-large-v3.bin`.
 - Se eligen los momentos con más **gancho** (≈ **1 cada 3 min** de vídeo, mín. 3
   y máx. 6) y se escriben en `transcripciones/<nombre>/cortes.json` (esquema en
   `cortes.example.json`). `clips.py "<nombre>"` lee ese archivo.
+- Cada corte lleva su **`gancho_texto`**: el texto corto (máx. 2 líneas, ~45
+  caracteres, con tildes) que abre un bucle y que el clip cumple. Si falta, el
+  Paso 4 usa el `titulo`.
 - **Duraciones**: ~30 s por defecto; opcionalmente también **60 s y 90 s**
   (independientes o extendiendo el de 30 s).
 - Por cada uno: **recorte vertical 9:16** con seguimiento de cara y encuadre de
@@ -58,23 +63,42 @@ Requiere `whisper/bin/whisper-cli.exe` y `whisper/models/ggml-large-v3.bin`.
 
 Por cada clip, en este orden de capas:
 
-1. **Gancho**: un mini-vídeo o imagen de stock (Pexels; fallback Openverse/Lorem
-   Picsum) a pantalla completa los primeros ~1.8 s.
-   La imagen debe tener **fuerte gancho visual** y **relación clara** con el
-   clip → se analiza el contenido para elegir bien la búsqueda (query en inglés).
+1. **Gancho visual**: un mini-vídeo de stock (Pexels) a pantalla completa los
+   primeros ~2,5 s (fallback: imagen libre de Openverse/Lorem Picsum, ~1,8 s).
+   Debe tener **fuerte gancho visual** y **relación clara** con el clip → se
+   analiza el contenido para elegir bien la búsqueda (`hook_query`, en inglés).
 2. **B-roll** a pantalla completa, sincronizado con la voz y elegido por
    semántica (`broll_assets` + `match_broll`) desde `superposiciones/` (local).
 3. **Música** desde `musicas/` (local) + **de-click**.
-4. **Subtítulos palabra a palabra** quemados **una sola vez**, encima de todo.
+4. **Gancho de texto** (`gancho_texto` del corte o, si falta, `titulo`) en la
+   franja superior desde el primer fotograma, 2,5 s con salida suave: misma
+   tipografía que los subtítulos, caja oscura semitransparente, máx. 2 líneas.
+5. **Subtítulos palabra a palabra** quemados **una sola vez**, encima de todo.
 
 Salida: `transcripciones/<nombre>/finales/`, listo para publicar. Las frases
 virales se guardan en Supabase (`viral_phrases`) para TheHistoria.
+Opciones: `--sin-gancho-texto` (sin texto de gancho) y `--sin-frases` (no guarda
+en `viral_phrases`; para pruebas o re-render de una corrección).
 
 ## Batch de clips ya cortados  (`procesar_batch_clip.py`)
 
 `procesar_batch_clip.py [RAIZ] [CARPETA] [MODO]`: reencuadre 9:16 + quitar
 silencios + Fase C para cada MP4 de las subcarpetas de `RAIZ` (por defecto
 `Desktop/Clip`). Modos de encuadre y detalles en `CLAUDE.md`.
+
+Con gancho de texto, en tres pasos:
+
+```bat
+:: 1) reencuadre + silencios + transcripción (sin render) -> textos/ y _prep/
+.venv\Scripts\python.exe procesar_batch_clip.py "<RAIZ>" "<CARPETA>" follow --solo-transcribir
+:: 2) el editor escribe transcripciones\<CARPETA>\ganchos.json
+::    {"clip 1.mp4": "¿Texto que abre el bucle?", "clip 2.mp4": "..."}
+:: 3) render reutilizando _prep/ (sin volver a transcribir)
+.venv\Scripts\python.exe procesar_batch_clip.py "<RAIZ>" "<CARPETA>" follow
+```
+
+Un clip sin texto en `ganchos.json` sale sin gancho y el batch lo avisa.
+`--sin-frases` evita guardar las transcripciones en `viral_phrases`.
 
 ## Encuadre y zonas seguras (RRSS)
 

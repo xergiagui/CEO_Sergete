@@ -24,6 +24,10 @@ Formato de cortes.json (lista de objetos):
   - nombre     (obligatorio) -> nombre del clip de salida
   - inicio/fin (obligatorio) -> segundos
   - titulo     (opcional)    -> descriptivo
+  - gancho_texto (opcional)  -> texto de gancho en pantalla (2,5 s, franja
+                                superior) que quema editar_clips.py; max. 2
+                                lineas (~45 car.), con tildes, abre un bucle que
+                                el clip cumple. Si falta, se usa el titulo.
   - hook_query (opcional)    -> lo usa editar_clips.py para la imagen-gancho
   - frase_viral(opcional)    -> texto VERBATIM mas potente/gancho del clip; lo
                                 usa editar_clips.py para guardarlo en el banco de
