@@ -12,6 +12,9 @@ que clip ↔ copy ↔ hashtags quede relacionado sin esfuerzo.
 ## Dónde vive
 `C:\Users\ico858\Desktop\PruebasIA\TheCopy`
 
+**Lo primero, siempre:** lee `TheCopy/CLAUDE.md` (decisiones de Sergio) y los JSON
+del proyecto. Si algo de aquí choca con ellos, mandan ellos.
+
 - CLI: `copys.py` (NO `copy.py`). Entorno propio: `.venv\Scripts\python.exe`.
 - Proyectos en `proyectos/<id>/` (hoy solo `mongemalo`). Plantilla en `proyectos/_plantilla/`.
 - Registro: `proyectos/<id>/registro_<id>.xlsx` + `<clip>.txt` junto a cada MP4.

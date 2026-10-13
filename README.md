@@ -37,7 +37,9 @@ CEO corre `descarga` y pasa el MP4 a `editor`.
 
 **TheHistoria es independiente:** descargar/editar no crea historias. Se lanza
 solo cuando lo pides. Coge las frases que TheEditor deja en `viral_phrases` y les
-pone un fondo del mismo banco de b-roll (`TheEditor/superposiciones/`).
+pone un fondo del mismo banco de b-roll (`TheEditor/superposiciones/`). Para
+promos o eventos tiene una vía de **historias especiales** con tu propio texto.
+Al darles OK pasan a `HISTORIAS/1. Pte publicar` (sin copy).
 
 **TheCopy entra al dar OK:** cuando apruebas clips y pasan a
 `REVISADOS/1. pte Publicar`, se escribe su copy y sus hashtags según las reglas del
@@ -56,12 +58,19 @@ texto están pendientes** de especificar.
 Cada funcionalidad nueva es una **carpeta hermana** en `PruebasIA/`. Para que el
 CEO la dirija:
 
-1. Crea la carpeta (y su repo si aplica).
-2. Añade su entrada en [`departamentos.json`](departamentos.json).
-3. Crea su subagente en `.claude/agents/<id>.md`.
-4. Añade la ruta a `additionalDirectories` en `.claude/settings.local.json`.
+1. Crea la carpeta y su repo (`github.com/xergiagui/<Nombre>`).
+2. Escribe su `CLAUDE.md` con sus reglas y su `README.md`.
+3. Añade su entrada en [`departamentos.json`](departamentos.json).
+4. Crea su subagente en `.claude/agents/<id>.md` (lo primero que hace: leer su `CLAUDE.md`).
+5. Añade la ruta a `additionalDirectories` en `.claude/settings.local.json`.
 
 Detalle del protocolo en [`CLAUDE.md`](CLAUDE.md).
+
+## Dónde viven las reglas
+
+Cada departamento tiene su **`CLAUDE.md`** con sus reglas (las de edición, en
+`TheEditor/CLAUDE.md`). Los subagentes lo leen siempre al empezar, porque no ven
+la memoria de la conversación. Cuando des una regla nueva, se apunta ahí.
 
 ## Supabase
 

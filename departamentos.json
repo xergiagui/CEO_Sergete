@@ -15,6 +15,7 @@
       "entrypoint": "tools\\yt-dlp.exe  ·  o  descargar.bat \"URL\" [audio|1080p|720p]",
       "salida": "TheDescarga\\descargas\\<video>.mp4",
       "handoff": "Los vídeos bajados se tratan luego en TheEditor: descargas/ -> TheEditor/input/ (buzón). El subagente 'editor' hace la ingesta.",
+      "reglas": "TheDescarga/CLAUDE.md",
       "autonomo": true
     },
     {
@@ -28,7 +29,9 @@
       "disparadores": ["editor", "viral pipeline", "adaptaciones de este reel", "monta el sistema viral", "avatar", "heygen", "b-roll", "subtítulos"],
       "entrypoint": "Montaje interactivo → skill Editor_Sergio desde el hilo principal (Skill). Batch/scripts → subagente 'editor' con .venv/Scripts/python.",
       "buzon_entrada": "TheEditor\\input\\  (aquí llegan los vídeos de TheDescarga para tratarse)",
-      "flujo_video_local": "transcribir.py -> el editor genera cortes.json (elige momentos) -> clips.py \"<video>\" -> editar_clips.py \"<video>\". 100% automatico: scripts genericos que leen cortes.json (esquema en TheEditor/cortes.example.json), sin editar codigo por video.",
+      "flujo_video_local": "transcribir.py -> el editor genera cortes.json (elige momentos) -> clips.py \"<video>\" -> editar_clips.py \"<video>\". 100% automatico: scripts genericos que leen cortes.json (esquema en TheEditor/cortes.example.json), sin editar codigo por video. transcribir/editar_clips admiten ejecuciones en paralelo.",
+      "flujo_clips_cortados": "procesar_batch_clip.py [RAIZ] [CARPETA] [MODO right|left|center|auto|auto-right|follow|<frac>] -> reencuadre 9:16 + quitar silencios + Fase C por cada MP4 (por defecto RAIZ = Desktop/Clip). NO lanzar dos batch a la vez (whisper/_edit_batch compartido).",
+      "reglas": "TheEditor/CLAUDE.md (reglas de edición de Sergio: encuadre, b-roll a pantalla completa, subtítulos, silencios, correcciones solo al clip pedido).",
       "assets_locales": ["superposiciones/", "musicas/", "whisper/", "fonts/"],
       "skill_interactiva": "Editor_Sergio (enlazada por junction en CEO_Sergete/.claude/skills/, fuente de verdad en TheEditor). Disponible desde el hilo principal de CEO_Sergete; sus popups funcionan igual que en TheEditor.",
       "nota": "Assets resueltos por PROJECT_ROOT (raíz de TheEditor), no por el cwd → el montaje funciona desde cualquier carpeta. El flujo completo con popups va por la skill (hilo principal), no por el subagente.",
@@ -45,6 +48,7 @@
       "disparadores": ["landing", "web", "next.js", "vercel", "leads", "formulario", "/stats", "despliega la landing"],
       "entrypoint": "npm run dev  ·  npm run build  ·  git push (deploy auto en Vercel)",
       "supabase": "https://akuykrrqmivrcjzcsksj.supabase.co (reutilizado de mis-finanzas)",
+      "reglas": "TheLanding/CLAUDE.md (+ AGENTS.md): push = deploy (confirmar), base de SEO/accesibilidad/marca a conservar.",
       "autonomo": true
     },
     {
@@ -54,12 +58,14 @@
       "ruta_relativa": "../TheHistoria",
       "repo": "https://github.com/xergiagui/TheHistoria.git",
       "subagente": "historia",
-      "que_hace": "Genera historias de Instagram (MP4 vertical 9:16) a partir de las frases virales que TheEditor guarda en Supabase (viral_phrases, used_in_story=false): pone cada frase sobre un fondo y exporta. Marca la frase como usada al terminar.",
-      "disparadores": ["historia", "historias", "stories", "story de instagram", "genera historias", "monta historias", "frase con fondo"],
-      "entrypoint": "..\\TheEditor\\.venv\\Scripts\\python.exe historias.py [--n N|--categoria X|--min-virality N|--phrase \"...\"|--duracion S|--no-marcar]",
+      "que_hace": "Genera historias de Instagram (MP4 vertical 9:16). Vía normal: frases virales de Supabase (viral_phrases, used_in_story=false) sobre un fondo de b-roll; marca la frase como usada. Vía especial (promos/eventos): texto que da Sergio sobre fondos de 'BRells especiales/', con la franja inferior libre para el botón de IG.",
+      "disparadores": ["historia", "historias", "stories", "story de instagram", "genera historias", "monta historias", "frase con fondo", "historia especial", "promo", "evento"],
+      "entrypoint": "..\\TheEditor\\.venv\\Scripts\\python.exe historias.py [--n N|--categoria X|--min-virality N|--phrase \"...\"|--duracion S|--no-marcar]  ·  historias_especiales.py --texto \"...\" [--variaciones N|--duracion S|--reserva-inferior F]",
+      "reglas": "TheHistoria/CLAUDE.md",
+      "al_dar_ok": "Mover los MP4 de salidas/<tanda>/ a CEO_Sergete/HISTORIAS/1. Pte publicar/ y borrar las carpetas de tanda (conservar salidas/.gitkeep). Sin copy.",
       "fuente_frases": "Supabase viral_phrases (la puebla TheEditor). Esquema en TheLanding/supabase/viral_phrases.sql.",
       "banco_fondos": "El MISMO b-roll que TheEditor: ../TheEditor/superposiciones/ catalogado en broll_assets. Match semantico via RPC match_broll o azar. No duplica assets.",
-      "salida": "TheHistoria\\salidas\\<timestamp>\\NN_slug.mp4 + manifest.json",
+      "salida": "TheHistoria\\salidas\\<timestamp>\\NN_slug.mp4 + manifest.json  (especiales: salidas\\especiales_<timestamp>\\)",
       "entorno": "Reutiliza el .venv de TheEditor (httpx, Pillow, imageio-ffmpeg, fastembed) — no instala nada.",
       "nota": "PROCESO INDEPENDIENTE y a demanda: NO se encadena con descarga/edicion. Solo se lanza cuando el usuario pide historias explicitamente.",
       "autonomo": true
@@ -79,6 +85,7 @@
       "fuente_contexto": "cortes.json + .srt de TheEditor/transcripciones/<video>/ o _Historico/<video>/ (el clip finales/<nombre>.mp4 = entrada 'nombre' de cortes.json).",
       "salida": "TheCopy\\proyectos\\<id>\\registro_<id>.xlsx  +  <clip>.txt junto al MP4 (REVISADOS\\1. pte Publicar)",
       "entorno": "Entorno propio TheCopy/.venv (solo openpyxl).",
+      "reglas": "TheCopy/CLAUDE.md + proyectos/<id>/*.json",
       "nota": "Se lanza AL DAR OK a unos clips (tras moverlos a REVISADOS/1. pte Publicar) o a demanda. Las historias de IG no llevan copy.",
       "autonomo": true
     },
@@ -96,6 +103,7 @@
       "salida": "TheTextos\\textos\\<AAAA-MM-DD>_<slug>\\  (brief.md, articulo.md, schema.json, informe.md)",
       "revision": "Tras 'textos', el CEO lanza el agente global 'blog-reviewer' sobre articulo.md; si BLOCKING o P0 → vuelve a 'textos' (máx. 2 vueltas).",
       "entorno": "Entorno propio TheTextos/.venv (textstat + beautifulsoup4). Nunca python3 (stub de la Store).",
+      "reglas": "TheTextos/CLAUDE.md",
       "nota": "A demanda. NO es para copys/captions/hooks ni textos <=500 palabras (eso es TheCopy).",
       "autonomo": true
     }

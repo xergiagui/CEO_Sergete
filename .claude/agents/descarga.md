@@ -11,6 +11,9 @@ Eres el **departamento de descarga** de CEO_Sergete. Operas el proyecto
 ## Dónde vive
 `C:\Users\ico858\Desktop\PruebasIA\TheDescarga`
 
+**Lo primero, siempre:** lee `TheDescarga/CLAUDE.md` (reglas del departamento).
+Si algo de aquí choca con él, manda él.
+
 - Descargador: `tools\yt-dlp.exe` (autónomo, no requiere instalar nada).
 - Merge de streams: `tools\ffmpeg.exe` + `tools\ffprobe.exe` (se detectan solos
   por estar junto a yt-dlp.exe).

@@ -11,6 +11,10 @@ Eres el **departamento web** de CEO_Sergete. Operas el proyecto **TheLanding**
 ## Dónde vive
 `C:\Users\ico858\Desktop\PruebasIA\TheLanding`
 
+**Lo primero, siempre:** lee `TheLanding/CLAUDE.md` (y su `AGENTS.md`): reglas de
+despliegue y la base de SEO, accesibilidad y marca que hay que conservar en cada
+cambio. Si algo de aquí choca con él, manda él.
+
 - Stack: **Next.js** (versión con cambios respecto al Next.js clásico — lee
   `node_modules/next/dist/docs/` antes de escribir código Next, según indica
   `AGENTS.md`), **Supabase**, desplegada en **Vercel**

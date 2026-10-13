@@ -12,6 +12,13 @@ especializado (uno por departamento, en `.claude/agents/`).
 El registro maestro está en [`departamentos.json`](departamentos.json). Es la
 fuente de verdad: rutas, repos, disparadores y cómo se ejecuta cada uno.
 
+**Cada departamento tiene su propio `CLAUDE.md`** con sus reglas de trabajo (las
+de edición de Sergio están en `TheEditor/CLAUDE.md`, por ejemplo). Su subagente lo
+lee siempre al empezar, porque los subagentes **no ven la memoria** de esta
+conversación. Por eso, cuando Sergio dé una **regla nueva o una corrección que
+deba repetirse**, apúntala en el `CLAUDE.md` del departamento (y haz commit), no
+solo en la memoria.
+
 ---
 
 ## Departamentos actuales
@@ -42,8 +49,14 @@ fuente de verdad: rutas, repos, disparadores y cómo se ejecuta cada uno.
    `descarga` → pasa la ruta del MP4 → `editor`.
 5. **Reporta al usuario** en claro: qué se hizo, dónde quedó el archivo (ruta
    exacta), y qué falta. No vuelques logs crudos; resume.
+   - **Varios vídeos → avisa por vídeo:** en tandas de varios vídeos (descarga,
+     edición o retoques), da el parte de cada uno **en cuanto termina**, sin
+     esperar a que estén todos. Sergio revisa sobre la marcha.
 6. **Si la orden no encaja con ningún departamento**, dilo y propón crear uno
    nuevo (ver «Añadir un departamento»).
+7. **Correcciones: solo lo pedido.** Si Sergio corrige un clip (o unos pocos),
+   pide al departamento que aplique el cambio **solo a esos**, sin convertirlo en
+   comportamiento global que altere lo que ya estaba bien.
 
 ### Reglas
 - **No dupliques código** de los departamentos aquí. CEO_Sergete solo coordina.
@@ -51,7 +64,7 @@ fuente de verdad: rutas, repos, disparadores y cómo se ejecuta cada uno.
   subagentes ya las conocen). Estás en Windows: PowerShell + Bash disponibles.
 - **Acciones externas o difíciles de revertir** (git push, deploy, borrar,
   enviar): confirma con el usuario salvo que ya lo haya autorizado.
-- **Editor — dos vías:**
+- **Editor — tres vías** (detalle y reglas de edición en `TheEditor/CLAUDE.md`):
   - **Montaje viral completo (interactivo, con popups y gates)**: NO uses el
     subagente. Invoca la **skill `Editor_Sergio` desde el hilo principal**
     (herramienta `Skill`). Está enlazada por junction en
@@ -62,11 +75,18 @@ fuente de verdad: rutas, repos, disparadores y cómo se ejecuta cada uno.
   - **Tareas scriptables/batch** (transcribir, cortar clips, correr una fase con
     todos los parámetros dados, sin popups): delega en el subagente `editor`, que
     ejecuta con el `.venv` de TheEditor.
-- **Historia — proceso independiente:** TheHistoria genera historias de IG a
-  partir de las frases que TheEditor guarda en `viral_phrases`. **NO se encadena**
-  con descarga/edición: se lanza **solo cuando el usuario pide historias**. Delega
-  en el subagente `historia` (usa el `.venv` de TheEditor y `superposiciones/`
-  como banco de fondos; no instala nada).
+  - **Clips ya cortados → reels** (carpetas tipo `Desktop/Clip/Largo N
+    Extractos`): subagente `editor` con `procesar_batch_clip.py` y el modo de
+    encuadre de cada carpeta. Nunca dos batch a la vez (comparten carpeta de
+    trabajo). Las ediciones normales (`editar_clips.py`) sí pueden ir en paralelo.
+- **Historia — proceso independiente:** TheHistoria genera historias de IG.
+  **NO se encadena** con descarga/edición: se lanza **solo cuando el usuario pide
+  historias**. Delega en el subagente `historia` (usa el `.venv` de TheEditor; no
+  instala nada). Dos vías:
+  - **Normal:** frases de `viral_phrases` + fondo de `TheEditor/superposiciones/`.
+  - **Especiales** (promos/eventos): texto que da Sergio + fondos de
+    `TheHistoria/BRells especiales/`, con la franja inferior libre para el botón
+    de IG.
 - **Copy — al dar OK y a demanda:** TheCopy escribe el copy y los hashtags de
   los clips y los registra (Excel por proyecto en
   `TheCopy/proyectos/<id>/registro_<id>.xlsx` + `<clip>.txt` junto a cada MP4).
@@ -164,6 +184,36 @@ Cuando Sergio aprueba clips:
 Cuando Sergio pase vídeos a `REVISADOS/2. Publicados`, `copy` con
 `copys.py sincronizar` los marca como *Publicado* (con fecha) en el Excel.
 
+### Al dar OK a unas historias
+
+1. **Mueve** (no copies) todos los MP4 de las tandas aprobadas de
+   `TheHistoria/salidas/<tanda>/` a `HISTORIAS/1. Pte publicar/` (aplanados).
+2. **Borra** esas carpetas de tanda en `salidas/` (conserva `salidas/.gitkeep`).
+3. Las historias **no llevan copy**: no lances `copy`.
+
+---
+
+## Entorno y convenciones
+
+- **Windows.** PowerShell 5.1 y Git Bash disponibles. **`python3` no funciona**
+  (es el acceso directo de la Microsoft Store): usa `py`, `python` o el `.venv`
+  del departamento.
+- **Entornos Python:** TheEditor `.venv` (también lo usa TheHistoria) · TheCopy
+  `.venv` · TheTextos `.venv`. TheDescarga no usa Python (binarios en `tools/`).
+  TheLanding es Node (`npm`).
+- **Carpetas de publicación** (aquí, fuera de git): `REVISADOS/1. pte Publicar`,
+  `REVISADOS/2. Publicados`, `HISTORIAS/1. Pte publicar`, `HISTORIAS/2. Publicadas`.
+  Archivo de transcripciones aprobadas: `PruebasIA/_Historico/`.
+- **Skills globales** (`~/.claude/skills/`): `clean-user-facing-text` se aplica
+  **siempre** a textos de más de 500 palabras (nunca a copys, hooks o captions;
+  regla en `~/.claude/CLAUDE.md`). La suite `blog-*` de claude-blog y `ai-seo` las
+  usa TheTextos, y los agentes `blog-*` (`blog-reviewer`, etc.) están disponibles
+  aquí. `Editor_Sergio` está enlazada por junction en `.claude/skills/`.
+- **Git:** cada departamento tiene su repo en `github.com/xergiagui/<Nombre>` y
+  CEO_Sergete el suyo. Los commits terminan con la línea `Co-Authored-By` de
+  Claude. **Push a TheLanding = deploy en Vercel**: confírmalo antes. Nunca se
+  suben `.env`, `.venv/`, logs ni vídeos.
+
 ---
 
 ## Supabase (compartido)
@@ -184,13 +234,18 @@ catálogo de b-roll de TheEditor (`broll_assets` + RPC `match_broll`).
 
 Cuando Sergio cree una subcarpeta nueva (funcionalidad concreta):
 
-1. Crea la carpeta hermana en `PruebasIA/` (su propio proyecto/repo si aplica).
-2. Añade su entrada en [`departamentos.json`](departamentos.json)
+1. Crea la carpeta hermana en `PruebasIA/` con su repo git (rama `main`, remoto
+   `github.com/xergiagui/<Nombre>`) y, si usa Python, su propio `.venv` +
+   `requirements.txt`.
+2. Escribe su **`CLAUDE.md`** (qué hace, entorno, reglas, flujo, salida) y su
+   `README.md`.
+3. Añade su entrada en [`departamentos.json`](departamentos.json)
    (`id`, `nombre`, `ruta`, `repo`, `disparadores`, `entrypoint`).
-3. Crea su subagente en `.claude/agents/<id>.md` (copia la estructura de uno
-   existente: describe **cuándo** usarlo y **cómo** ejecutar el proyecto).
-4. Añade la ruta a `additionalDirectories` en
+4. Crea su subagente en `.claude/agents/<id>.md` (copia la estructura de uno
+   existente: describe **cuándo** usarlo, **cómo** ejecutar el proyecto y que lo
+   primero sea leer su `CLAUDE.md`).
+5. Añade la ruta a `additionalDirectories` en
    [`.claude/settings.local.json`](.claude/settings.local.json).
-5. Añádelo a la tabla de arriba y a `README.md`.
+6. Añádelo a la tabla de arriba y a `README.md` (árbol, tabla y lista de repos).
 
 Así el nuevo módulo queda «dirigible» desde aquí sin tocar el resto.
