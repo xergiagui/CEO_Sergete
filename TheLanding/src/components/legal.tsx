@@ -86,11 +86,6 @@ export function Identificativos() {
           <A href="mailto:xergiagui.ventas@gmail.com">xergiagui.ventas@gmail.com</A>
         </li>
       </UL>
-      <p>
-        Los datos facilitados con tu consentimiento serán incorporados a un fichero
-        automatizado debidamente inscrito en la Agencia Española de Protección de
-        Datos, cuyo responsable es <Site />
-      </p>
     </>
   );
 }
