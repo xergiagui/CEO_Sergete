@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const alt =
-  "Aprende a vender y ganar dinero online · 5 recursos de Luis Monge Malo";
+  "Aprende a vender online · 5 recursos de Luis Monge Malo";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 

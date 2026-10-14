@@ -238,10 +238,10 @@ export default function ProductsSection({ products }: { products: Product[] }) {
         <span className="pill">Elige tu recurso</span>
         <h2 className="mt-5 font-display text-3xl sm:text-4xl md:text-5xl leading-[1.05] tracking-tight">
           5 formas de empezar a{" "}
-          <span className="hl">ganar dinero</span> vendiendo
+          <span className="hl">aprender a vender</span> online
         </h2>
         <p className="mt-4 text-[var(--text-muted)]">
-          Del primer euro como afiliado a cerrar ventas de miles. Elige por dónde
+          De dar tus primeros pasos como afiliado a cerrar ventas con método. Elige por dónde
           entrar — pulsa, deja tu email y te llevamos al recurso.
         </p>
       </Reveal>

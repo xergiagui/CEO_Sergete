@@ -26,7 +26,7 @@ function StructuredData() {
           height: 180,
         },
         description:
-          "Selección independiente de los 5 recursos de Luis Monge Malo para aprender a vender y ganar dinero online.",
+          "Selección independiente de los 5 recursos de Luis Monge Malo para aprender a vender online.",
       },
       {
         "@type": "WebSite",
@@ -34,7 +34,7 @@ function StructuredData() {
         url: SITE_URL,
         name: "Selección · Monge Malo",
         description:
-          "Los 5 recursos de Luis Monge Malo para aprender a vender y ganar dinero online.",
+          "Los 5 recursos de Luis Monge Malo para aprender a vender online.",
         inLanguage: "es-ES",
         publisher: { "@id": `${SITE_URL}/#org` },
       },
@@ -49,7 +49,7 @@ function StructuredData() {
       {
         "@type": "ItemList",
         "@id": `${SITE_URL}/#recursos`,
-        name: "5 recursos para vender y ganar dinero online",
+        name: "5 recursos para vender online",
         numberOfItems: PRODUCTS.length,
         itemListElement: PRODUCTS.map((p, i) => ({
           "@type": "ListItem",

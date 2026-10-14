@@ -3,7 +3,7 @@ import Reveal from "@/components/Reveal";
 export const FAQS = [
   {
     q: "¿Qué es exactamente esto?",
-    a: "Una selección de los 5 recursos de Luis Monge Malo para aprender a vender y ganar dinero online. Cada uno resuelve un momento distinto: empezar de cero, entender el modelo, cerrar más ventas, rodearte de una comunidad ambiciosa con mentoría diaria o tener acompañamiento continuo.",
+    a: "Una selección de los 5 recursos de Luis Monge Malo para aprender a vender online. Cada uno resuelve un momento distinto: empezar de cero, entender el modelo, cerrar más ventas, rodearte de una comunidad ambiciosa con mentoría diaria o tener acompañamiento continuo.",
   },
   {
     q: "¿Necesito experiencia previa?",
