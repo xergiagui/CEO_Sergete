@@ -35,7 +35,11 @@ casos de «Leer solo cuando haga falta» de `CLAUDE.md`.
 - **claude-blog** (`AgriciDaniel/claude-blog`): `blog-brief`, `blog-write`,
   `blog-geo`, `blog-seo-check`, `blog-factcheck`, `blog-schema` y el resto de la
   suite `blog-*`, además de sus agentes (`blog-reviewer`, etc.) en
-  `~/.claude/agents/`.
+  `~/.claude/agents/`. Se copió a mano (no se actualiza con `npx skills update`).
+  Desde el 14-oct-2026 sus 32 `SKILL.md` llevan `disable-model-invocation: true`
+  para no cargar su descripción en cada sesión: se leen por ruta y siguen
+  funcionando como `/comando`. **Si se reinstala claude-blog, hay que volver a
+  ponerlo.**
 - **clean-user-facing-text** (`guillaumemeyer/watermarks-remover`): limpieza
   final de todo texto de más de 500 palabras (scripts en su carpeta `scripts/`).
 - **ai-seo** (`coreyhaines31/marketingskills`): estrategia GEO de sitio; no se
