@@ -29,37 +29,35 @@ export default function Cookies() {
 
       <H2>Cookies utilizadas en este sitio web</H2>
       <p>
-        Siguiendo las directrices de la Agencia Española de Protección de Datos
-        procedemos a detallar el uso de <em>cookies</em> que hace esta web con el
-        fin de informarle con la máxima exactitud posible.
+        Este sitio web no utiliza <em>cookies</em> propias ni de terceros, no
+        emplea Google Analytics ni servicios de publicidad, no dispone de
+        comentarios ni de botones de redes sociales y, por ese motivo, no muestra
+        banner de consentimiento de <em>cookies</em>.
       </p>
       <p>
-        Este sitio web utiliza las siguientes <Strong>cookies propias</Strong>:
+        Lo único que se guarda en su navegador, mediante el almacenamiento local
+        (<em>localStorage</em>), es lo siguiente, con la finalidad exclusiva de la
+        analítica propia de este sitio:
       </p>
       <UL>
         <li>
-          Cookies de sesión, para garantizar que los usuarios que escriban
-          comentarios en el blog sean humanos y no aplicaciones automatizadas. De
-          esta forma se combate el <em>spam</em>.
+          Un identificador de sesión aleatorio, que permite contar visitas y
+          relacionar las acciones realizadas en un mismo navegador.
+        </li>
+        <li>
+          Datos de atribución de la primera visita: la página de procedencia
+          (<em>referrer</em>) y los parámetros de campaña (<em>utm_source</em>,{" "}
+          <em>utm_medium</em> y <em>utm_campaign</em>), si existen.
         </li>
       </UL>
       <p>
-        Este sitio web utiliza las siguientes <Strong>cookies de terceros</Strong>:
+        Estos datos se envían a nuestro servidor y se almacenan en Supabase, que
+        actúa como proveedor de almacenamiento, junto con el tipo de evento
+        (visita, consulta de un recurso, clic o envío de formulario), la página
+        visitada, el tipo de dispositivo, el país (si lo facilita el servicio de
+        alojamiento) y el <em>user agent</em> del navegador. Con ellos no se le
+        identifica por su nombre.
       </p>
-      <UL>
-        <li>
-          Google Analytics: Almacena <em>cookies</em> para poder elaborar
-          estadísticas sobre el tráfico y volumen de visitas de esta web. Al
-          utilizar este sitio web está consintiendo el tratamiento de información
-          acerca de usted por Google. Por tanto, el ejercicio de cualquier derecho
-          en este sentido deberá hacerlo comunicando directamente con Google.
-        </li>
-        <li>
-          Redes sociales: Cada red social utiliza sus propias <em>cookies</em> para
-          que usted pueda pinchar en botones del tipo <em>Me gusta</em> o{" "}
-          <em>Compartir</em>.
-        </li>
-      </UL>
 
       <H2>Desactivación o eliminación de cookies</H2>
       <p>
@@ -75,32 +73,20 @@ export default function Cookies() {
       <H2>Notas adicionales</H2>
       <UL>
         <li>
-          Ni esta web ni sus representantes legales se hacen responsables ni del
-          contenido ni de la veracidad de las políticas de privacidad que puedan
-          tener los terceros mencionados en esta política de <em>cookies</em>.
+          Los navegadores web son las herramientas encargadas de almacenar este tipo
+          de datos y desde este lugar puede efectuar su derecho a eliminación o
+          desactivación de los mismos. Ni esta web ni sus representantes legales
+          pueden garantizar la correcta o incorrecta manipulación de estos datos
+          por parte de los navegadores.
         </li>
         <li>
-          Los navegadores web son las herramientas encargadas de almacenar las{" "}
-          <em>cookies</em> y desde este lugar debe efectuar su derecho a eliminación
-          o desactivación de las mismas. Ni esta web ni sus representantes legales
-          pueden garantizar la correcta o incorrecta manipulación de las{" "}
-          <em>cookies</em> por parte de los mencionados navegadores.
+          Si borra los datos del sitio en su navegador, se eliminarán el
+          identificador de sesión y los datos de atribución guardados; se generará
+          uno nuevo en su siguiente visita.
         </li>
         <li>
-          En algunos casos es necesario instalar <em>cookies</em> para que el
-          navegador no olvide su decisión de no aceptación de las mismas.
-        </li>
-        <li>
-          En el caso de las <em>cookies</em> de Google Analytics, esta empresa
-          almacena las <em>cookies</em> en servidores ubicados en Estados Unidos y
-          se compromete a no compartirla con terceros, excepto en los casos en los
-          que sea necesario para el funcionamiento del sistema o cuando la ley
-          obligue a tal efecto. Según Google no guarda su dirección IP. Google Inc.
-          es una compañía adherida al Acuerdo de Puerto Seguro que garantiza que
-          todos los datos transferidos serán tratados con un nivel de protección
-          acorde a la normativa europea. Para cualquier duda o consulta acerca de
-          esta política de <em>cookies</em> no dude en comunicarse con nosotros a
-          través de la sección de contacto.
+          Para cualquier duda o consulta acerca de esta política no dude en
+          comunicarse con nosotros a través de la sección de contacto.
         </li>
       </UL>
 

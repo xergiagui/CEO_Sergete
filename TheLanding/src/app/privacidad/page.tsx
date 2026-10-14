@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { LegalShell, Site, H2, Identificativos } from "@/components/legal";
+import { LegalShell, Site, A, H2, Identificativos } from "@/components/legal";
 
 export const metadata: Metadata = {
   title: "Política de privacidad",
@@ -33,54 +33,49 @@ export default function Privacidad() {
 
       <H2>Información que se recopila</H2>
       <p>
-        Nuestro sitio web puede recopilar información personal como su nombre,
-        información de contacto como su dirección de correo electrónico e
-        información demográfica. También, cuando sea necesario, se puede requerir
-        información específica para procesar un pedido o realizar una entrega o
-        facturación.
+        Este sitio web recopila los siguientes datos, según la acción que usted
+        realice:
       </p>
+      <ul className="list-disc space-y-2 pl-6">
+        <li>
+          Al solicitar un recurso, su dirección de correo electrónico, el recurso
+          elegido y la página desde la que lo solicita.
+        </li>
+        <li>
+          Al enviar el formulario de contacto, su nombre (opcional), su dirección de
+          correo electrónico y el mensaje que escriba.
+        </li>
+        <li>
+          De forma automática, datos de analítica propia: un identificador de sesión
+          aleatorio, la página de procedencia y los parámetros de campaña de su
+          primera visita, el tipo de dispositivo, el país (si lo facilita el
+          servicio de alojamiento), el <em>user agent</em> del navegador y las
+          acciones realizadas en el sitio (visitas, consulta de recursos y clics).
+        </li>
+      </ul>
 
       <H2>Uso de la información recopilada</H2>
       <p>
-        Nuestro sitio web utiliza la información con el fin de proporcionar el mejor
-        servicio posible, en particular para realizar un seguimiento de los
-        usuarios, para hacer un seguimiento de los pedidos en su caso, y para
-        mejorar nuestros productos y servicios. Los correos electrónicos pueden ser
-        enviados periódicamente a través de nuestro sitio con ofertas especiales,
-        nuevos productos y otra información publicitaria que consideremos relevante
-        para usted o que pueda proporcionarle un beneficio, estos correos
-        electrónicos serán enviados a la dirección que usted proporcione y podrán
-        ser cancelados en cualquier momento.
+        Utilizamos su correo electrónico para llevarle al recurso que ha solicitado
+        y, en el caso del formulario de contacto, para responder a su mensaje. Los
+        datos de analítica se utilizan únicamente para conocer qué contenidos
+        funcionan mejor y mejorar el sitio.
       </p>
       <p>
-        <Site /> está altamente comprometido a mantener su información segura.
-        Utilizamos los sistemas más avanzados y los actualizamos constantemente para
-        asegurarnos de que no haya acceso no autorizado.
+        Los datos se almacenan en Supabase, proveedor de almacenamiento. Los
+        mensajes enviados desde el formulario de contacto también se reenvían por
+        correo electrónico al titular del sitio mediante un servicio de envío de
+        correo.
       </p>
 
       <H2>Cookies</H2>
       <p>
-        Una cookie se refiere a un archivo que se envía con el fin de solicitar
-        permiso para ser almacenado en su ordenador, mediante la aceptación de este
-        archivo se crea y la cookie a continuación, sirve para tener información
-        sobre el tráfico web, y también facilita futuras visitas a un sitio web
-        recurrente. Otra función que tienen las cookies es que con ellas los sitios
-        web pueden reconocerle individualmente y por lo tanto proporcionarle el
-        mejor servicio personalizado en su sitio web.
-      </p>
-      <p>
-        Nuestro sitio web utiliza cookies para identificar las páginas que son
-        visitadas y su frecuencia. Esta información se utiliza únicamente para el
-        análisis estadístico y, a continuación, se elimina de forma permanente.
-        Usted puede eliminar las cookies de su ordenador en cualquier momento. Sin
-        embargo, las cookies ayudan a proporcionar un mejor servicio de los sitios
-        web, que no dan acceso a la información de su ordenador o de usted, a menos
-        que desee y proporcionar directamente, las visitas a un sitio web. Usted
-        puede aceptar o rechazar el uso de cookies, sin embargo, la mayoría de los
-        navegadores aceptan cookies automáticamente ya que sirve para tener un mejor
-        servicio web. También puede cambiar la configuración de su ordenador para
-        rechazar las cookies. Si se rechazan, es posible que no pueda utilizar
-        algunos de nuestros servicios.
+        Este sitio web no utiliza cookies propias ni de terceros. Únicamente guarda
+        en su navegador, mediante almacenamiento local, un identificador de sesión y
+        los datos de atribución de su primera visita, para la analítica propia
+        descrita arriba. Puede eliminarlos en cualquier momento borrando los datos
+        del sitio en la configuración de su navegador. Encontrará más información en
+        nuestra <A href="/cookies">Política de cookies</A>.
       </p>
 
       <H2>Enlaces de terceros</H2>
@@ -96,12 +91,10 @@ export default function Privacidad() {
 
       <H2>Control de su información personal</H2>
       <p>
-        En cualquier momento usted puede restringir la recopilación o el uso de la
-        información personal que se proporciona a nuestro sitio web. Cada vez que se
-        le pida que rellene un formulario, como el formulario de registro de
-        usuario, puede marcar o desmarcar la opción para recibir información por
-        correo electrónico. Si ha marcado la casilla para recibir nuestro boletín o
-        anuncio, puede cancelarlo en cualquier momento.
+        En cualquier momento puede solicitar el acceso, la rectificación o la
+        supresión de los datos personales que nos ha facilitado, escribiendo a{" "}
+        <A href="mailto:xergiagui.ventas@gmail.com">xergiagui.ventas@gmail.com</A>{" "}
+        o a través de la página de <A href="/contacto">contacto</A>.
       </p>
       <p>
         Esta compañía no venderá, dará o distribuirá la información personal que se
