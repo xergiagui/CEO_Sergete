@@ -1,0 +1,269 @@
+@import "tailwindcss";
+
+/* ============================================================
+   TheLanding · Sistema de diseño (TEMA CLARO)
+   Fondo blanco como los enlaces de afiliado (mongemalo.com).
+   Texto casi negro + acentos vivos de marca (ámbar, azul,
+   verde, rosa). Tipografía editorial (Fraunces) + Geist.
+   Movimiento según emil-design-eng: 160–200ms, easing propio.
+   ============================================================ */
+
+:root {
+  /* --- Superficies (blanco + grises muy claros) --- */
+  --bg: #ffffff;
+  --bg-2: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #f3f5f8;
+  --border: #e7e9ef;
+  --border-strong: #d7dbe4;
+
+  /* --- Texto (casi negro, como mongemalo) --- */
+  --text: #14171f;
+  --text-muted: #545c6e;
+  --text-faint: #6b7385;
+
+  /* --- Acentos (legibles sobre blanco) --- */
+  --gold: #f59e0b;        /* CTA / relleno de botón (ámbar vivo) */
+  --gold-ink: #b45309;    /* ámbar oscuro para texto sobre blanco */
+  --azure: #2563eb;
+  --emerald: #059669;
+  --rose: #e11d48;
+  --violet: #7c3aed;      /* acento premium — Grupo Alfa (buque insignia) */
+
+  /* Acento principal de marca (dinero) */
+  --accent: var(--gold);
+
+  /* --- Movimiento (emil-design-eng) --- */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 160ms;
+  --dur: 200ms;
+
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
+  --shadow-lift: 0 22px 48px -20px rgba(23, 37, 84, 0.22);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-muted: var(--text-muted);
+  --color-gold: var(--gold);
+  --color-azure: var(--azure);
+  --color-emerald: var(--emerald);
+  --color-rose: var(--rose);
+  --color-violet: var(--violet);
+  --font-sans: var(--font-geist-sans);
+  --font-display: var(--font-fraunces);
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-feature-settings: "ss01", "cv01";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--gold);
+  color: #2a1c02;
+}
+
+.font-display {
+  font-family: var(--font-fraunces), Georgia, "Times New Roman", serif;
+  font-optical-sizing: auto;
+}
+
+/* --- Resaltado tipo rotulador (para palabras clave sobre blanco) --- */
+.hl {
+  background-image: linear-gradient(
+    120deg,
+    color-mix(in oklab, var(--gold) 34%, transparent),
+    color-mix(in oklab, var(--gold) 34%, transparent)
+  );
+  background-repeat: no-repeat;
+  background-size: 100% 38%;
+  background-position: 0 82%;
+  padding: 0 0.06em;
+  border-radius: 0.1em;
+}
+
+/* --- Fondo con resplandor sutil de color (sobre blanco) --- */
+.bg-aura {
+  position: relative;
+  isolation: isolate;
+}
+.bg-aura::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(60rem 40rem at 82% -10%, rgba(245, 158, 11, 0.12), transparent 60%),
+    radial-gradient(46rem 32rem at 6% 4%, rgba(37, 99, 235, 0.09), transparent 55%),
+    radial-gradient(70rem 50rem at 50% 120%, rgba(5, 150, 105, 0.07), transparent 60%);
+}
+
+/* --- Píldora / etiqueta --- */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: color-mix(in oklab, var(--surface-2) 80%, transparent);
+}
+
+/* --- Botón primario (acento ámbar) --- */
+.btn-primary {
+  --btn: var(--accent);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 650;
+  font-size: 0.98rem;
+  color: #2a1c02;
+  background: var(--btn);
+  padding: 0.85rem 1.35rem;
+  border-radius: 0.85rem;
+  border: 1px solid color-mix(in oklab, var(--btn) 78%, #000 8%);
+  box-shadow: 0 10px 26px -10px color-mix(in oklab, var(--btn) 55%, transparent);
+  transition: transform var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out),
+    filter var(--dur-fast) var(--ease-out);
+  will-change: transform;
+}
+.btn-primary:hover {
+  filter: brightness(1.04);
+  box-shadow: 0 16px 34px -12px color-mix(in oklab, var(--btn) 62%, transparent);
+}
+.btn-primary:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+/* --- Botón secundario / fantasma --- */
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 550;
+  color: var(--text);
+  background: var(--surface);
+  padding: 0.85rem 1.25rem;
+  border-radius: 0.85rem;
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+.btn-ghost:hover {
+  border-color: color-mix(in oklab, var(--text-muted) 40%, var(--border-strong));
+  background: var(--surface-2);
+}
+.btn-ghost:active {
+  transform: translateY(1px);
+}
+
+/* --- Tarjeta --- */
+.card {
+  position: relative;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--bg-2) 140%);
+  border: 1px solid var(--border);
+  border-radius: 1.25rem;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--dur) var(--ease-out),
+    border-color var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out);
+  will-change: transform;
+}
+.card:hover {
+  transform: translateY(-4px);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-lift);
+}
+
+/* --- Reveal al hacer scroll --- */
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+}
+.reveal.is-visible {
+  animation: reveal var(--dur) var(--ease-out) forwards;
+}
+@keyframes reveal {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- Modal --- */
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.backdrop-in { animation: backdrop-in var(--dur-fast) var(--ease-out) forwards; }
+.modal-in { animation: modal-in var(--dur) var(--ease-out) forwards; }
+
+/* --- Marquesina de prueba social --- */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee 32s linear infinite;
+}
+.marquee-mask {
+  mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+}
+
+/* --- Foco accesible --- */
+:where(a, button, input, textarea):focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  border-radius: 0.4rem;
+}
+
+/* --- Respeto a "reducir movimiento" --- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}
