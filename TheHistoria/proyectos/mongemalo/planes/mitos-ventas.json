@@ -1,0 +1,20 @@
+{
+  "tipo": "carrusel",
+  "proyecto": "mongemalo",
+  "slug": "mitos-ventas",
+  "tema": "Seis creencias sobre vender que te cuestan clientes",
+  "formula": "IG7_mitos",
+  "objetivo": "compartidos",
+  "pilar": "educativo",
+  "fuente": {"tipo": "video", "ruta": "_Historico/mongemalo/Probé Todas las Formas de Vender, Esta es la Mejor"},
+  "slides": [
+    {"titulo": "6 mitos de ventas que te **frenan**", "texto": "Luis Monge los probó todos"},
+    {"titulo": "Mito: hay que tener labia", "texto": "Callando y escuchando consigues más clientes que hablando. Quien no para de hablar **genera menos confianza**."},
+    {"titulo": "Mito: tu mensaje tiene que ser creativo", "texto": "Nadie te da su dinero por ser más creativo. Un mensaje usado miles de veces **sigue vendiendo** aunque ya no sorprenda."},
+    {"titulo": "Mito: necesitas un producto innovador", "texto": "La innovación es dificilísima de vender. Vende algo que ya existe y, cuando lo domines, añade una **mínima innovación**."},
+    {"titulo": "Mito: tu valor diferencial tiene que ser sexy", "texto": "La mayoría de las ventas se hacen por **conveniencia**: eres quien está delante, disponible, fácil de contactar y contesta rápido."},
+    {"titulo": "Mito: el cliente siempre tiene la razón", "texto": "Si haces todo lo que piden, les gustarás. La pregunta es si **vendes** y si tus ingresos suben."},
+    {"titulo": "Mito: el éxito depende de tener contactos", "texto": "Lo que cuenta es saber **hacer contactos**, no tenerlos ya. Y escuchar es la mejor forma de empezar."},
+    {"titulo": "Los 6 mitos, de un vistazo", "puntos": ["Labia: mejor escuchar", "Creatividad: vende lo probado", "Innovación: difícil de vender", "Valor diferencial: conveniencia", "Cliente siempre con razón: mira tus ingresos", "Contactos: aprende a hacerlos"], "texto": "En ventas solo hay una brújula: los resultados económicos.", "peticion": "Envíaselo a quien aún se cree el de la labia."}
+  ]
+}

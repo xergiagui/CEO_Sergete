@@ -52,10 +52,10 @@ que hace un departamento.
   HeyGen/ElevenLabs). No lo propongas ni preguntes por él; si Sergio lo pide algún día,
   la skill va desde el hilo principal, nunca el subagente.
 - **Historias:** solo cuando Sergio las pide; no se encadenan con descarga/edición.
-- **Carruseles:** a demanda o por huecos. Tras `copy … --planificar`, si la línea `FALTAN`
-  pide carruseles, `py ceo.py huecos --proyecto <id>` (descuenta los pendientes de OK) y,
-  si `HACER_CARRUSELES` > 0, lanza `historia` con material de los clips aprobados más
-  recientes (`carruseles.py --listar` para no repetir). Enséñale a Sergio el `_vista.jpg`.
+- **Carruseles: solo cuando Sergio los pide** (decisión del 14-oct-2026: «no hagas más»).
+  Si la línea `FALTAN` pide carruseles, **solo avísale en una línea** (`py ceo.py huecos`
+  da la cifra); no los generes por tu cuenta. Al hacerlos, usa material de los clips
+  aprobados más recientes (`carruseles.py --listar` para no repetir) y enséñale el `_vista.jpg`.
 - **Atrasados:** si `ceo.py semana` marca ATRASADOS, avisa y ofrece replanificarlos.
 - **Textos:** `textos` → el CEO lanza `blog-reviewer` con la carpeta (`articulo.md` +
   `schema.json` + tabla de datos del brief) y esta lista **N/A**: autor/bio, confianza del

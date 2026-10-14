@@ -1,0 +1,21 @@
+{
+  "tipo": "carrusel",
+  "proyecto": "mongemalo",
+  "slug": "titulares-copywriting",
+  "tema": "Cómo escribir titulares que se leen copiando fórmulas que ya funcionan",
+  "formula": "IG8_metodo",
+  "objetivo": "guardados",
+  "pilar": "educativo",
+  "fuente": {"tipo": "video", "ruta": "_Historico/mongemalo/Si Vas a Ver un Vídeo sobre Copywriting, que sea ESTE"},
+  "portada_fondo": {"ruta": "_Historico/mongemalo/Si Vas a Ver un Vídeo sobre Copywriting, que sea ESTE/clips/03_copia_lo_que_funciona.mp4", "segundo": 5.0, "foco_y": 0.0},
+  "portada_texto": "abajo",
+  "slides": [
+    {"titulo": "Escribe **titulares** sin inventar nada", "texto": "Método de Luis Monge en 5 pasos"},
+    {"titulo": "Paso 1: mete promesa y curiosidad", "texto": "Todo titular lleva dos ingredientes: prometes un destino y lo haces con **curiosidad**. No puedes resolverlo en el propio titular."},
+    {"titulo": "Paso 2: roba ideas a la Cosmopolitan", "texto": "Mira los titulares de revistas del corazón y **modifícalos**. Si hablan de 52 ideas para una primera cita, tú escribes 37 recomendaciones de lo tuyo."},
+    {"titulo": "Paso 3: reutiliza fórmulas", "texto": "«7 pasos para jubilarte antes de los 50» o «Mejora tu piel con esta técnica japonesa». Hay cientos de **fórmulas** probadas: no inventes las tuyas."},
+    {"titulo": "Paso 4: guarda todo lo que veas", "texto": "Guarda cada web y anuncio que te llame la atención, de cualquier sector o idioma. Acumulas **patrones** que luego combinas."},
+    {"titulo": "Paso 5: pasa el test de la abuela", "texto": "Tu abuela, desconectada de lo que haces, debe entender el mensaje en **20 segundos**. Y sé telegráfico hasta dominar la elocuencia."},
+    {"titulo": "El método, de un vistazo", "puntos": ["Promesa más curiosidad", "Modifica titulares de revistas", "Reutiliza fórmulas", "Archivo de anuncios y webs", "Test de la abuela"], "texto": "Copia a los que venden, no a los famosos.", "peticion": "Guárdalo para tu próximo titular."}
+  ]
+}

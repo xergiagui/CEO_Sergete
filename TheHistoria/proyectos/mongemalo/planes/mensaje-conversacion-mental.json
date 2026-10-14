@@ -1,0 +1,19 @@
+{
+  "tipo": "carrusel",
+  "proyecto": "mongemalo",
+  "slug": "mensaje-conversacion-mental",
+  "tema": "Cómo cambiar el «conmigo ganarás más» por un mensaje que conecte con lo que piensa el comprador",
+  "formula": "IG6_antes_despues",
+  "objetivo": "guardados",
+  "pilar": "educativo",
+  "fuente": {"tipo": "video", "ruta": "_Historico/mongemalo/Largo 4 Extractos"},
+  "slides": [
+    {"titulo": "Tu mensaje de ventas **no conecta**", "texto": "Y qué decir en su lugar"},
+    {"titulo": "Antes: «cómprame y ganarás pasta»", "texto": "Así empieza casi cualquier web, folleto, anuncio o llamada. Nadie se acuesta deseando ganar más: es un objetivo **demasiado finalista**."},
+    {"titulo": "Después: entra en su conversación mental", "texto": "Descubre el **run run** de tu cliente y métete en medio como si llevaras toda la vida dentro. Luego tiendes un puente hacia tu producto."},
+    {"titulo": "Busca el problema concreto", "texto": "Un cuello de botella en la producción, una discusión con la pareja que impide concentrarse, el agobio del **domingo por la tarde**."},
+    {"titulo": "Ejemplo: del dinero al cosquilleo", "texto": "En vez de «ganarás mucho y ahorrarás», prueba: «¿Sabes ese cosquilleo del domingo? Podemos **eliminarlo**». Dices lo mismo, en sus palabras."},
+    {"titulo": "Sirve para cualquier comprador", "texto": "Quien decide una obra de mil millones también compra el pan. Es el mismo comprador, con la **misma psicología**."},
+    {"titulo": "Tu mensaje, antes y después", "puntos": ["Antes: cómprame y ganarás pasta", "Después: su conversación mental", "Busca su problema concreto", "Puente hacia tu producto", "Mismo comprador, misma psicología"], "texto": "Di lo mismo, pero en los términos que él piensa de sí mismo.", "peticion": "Guárdalo antes de escribir tu próximo mensaje."}
+  ]
+}
