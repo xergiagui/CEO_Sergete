@@ -141,14 +141,16 @@ haga falta Layer B.
 
 1. **Medir** el cuerpo sin frontmatter:
    ```bash
-   awk 'NR==1&&/^---/{f=1;next} f&&/^---/{f=0;next} !f' "$D/articulo.md" | "$PY" "$S/inspect_text.py" --stylometry --json - | "$PY" -c "import json,sys;r=json.load(sys.stdin);s=r['stylometry'];print('invisibles',r['suspicious_total'],'| palabras',s.get('word_count'),'| score',s.get('score'),'| tier',s.get('density_tier'))"
+   awk 'NR==1&&/^---/{f=1;next} f&&/^---/{f=0;next} !f' "$D/articulo.md" | "$PY" "$S/inspect_text.py" --stylometry --json - | "$PY" -c "import json,sys;r=json.load(sys.stdin);s=r['stylometry'];print('invisibles',r['suspicious_total'],'| palabras',s.get('word_count'),'| score',s.get('score'),'| tier',s.get('density_tier'),'| burstiness_cv',s.get('burstiness_cv'))"
    ```
 2. **Layer A:**
    ```bash
    "$PY" "$S/clean_text.py" "$D/articulo.md" --in-place --no-normalize-spaces && rm -f "$D/articulo.md.bak"
    ```
-3. **Layer B solo si `tier` = `high`** (regla global de Sergio; no se cambia
-   sin su decisión): lee el SKILL.md de la skill y reescribe una vez sin tocar
+3. **Layer B** (regla global de Sergio en `~/.claude/CLAUDE.md`, adaptada al
+   español el 14-oct-2026) si se cumple **cualquiera**: `tier` = `high`,
+   `burstiness_cv` < 0,35, o 3+ muletillas en el grep del paso 3 del flujo.
+   Entonces lee el SKILL.md de la skill y reescribe una vez sin tocar
    el frontmatter, los encabezados, la keyword en sus posiciones, las preguntas
    de la FAQ, las anclas, las cifras, los nombres ni el aviso de afiliación.
    Después, **Layer A otra vez, medir otra vez** y repetir las medidas del
