@@ -1,0 +1,12 @@
+{
+  "proyecto": "<id>",
+  "nombre": "<Nombre>",
+  "idioma": "es-ES",
+  "blog_destino": "<url o plataforma del blog>",
+  "nicho": "<de qué escribe>",
+  "autor": "<quién firma>",
+  "marca": "marca/BRAND.md y marca/VOICE.md",
+  "enlaces_internos": [],
+  "reglas": [],
+  "_identidad": "Landing, afiliado, voz, palabras prohibidas y afiliación: CEO_Sergete/proyectos.json → identidad. URL de las ofertas: TheCopy/proyectos/<id>/ofertas.json."
+}

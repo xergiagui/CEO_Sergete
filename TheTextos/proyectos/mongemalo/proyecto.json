@@ -1,0 +1,12 @@
+{
+  "proyecto": "mongemalo",
+  "nombre": "MongeMalo",
+  "idioma": "es-ES",
+  "blog_destino": "PENDIENTE (¿blog dentro de TheLanding?)",
+  "nicho": "ventas, copywriting, emprendimiento y dinero (ideas de Luis Monge)",
+  "autor": "PENDIENTE (quién firma: E-E-A-T)",
+  "marca": "marca/BRAND.md y marca/VOICE.md (PENDIENTES)",
+  "enlaces_internos": [],
+  "reglas": [],
+  "_identidad": "Landing, afiliado, voz, palabras prohibidas y afiliación: CEO_Sergete/proyectos.json → identidad. URL de las ofertas: TheCopy/proyectos/<id>/ofertas.json."
+}
