@@ -1,0 +1,31 @@
+# Secretos / entorno
+.env
+.env.*.local
+
+# Node / build
+node_modules/
+.next/
+dist/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Claude (local, específico de máquina)
+.claude/settings.local.json
+
+# Skills enlazadas por junction desde su proyecto de origen (fuente de verdad
+# en TheEditor, etc.). No se versionan aquí para no duplicar.
+.claude/skills/
+
+# Excel de trabajo (no se versiona)
+mongemalo_videos_largos.xlsx
+
+# Carpetas de publicación (vídeos, historias y sus .txt): fuera de git
+REVISADOS/
+HISTORIAS/
