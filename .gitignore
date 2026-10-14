@@ -1,0 +1,21 @@
+# Monorepo CEO_Sergete (raíz = carpeta PruebasIA).
+# LISTA BLANCA: se ignora TODO lo que hay en la raíz salvo las carpetas del
+# sistema. Así nunca entran en git las carpetas personales de PruebasIA
+# (facturación, SAP, cuentas…), los datos (_Historico) ni otros repos.
+# Departamento nuevo = una línea «!/<Nombre>/» aquí.
+# OJO: nunca «git clean -x» en la raíz (borraría todo lo ignorado).
+/*
+!/.gitignore
+!/README.md
+
+!/CEO_Sergete/
+!/TheDescarga/
+!/TheEditor/
+!/TheHistoria/
+!/TheCopy/
+!/TheTextos/
+!/ThePerfil/
+!/TheLanding/
+
+# Lo de dentro de cada carpeta lo filtra su propio .gitignore
+# (.env, .venv/, vídeos, logs, salidas, registros Excel…).
