@@ -1,0 +1,56 @@
+{
+  "_fuente": "fuentes/Copys_MongeMalo.pdf + TheLanding/src/lib/products.ts (links de afiliado)",
+  "generico": {
+    "id": "generico",
+    "nombre": "Genérico",
+    "cta": "Todo en el link de la bio.",
+    "cuando_usarla": "El clip no encaja claramente con ninguna oferta (mentalidad general, anécdota, motivación)."
+  },
+  "ofertas": [
+    {
+      "id": "gestion_objeciones",
+      "nombre": "Gestión de Objeciones",
+      "tipo": "curso",
+      "precio": "450 €",
+      "url": "https://mongemalo.com/curso-objeciones-afiliados/?via=sergio-aguilar",
+      "cuando_usarla": "Objeciones, cierre de ventas, 'lo tengo que pensar', 'no tengo dinero', miedo del cliente, negociar precio, perder ventas.",
+      "temas": ["objeciones", "cierre", "precio", "negociacion", "ventas"]
+    },
+    {
+      "id": "grupo_alfa",
+      "nombre": "Grupo Alfa",
+      "tipo": "comunidad",
+      "precio": "99 € primer mes · luego 49 €/mes",
+      "url": "https://mongemalo.com/grupo-alfa/?via=sergio-aguilar",
+      "cuando_usarla": "Entorno, rodearte de gente ambiciosa, mentalidad, disciplina, libertad financiera (generar, invertir y proteger dinero), no ir solo.",
+      "temas": ["comunidad", "entorno", "mentalidad", "disciplina", "libertad financiera", "dinero"]
+    },
+    {
+      "id": "escuela_afiliados",
+      "nombre": "Escuela de Afiliados",
+      "tipo": "membresía",
+      "precio": "49 €/mes",
+      "url": "https://mongemalo.com/afiliados/?via=sergio-aguilar",
+      "cuando_usarla": "Empezar desde cero, ganar dinero online sin producto propio, afiliación, primeros ingresos, 'cómo empiezo'.",
+      "temas": ["afiliacion", "empezar", "ingresos online", "sin producto", "negocio online"]
+    },
+    {
+      "id": "mentoria",
+      "nombre": "Mentoría",
+      "tipo": "mentoría",
+      "precio": "desde 200 €",
+      "url": "https://mongemalo.com/mentoria/?via=sergio-aguilar",
+      "cuando_usarla": "Ir rápido, evitar errores de principiante, venta avanzada, acompañamiento, escalar.",
+      "temas": ["mentoria", "venta avanzada", "escalar", "errores"]
+    },
+    {
+      "id": "mejor_negocio",
+      "nombre": "El Mejor Negocio, Destripado",
+      "tipo": "audio",
+      "precio": "120 €",
+      "url": "https://mongemalo.com/mejor-negocio-afiliados/?via=sergio-aguilar",
+      "cuando_usarla": "Modelo de negocio, captar clientes sin depender del algoritmo, negocio predecible, estrategia.",
+      "temas": ["modelo de negocio", "captacion", "estrategia", "negocio"]
+    }
+  ]
+}

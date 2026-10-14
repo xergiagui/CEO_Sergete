@@ -1,0 +1,61 @@
+{
+  "_fuente": "fuentes/Copys_MongeMalo.pdf + fuentes/Hasktask.txt. Banco ampliado y clasificado por tamaño el 2026-10-13 (estrategia de tamaños adaptada de sergebulaev/instagram-skills, MIT).",
+  "_regla": "Las cifras (temáticos, total con los fijos, nicho, amplios, rotación) están SOLO en proyecto.json → plataformas.<p>.hashtags; copys.py brief las enseña.",
+  "_tamanos": "ESTIMADOS por especificidad (la API no da el nº de publicaciones): verificar en el buscador de IG. nicho < 50k publicaciones · medio 50k–500k · amplio > 500k.",
+  "fijos": {
+    "instagram": ["#grupoalfa"],
+    "tiktok": ["#ventas", "#dinero", "#grupoalfa", "#exitopersonal"],
+    "youtube": ["#shorts", "#ventas", "#dinero"]
+  },
+  "tamano_fijos": {
+    "#grupoalfa": "nicho",
+    "#shorts": "amplio"
+  },
+  "tematicos": {
+    "ventas": {
+      "nicho": ["#cierredeventas", "#psicologiadeventas", "#ventaconsultiva"],
+      "medio": ["#vendermas", "#tecnicasdeventa"],
+      "amplio": ["#ventas"]
+    },
+    "objeciones": {
+      "nicho": ["#gestiondeobjeciones", "#manejodeobjeciones", "#objecionesdeventa", "#cierredeventas"],
+      "medio": ["#tecnicasdeventa"],
+      "amplio": ["#ventas"]
+    },
+    "copywriting": {
+      "nicho": ["#copypersuasivo", "#redaccionpersuasiva", "#escribirparavender", "#textosquevenden"],
+      "medio": ["#redaccionpublicitaria"],
+      "amplio": ["#copywriting"]
+    },
+    "emprendimiento": {
+      "nicho": ["#emprenderdesdecero", "#emprenderenespana", "#emprendedoreshispanos"],
+      "medio": ["#emprendedoresdigitales", "#mentalidademprendedora"],
+      "amplio": ["#emprendimiento", "#emprender"]
+    },
+    "mentalidad": {
+      "nicho": ["#mentalidaddecrecimiento", "#habitosdeexito", "#disciplinayconstancia"],
+      "medio": ["#exitopersonal"],
+      "amplio": ["#mentalidadganadora"]
+    },
+    "dinero_finanzas": {
+      "nicho": ["#finanzasparaemprendedores", "#mentalidadfinanciera", "#gestiondeldinero"],
+      "medio": ["#exitofinanciero", "#independenciafinanciera"],
+      "amplio": ["#dinero", "#libertadfinanciera", "#finanzaspersonales"]
+    },
+    "marketing": {
+      "nicho": ["#embudodeventas", "#captaciondeclientes", "#marketingparaemprendedores"],
+      "medio": ["#estrategiasdemarketing"],
+      "amplio": ["#marketingdigital", "#marketingonline"]
+    },
+    "negocio_online": {
+      "nicho": ["#negocioonlinerentable", "#vivirdeinternet", "#modelodenegocio"],
+      "medio": ["#negociodigital", "#ingresosonline"],
+      "amplio": ["#negociosonline", "#trabajardesdecasa"]
+    },
+    "afiliacion": {
+      "nicho": ["#marketingdeafiliacion", "#afiliadosdigitales", "#ingresosporafiliacion"],
+      "medio": ["#afiliados", "#marketingdeafiliados"],
+      "amplio": []
+    }
+  }
+}

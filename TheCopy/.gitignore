@@ -1,0 +1,17 @@
+# Entorno propio
+.venv/
+__pycache__/
+*.pyc
+
+# Tandas de trabajo (JSON intermedios; lo que vale queda en el registro Excel)
+tandas/*
+!tandas/.gitkeep
+
+# Bloqueos de Office (Excel abierto)
+~$*
+
+# Plan semanal del calendario (se rehace desde el Excel con `copys.py calendario planificar`)
+proyectos/*/calendario/
+
+# Registro Excel de cada proyecto (datos de trabajo, no código)
+proyectos/*/registro_*.xlsx

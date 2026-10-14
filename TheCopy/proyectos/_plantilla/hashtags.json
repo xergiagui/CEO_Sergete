@@ -1,0 +1,19 @@
+{
+  "_regla": "Por post: los FIJOS de la plataforma (se añaden solos) + los TEMÁTICOS del banco. Las cifras (temáticos, total con los fijos, nicho, amplios, rotación) están SOLO en proyecto.json → plataformas.<p>.hashtags y tienen que cuadrar con el nº de fijos de aquí.",
+  "_tamanos": "ESTIMADOS por especificidad (la API no da el nº de publicaciones): verificar en el buscador de IG. nicho < 50k publicaciones · medio 50k–500k · amplio > 500k. El formato antiguo (tema → lista) también vale, pero sin tamaños.",
+  "fijos": {
+    "instagram": [],
+    "tiktok": [],
+    "youtube": ["#shorts"]
+  },
+  "tamano_fijos": {
+    "#shorts": "amplio"
+  },
+  "tematicos": {
+    "tema_ejemplo": {
+      "nicho": ["#etiquetamuyespecifica", "#otraetiquetadenicho"],
+      "medio": ["#subtemaconocido"],
+      "amplio": ["#temageneral"]
+    }
+  }
+}

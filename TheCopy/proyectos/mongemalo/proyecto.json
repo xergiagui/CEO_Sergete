@@ -1,0 +1,123 @@
+{
+  "id": "mongemalo",
+  "nombre": "MongeMalo",
+  "descripcion": "Clips (Reels) y carruseles de Luis Monge (MongeMalo) para captar tráfico hacia sus productos con el link de afiliado de Sergio.",
+  "_identidad": "Cuenta, landing, afiliado, voz (persona, tono, idioma, emojis_max), palabras prohibidas y marca: CEO_Sergete/proyectos.json → identidad (fuente única; no se copian aquí).",
+  "prefijo_id": "MM",
+  "tipo": "largos",
+  "como_reconocerlo": [
+    "Clips sacados de vídeos de Luis Monge / MongeMalo (ventas, copywriting, emprendimiento, dinero).",
+    "Cuenta de IG @xergi.ventas."
+  ],
+  "carpetas": {
+    "_ayuda": "Relativas a PruebasIA/; <id> = id del proyecto. pendiente/publicado e historias las crea el CEO. contexto = dónde buscar cortes.json + .srt (largos) o textos/<clip>.txt (clipping) de cada clip.",
+    "pendiente": "CEO_Sergete/REVISADOS/<id>/1. pte Publicar",
+    "publicado": "CEO_Sergete/REVISADOS/<id>/2. Publicados",
+    "contexto": ["TheEditor/proyectos/<id>/transcripciones", "_Historico/<id>"]
+  },
+  "registro": "registro_mongemalo.xlsx",
+
+  "reglas_copy": [
+    "La primera frase es el gancho y sale de lo que se dice en el clip (frase_viral / transcripcion); tiene que entenderse sola.",
+    "1–3 frases en total, sin relleno.",
+    "Termina siempre con CTA a la bio: «Link en bio.», «Bio.» o «Todo en el link de la bio.».",
+    "Si el tema encaja con una oferta, nómbrala; si no encaja ninguna, oferta = generico.",
+    "Precios solo si el clip va de dinero o inversión y suma. Nada de datos ni cifras que no salgan del clip.",
+    "De tú al lector; Luis Monge en tercera persona; nunca hablar como él.",
+    "Estilo: lo marca el auditor al registrar; corrige los avisos reescribiendo (solo se dejan si la frase es literal del clip)."
+  ],
+
+  "campos_extra": [
+    {"id": "oferta", "columna": "Oferta", "obligatorio": true, "valores": "ofertas"},
+    {"id": "objetivo", "columna": "Objetivo", "obligatorio": true,
+     "valores": ["guardados", "compartidos", "comentarios", "seguidores"],
+     "ayuda": "señal que busca la pieza: guardados = lista, método o pasos para volver a consultar; compartidos = verdad incómoda, mito, algo que se le manda a alguien; comentarios = situación que invita a responder; seguidores = historia, antes/después"},
+    {"id": "pilar", "columna": "Pilar", "obligatorio": true,
+     "valores": ["educativo", "historia", "interaccion", "promocion"],
+     "ayuda": "educativo = enseña; historia = historia contada (de Luis o de un caso), no en primera persona; interaccion = situación con la que se identifica la audiencia; promocion = solo si la pieza va sobre todo de vender un producto (nombrar la oferta en el caption no la convierte en promoción). En los carruseles, objetivo y pilar vienen de carrusel.json; en los Reels se eligen al escribir el copy"}
+  ],
+
+  "calendario": {
+    "activo": true,
+    "_nota": "Valores PROVISIONALES (adaptados de sergebulaev/instagram-skills, MIT): ajustar con las estadísticas de la cuenta (Insights de IG: horas con la audiencia conectada y qué formatos se guardan y comparten más). Explicación en referencias/calendario.md.",
+    "zona_horaria": "Europe/Madrid",
+    "publicaciones_semana": 5,
+    "dias": ["lun", "mar", "jue", "vie", "dom"],
+    "franjas": {"lun": "13:30", "mar": "13:30", "mie": "13:30", "jue": "13:30", "vie": "13:30", "dom": "20:30"},
+    "segunda_franja": "20:30",
+    "_segunda_franja": "Se usa si hace falta: fecha puesta a mano sin hora en un día que ya tiene post, o si publicaciones_semana pasa del nº de días.",
+    "semanas_por_defecto": 2,
+    "reserva_formatos_dias": 7,
+    "prioridad_tras_dias": 14,
+    "balance": {
+      "_nota": "Recomendaciones (no bloquean). formato_min se cumple 'si hay': en los primeros reserva_formatos_dias días se llena con lo que haya; después el hueco se guarda para el formato que falta y sale en FALTAN.",
+      "formato_min": {"reel": 2, "carrusel": 2},
+      "objetivo_min": {"guardados": 3, "compartidos": 2},
+      "pilar_max": {"promocion": 2},
+      "formula_max": 2,
+      "evitar_seguidas": ["origen", "oferta"]
+    },
+    "historias": {
+      "carpeta": "CEO_Sergete/HISTORIAS/<id>/1. Pte publicar",
+      "por_dia_min": 2,
+      "por_dia_max": 4,
+      "recordatorio": "Comparte en historias el post del día cuando lo publiques.",
+      "recordatorio_sin_post": "Hoy no hay post: vuelve a compartir en historias el último."
+    }
+  },
+
+  "plataformas": {
+    "instagram": {
+      "activa": true,
+      "nombre": "Instagram",
+      "formatos": {
+        "reel": {"_nota": "Hereda todo lo de la plataforma (guia, copy_recomendado, gancho, hashtags)."},
+        "carrusel": {
+          "copy_recomendado": [60, 250],
+          "guia": "Caption de carrusel: repite el gancho de la slide 1 (contexto.gancho_slide1) al principio, antes del «más». 1–2 frases: las slides cuentan el resto. Cierra con el CTA a la bio; si el objetivo es guardados, puede invitar a guardarlo antes («Guárdalo para tu próxima venta. Link en bio.»)."
+        }
+      },
+      "max_caracteres": 2200,
+      "copy_recomendado": [80, 400],
+      "requiere_titulo": false,
+      "cta_obligatorio": true,
+      "cta_patrones": ["\\bbio\\b"],
+      "cta_ejemplo": "Link en bio.",
+      "gancho_max": 125,
+      "hashtags": {"tematicos_min": 2, "tematicos_max": 4, "total_min": 3, "total_max": 5, "nicho_min": 2, "amplios_max": 1},
+      "formato_texto": "{copy}\n\n{hashtags}",
+      "guia": "Caption de Reel: gancho + idea + CTA a la bio."
+    },
+    "tiktok": {
+      "activa": false,
+      "_nota": "PREPARADA, sin activar. Antes de activarla, Sergio confirma fijos/nº de hashtags y CTA.",
+      "nombre": "TikTok",
+      "formatos": {"reel": {}},
+      "max_caracteres": 4000,
+      "copy_recomendado": [40, 220],
+      "requiere_titulo": false,
+      "cta_obligatorio": true,
+      "cta_patrones": ["\\bbio\\b", "perfil"],
+      "cta_ejemplo": "Link en bio.",
+      "hashtags": {"tematicos_min": 1, "tematicos_max": 2, "total_min": 5, "total_max": 6},
+      "formato_texto": "{copy}\n\n{hashtags}",
+      "guia": "Más corto que en IG: una frase gancho + CTA al perfil/bio. El gancho manda."
+    },
+    "youtube": {
+      "activa": false,
+      "_nota": "PREPARADA, sin activar (YouTube Shorts). Antes de activarla, Sergio confirma fijos y CTA.",
+      "nombre": "YouTube",
+      "formatos": {"reel": {}},
+      "requiere_titulo": true,
+      "titulo_max": 100,
+      "max_caracteres": 5000,
+      "copy_recomendado": [80, 500],
+      "cta_obligatorio": true,
+      "cta_patrones": ["\\bbio\\b", "canal", "descripci[oó]n", "enlace", "link"],
+      "cta_ejemplo": "Link en la descripción del canal.",
+      "hashtags": {"tematicos_min": 1, "tematicos_max": 2, "total_min": 4, "total_max": 5},
+      "formato_texto": "{copy}\n\n{hashtags}",
+      "guia": "Título con el gancho del clip. Descripción breve + CTA. Los 3 primeros hashtags salen sobre el título."
+    }
+  }
+}

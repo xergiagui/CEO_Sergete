@@ -1,0 +1,50 @@
+{
+  "_fuente": "fuentes/Copys_MongeMalo.pdf (generado por CEO_Sergete el 2026-10-01)",
+  "_uso": "De RESERVA cuando un clip trae `aviso` (sin contexto): elegir uno '(libre)' con `copys.py banco` y adaptarlo. El CTA genérico está en ofertas.json → generico.cta.",
+  "_auditoria": "2026-10-13: pasado por `copys.py auditar --banco`; reescritas solo las entradas marcadas (paralelismos negativos, revelaciones, cebo de interacción y gancho > 125).",
+  "genericos": [
+    "El dinero llega cuando aprendes a vender, y a vender se aprende. En el link de la bio tienes por dónde empezar.",
+    "Nadie nace sabiendo vender. Se aprende. Y cuanto antes empieces, antes cambia tu cuenta bancaria.",
+    "Si sigues \"intentándolo\" sin un sistema, vas a seguir en el mismo sitio dentro de un año.",
+    "Lo que ves aquí es técnica, y la técnica se entrena. Guárdalo para cuando lo necesites.",
+    "¿Cuántas ventas has perdido por no saber manejar una objeción? Esto te lo soluciona.",
+    "La diferencia entre vivir ajustado y vivir libre está en una habilidad: saber vender.",
+    "Los seguidores que ya tienes te bastan para vender, si sabes convertirlos.",
+    "Vender online funciona con una estructura que nadie te cuenta.",
+    "Deja de atraer clientes tóxicos: el filtro de entrada lo pones tú.",
+    "Si tu oferta no vende, el problema casi nunca es el precio.",
+    "Guarda este vídeo. Dentro de un mes vas a necesitar volver a verlo.",
+    "La libertad financiera, eso que parece un sueño random, es la consecuencia de hacer esto bien.",
+    "Mientras tú dudas si lanzarte, otros ya están facturando con esto mismo.",
+    "Hacer copywriting es conseguir que alguien actúe después de leerte. Así se hace.",
+    "Esto es lo que te conviene saber antes de perder tiempo y dinero.",
+    "Antes de trabajar más horas, aprende a vender mejor las que ya trabajas.",
+    "Cada objeción que no sabes rebatir es una venta que estás regalando a la competencia.",
+    "Mándaselo hoy a esa persona que necesita escucharlo.",
+    "Esto resume en 60 segundos lo que a Luis le costó años entender.",
+    "El negocio que funciona es el que más vende, aunque no sea el que más te guste."
+  ],
+  "por_oferta": {
+    "gestion_objeciones": [
+      "\"No tengo dinero\", \"lo tengo que pensar\", \"mándamelo por escrito\". Si cada objeción te paraliza, lo que falla es tu guion, por bueno que sea tu producto. Aquí está el curso que lo arregla. Link en bio.",
+      "Cuando una objeción te deja sin respuesta, esa venta se la lleva otro. Aprende a manejarlas en el curso de Gestión de Objeciones. Bio.",
+      "Detrás del \"no\" al precio hay un miedo que no le has quitado al cliente. Esto te enseña exactamente cómo quitárselo. Link en bio."
+    ],
+    "grupo_alfa": [
+      "Si estás solo intentando vender, vas más lento. En el Grupo Alfa están los que ya lo están consiguiendo, compartiendo lo que funciona ahora mismo. Bio.",
+      "Entrar en el Grupo Alfa son 99€ el primer mes. Lo que cuesta no entrar es todo el tiempo que sigues improvisando solo. Link en bio.",
+      "La comunidad con la que te rodeas decide tu ritmo. El Grupo Alfa es el acceso directo a gente que ya está en otro nivel. Bio."
+    ],
+    "escuela_afiliados": [
+      "No necesitas crear un producto para vivir de vender online. La Escuela de Afiliados te enseña a ganar dinero promocionando lo que otros ya crearon. Link en bio.",
+      "Es el recurso más popular de todos por algo: es la forma más sencilla de empezar a generar ingresos sin arrancar de cero. Bio.",
+      "Si llevas tiempo dando vueltas a \"cómo empiezo\", la Escuela de Afiliados es la respuesta directa. Link en bio."
+    ],
+    "mentoria": [
+      "Hay cosas que un vídeo no te resuelve. La mentoría es para cuando ya quieres ir rápido y sin errores de principiante. Bio."
+    ],
+    "mejor_negocio": [
+      "Todo el negocio explicado sin rodeos, en formato audio, para escuchar mientras conduces o entrenas. 120€ que te ahorran meses de prueba y error. Link en bio."
+    ]
+  }
+}
