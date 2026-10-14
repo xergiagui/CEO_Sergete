@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "youtube-downloader": {
+      "source": "composiohq/awesome-claude-skills",
+      "sourceType": "github",
+      "skillPath": "video-downloader/SKILL.md",
+      "computedHash": "baf53606f73fc1c23ed61eda0d534d3c2ab59838562075a6af6bdc85ac6bd07d"
+    }
+  }
+}

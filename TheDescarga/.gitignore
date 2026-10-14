@@ -1,0 +1,15 @@
+descargas/
+tools/
+*.mp4
+*.webm
+*.mkv
+*.mp3
+*.part
+
+# Configuración local de agentes — no subir
+.claude/
+.agents/
+
+# Sistema / editor
+desktop.ini
+.DS_Store
