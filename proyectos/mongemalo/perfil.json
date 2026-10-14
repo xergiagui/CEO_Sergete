@@ -16,6 +16,11 @@
       "fecha": "2026-10-13",
       "captura": "capturas/2026-10-13_cabecera.png",
       "auditoria": "auditorias/2026-10-13.md"
+    },
+    {
+      "fecha": "2026-10-14",
+      "captura": "capturas/2026-10-14_cabecera.png",
+      "auditoria": "auditorias/2026-10-14.md"
     }
   ]
 }
