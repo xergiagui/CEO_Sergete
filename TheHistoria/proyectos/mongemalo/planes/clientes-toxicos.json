@@ -1,0 +1,63 @@
+{
+  "tipo": "carrusel",
+  "proyecto": "mongemalo",
+  "slug": "clientes-toxicos",
+  "tema": "Cómo filtrar clientes tóxicos antes de venderles",
+  "formula": "IG5_lista",
+  "objetivo": "guardados",
+  "pilar": "educativo",
+  "fuente": {
+    "tipo": "video",
+    "ruta": "_Historico/mongemalo/Cómo Dejar de Atraer a Clientes Tóxicos",
+    "credito": "Ideas de Luis Monge"
+  },
+  "portada_fondo": {
+    "ruta": "_Historico/mongemalo/Cómo Dejar de Atraer a Clientes Tóxicos/clips/03_99_clientes_de_mierda.mp4",
+    "segundo": 6.5,
+    "foco_y": 0.0
+  },
+  "portada_texto": "abajo",
+  "slides": [
+    {"n": 1, "rol": "gancho",
+     "titulo": "8 filtros contra **clientes tóxicos**",
+     "texto": "Casi nadie se atreve con el segundo"},
+    {"n": 2, "rol": "valor",
+     "titulo": "Sube los precios",
+     "texto": "La calidad de tus clientes sube **al instante**. Si tu franja de precios no es la que buscan los buenos, nunca los conseguirás."},
+    {"n": 3, "rol": "valor",
+     "titulo": "Cobra por adelantado y no financies",
+     "texto": "Si nadie en tu sector lo hace, mejor: te verán como **superior**. No eres un banco: financiar atrae clientes tóxicos de todos los tamaños."},
+    {"n": 4, "rol": "valor",
+     "titulo": "Di el precio y las condiciones cuanto antes",
+     "texto": "Precio alto y pago por adelantado, a la vista desde el principio. Así, quien llega tiene **interés de verdad** en contratarte."},
+    {"n": 5, "rol": "valor",
+     "titulo": "Vende con la mentalidad del **cliente perdido**",
+     "texto": "Cero presión: actúa como si te diera igual perder la venta, aunque por dentro tiembles. Así se transmite seguridad."},
+    {"n": 6, "rol": "valor",
+     "titulo": "Cuenta tus desventajas sin rubor",
+     "texto": "Ponlas en tu web y en tu publicidad. Quien llegue ya las habrá aceptado y el mal cliente se queda **sin munición** para negociar."},
+    {"n": 7, "rol": "valor",
+     "titulo": "Responde las dudas antes de que pregunten",
+     "texto": "Cada objeción que te han puesto alguna vez, comunicada de antemano. Así filtras a novatos, indecisos y a quien solo busca **terapia**."},
+    {"n": 8, "rol": "valor",
+     "titulo": "Intenta cerrar desde el primer momento",
+     "texto": "Hasta el final de la conversación, claro y sin pudor. ¿Te dicen que solo te importa el dinero? Responde: **«Correcto, así es»**."},
+    {"n": 9, "rol": "valor",
+     "titulo": "Descarta rápido y con alegría",
+     "texto": "Si se porta mal durante la venta, no mejorará después. Ten preparada esta frase: **«No somos la empresa más adecuada para ti»**."},
+    {"n": 10, "rol": "cierre",
+     "titulo": "Los 8 filtros, de un vistazo",
+     "puntos": [
+       "Sube los precios",
+       "Cobra por adelantado y no financies",
+       "Precio y condiciones, de entrada",
+       "Mentalidad del cliente perdido",
+       "Tus desventajas, a la vista",
+       "Todas las dudas, resueltas antes",
+       "Cierra desde el primer momento",
+       "Descarta rápido y con alegría"
+     ],
+     "texto": "Hay más clientes buenos que longanizas.",
+     "peticion": "Guárdalo y repásalo antes de tu próxima venta."}
+  ]
+}

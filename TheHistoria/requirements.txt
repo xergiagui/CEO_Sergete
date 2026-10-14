@@ -1,0 +1,7 @@
+# Dependencias de TheHistoria. Ya están todas en el .venv de TheEditor, así que
+# lo normal es reutilizar ese intérprete (ver README). Este fichero sirve por si
+# se quiere un .venv propio: python -m venv .venv && .venv/Scripts/pip install -r requirements.txt
+httpx>=0.28
+Pillow>=11
+imageio-ffmpeg>=0.6
+fastembed>=0.8        # opcional: solo para el fondo semántico (match_broll)

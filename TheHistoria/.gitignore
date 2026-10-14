@@ -1,0 +1,18 @@
+# Secretos
+.env
+
+# Entorno propio (si algún día se crea uno)
+.venv/
+__pycache__/
+*.pyc
+
+# Salidas generadas (salidas/<id>/…: historias y carruseles renderizados)
+salidas/*
+!salidas/.gitkeep
+
+# Fondos de las historias especiales de cada proyecto (vídeos pesados, no a git)
+proyectos/*/especiales/*
+!proyectos/*/especiales/.gitkeep
+
+# Caché local (última respuesta de TheCopy `campos`)
+.cache/
