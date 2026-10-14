@@ -91,8 +91,9 @@ línea en blanco tras una pausa de más de 1,5 s.
   de texto) ni en el último segundo.
 - Cada ventana lleva el clip que casa por significado (umbral 0,30; sin
   `aviso-*` y sin repetir): banco común → `broll_assets` + RPC `match_broll`;
-  propio → índice local. **Sin coincidencia, como mucho 1 b-roll al azar por
-  clip** (`BROLL_AZAR_MAX`); el resto de ventanas se quedan sin b-roll.
+  propio → índice local. **Sin coincidencia, uno al azar sin repetir** por
+  ventana (`BROLL_AZAR_MAX = None`, decisión de Sergio del 14-oct-2026; un número
+  lo limitaría por clip).
 - `indexar_broll.py --faltan` lista lo que hay en `superposiciones/` y no está
   en `broll_assets` (solo lectura); se indexa con `broll_index/` (README).
 - Click de entrada (`viral-pipeline-assets/sfx` o `recursos/sfx/` del proyecto).

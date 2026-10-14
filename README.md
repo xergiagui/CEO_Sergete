@@ -168,7 +168,7 @@ Para proyectos con `broll: propio`. Mismo modelo que el catálogo común
 .venv\Scripts\python.exe indexar_broll.py --proyecto <id>
 ```
 
-Sin índice no hay casación por significado: como mucho 1 b-roll al azar por clip.
+Sin índice no hay casación por significado: el b-roll sale al azar (sin repetir).
 
 ## Proyecto nuevo
 
@@ -192,7 +192,7 @@ Copia `proyectos/_plantilla/` (o lo hace el `nuevo_proyecto.py` del CEO). Despu�
   verticales, ≤ 10 s). Para bajar más: `https://api.pexels.com/videos/search` con
   `Authorization: <PEXELS_API_KEY>` **y** `User-Agent: Mozilla/5.0` (sin él, 403).
   `indexar_broll.py --faltan` lista lo que aún no está en `broll_assets` (sin
-  catálogo, ese b-roll solo sale al azar, máx. 1 por clip); se indexa con
+  catálogo, ese b-roll solo sale al azar); se indexa con
   `.claude/skills/Editor_Sergio/broll_index/` (idempotente).
 - `musicas/`: subcarpetas por tipología («9. MOTIVACIÓN», «15. ÉPICA»…).
 

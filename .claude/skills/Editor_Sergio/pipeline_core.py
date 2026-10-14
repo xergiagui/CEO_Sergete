@@ -973,8 +973,21 @@ def _broll_windows_from_speech(phrases: list[dict], duration: float,
 # None y el caller cae a selección local al azar.
 # ============================================================
 _EMBED_MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-BROLL_AZAR_MAX = 1      # b-roll al azar (sin coincidencia ≥ 0,30) como mucho por clip
+# B-roll al azar (ventanas sin coincidencia ≥ 0,30) como mucho por clip.
+# None = sin límite: cada ventana sin coincidencia lleva uno al azar, sin repetir
+# (decisión de Sergio, 14-oct-2026: «relaja»). Un número N lo limita a N por clip.
+BROLL_AZAR_MAX = None
 _embed_model = None
+
+
+def _azar_permitido(n_azar: int) -> bool:
+    return BROLL_AZAR_MAX is None or n_azar < BROLL_AZAR_MAX
+
+
+def _n_broll_sin_frases(duration: float) -> int:
+    """Sin frases (sin semántica posible): uno cada ~6 s, o el límite si lo hay."""
+    n = max(1, int(duration // 6))
+    return n if BROLL_AZAR_MAX is None else min(n, BROLL_AZAR_MAX)
 _broll_aviso_cache = None
 
 
@@ -1540,7 +1553,8 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
     con word-timestamps y se derivan las ventanas), nunca bajo los ganchos.
     Cada ventana lleva el vídeo local (`superposiciones/`, `env['OVERLAYS_DIR']`
     o el propio del proyecto) que casa por significado (≥ 0,30); sin
-    coincidencia, como mucho UNO al azar por clip (`BROLL_AZAR_MAX`). Pexels
+    coincidencia, uno al azar sin repetir (límite en `BROLL_AZAR_MAX`; None = sin
+    límite). Pexels
     queda como fallback solo si no hay superposiciones locales y
     `env['PEXELS_API_KEY']` + `broll_keywords` están definidos.
     """
@@ -1601,13 +1615,13 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
     windows_full = _broll_windows_from_speech(phrases, duration, hook_dur=hook_guard)
 
     # B-roll a pantalla completa, CON INTENCIÓN: cada ventana lleva el b-roll que
-    # casa por significado (≥ 0,30). Sin coincidencia, como mucho UNO al azar
-    # por clip (BROLL_AZAR_MAX); el resto de ventanas se quedan sin b-roll.
+    # casa por significado (≥ 0,30). Sin coincidencia, uno al azar sin repetir
+    # (límite por clip en BROLL_AZAR_MAX; None = sin límite).
     clips = []
     windows = []
     n_sem = 0
     if pol["broll"] == "propio":
-        # SOLO el b-roll del proyecto: índice semántico local (o azar, máx. 1).
+        # SOLO el b-roll del proyecto: índice semántico local (o azar).
         # Nunca el catálogo común ni Pexels.
         by_rel = list_overlays_recursive(overlays_dir) if overlays_dir else {}
         indice = IndiceBrollLocal.cargar(pol["broll_indice"])
@@ -1621,7 +1635,7 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
                     src = "sem-local"; n_sem += 1
                 else:
                     pool = [r for r in by_rel if r not in used and r not in avisos]
-                    if not pool or n_azar >= BROLL_AZAR_MAX:
+                    if not pool or not _azar_permitido(n_azar):
                         print(f"  [broll] {s:.1f}-{e:.1f}s -> sin coincidencia (se omite)")
                         continue
                     rel = rng.choice(pool); src = "azar"; n_azar += 1
@@ -1633,7 +1647,7 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
         elif by_rel:
             pool = [r for r in by_rel if r not in avisos]
             rng.shuffle(pool)
-            clips = [by_rel[r] for r in pool[:BROLL_AZAR_MAX]]
+            clips = [by_rel[r] for r in pool[:_n_broll_sin_frases(duration)]]
             print(f"  [broll] {len(clips)} b-roll propio al azar (sin frases): "
                   + ", ".join(c.name for c in clips))
         else:
@@ -1649,12 +1663,14 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
         overlays = _list_overlay_videos(overlays_dir)
         if overlays and not net_ok:
             # Banco común SIN internet: nada de catálogo (Supabase) ni de clips
-            # que vinieron de internet (pexels_*); sin semántica -> máx. 1 al azar.
+            # que vinieron de internet (pexels_*); sin semántica -> azar sin repetir.
             overlays = [o for o in overlays if not o.name.lower().startswith("pexels_")]
+            used = set()
             for (s, e, text) in windows_full[:BROLL_AZAR_MAX]:
-                if not overlays:
+                pool = [o for o in overlays if o.name not in used]
+                if not pool:
                     break
-                clip = rng.choice(overlays)
+                clip = rng.choice(pool); used.add(clip.name)
                 clips.append(clip); windows.append((s, e))
                 print(f"  [broll] {s:.1f}-{e:.1f}s -> {clip.name} (azar, sin internet)")
             overlays = []
@@ -1662,7 +1678,7 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
     if overlays and windows_full:
         # SELECCIÓN SEMÁNTICA: por cada ventana (=frase) pedimos a Supabase
         # (match_broll) el b-roll más afín. Sin coincidencia ≥ umbral (o sin
-        # Supabase), como mucho UNO local al azar por clip. Sin repetir clip y
+        # Supabase), uno LOCAL al azar (límite: BROLL_AZAR_MAX). Sin repetir clip y
         # sin los marcados 'aviso-*' (marca/persona/calidad).
         by_name = {p.name: p for p in overlays}
         avisos = _broll_avisos(env or {})
@@ -1672,7 +1688,7 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
             fn = broll_match_filename(text, env or {}, exclude=used) if (env and text) else None
             if fn and fn in by_name:
                 clip = by_name[fn]; used.add(fn); src = "sem"; n_sem += 1
-            elif n_azar < BROLL_AZAR_MAX:
+            elif _azar_permitido(n_azar):
                 pool = ([o for o in overlays if o.name not in used and o.name not in avisos]
                         or [o for o in overlays if o.name not in used] or overlays)
                 clip = rng.choice(pool); used.add(clip.name); src = "azar"; n_azar += 1
@@ -1683,11 +1699,12 @@ def burn_subs_and_music(heygen_mp4: Path, music_dir: Path, out_mp4: Path,
             print(f"  [broll] {s:.1f}-{e:.1f}s -> {clip.name} ({src})")
         print(f"  [broll] {len(clips)} cortes sinc. con la voz ({n_sem} por semántica)")
     elif overlays:
-        # sin frases detectadas → sin semántica posible: como mucho 1 al azar
+        # sin frases detectadas → sin semántica posible: intervalos regulares al azar
         avisos = _broll_avisos(env or {})
         pool = [o for o in overlays if o.name not in avisos] or overlays
         rng.shuffle(pool)
-        clips = pool[:BROLL_AZAR_MAX]
+        n = _n_broll_sin_frases(duration)
+        clips = (pool * (n // len(pool) + 1))[:n]
         print(f"  [broll] {len(clips)} superposición local al azar (sin frases): "
               + ", ".join(c.name for c in clips))
     elif banco_broll and net_ok and not clips:
