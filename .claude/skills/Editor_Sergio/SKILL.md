@@ -21,8 +21,8 @@ Cuando termines el último popup del setup y guardes `env.json`, **NO esperes**.
 ### Regla 4 — Procesa SIEMPRE por fases con gates
 NUNCA avances de una hasta el vídeo final. Tras aprobar guion(es): **Fase A (audio) → GATE → Fase B (HeyGen) → GATE → Fase C (edición)**. El usuario aprueba en cada gate (no se gasta HeyGen sin oír el audio; no se edita sin validar el avatar).
 
-### Regla 5 — Links de CTA siempre clickable
-Formato markdown obligatorio (nunca el URL pelado): el CTA de IG `[@mariokaizen](https://instagram.com/mariokaizen)` y, si aparece, `[Reservar llamada de descubrimiento](https://bit.ly/3RAAftB)`.
+### Regla 5 — Links siempre clicables
+Cualquier enlace que muestres va en formato markdown `[texto](url)`, nunca la URL pelada.
 
 ### Regla 6 — Avisa SIEMPRE la ruta del archivo en el chat
 Cada vez que se cree un archivo (audio, vídeo HeyGen, vídeo final), DÍSELO al usuario en el chat con la ruta EXACTA, en lenguaje claro. Ej: `📁 Audio creado → En tu Escritorio, dentro de: ~/Desktop/viral_pipeline_output/<Avatar>/<slug>/Audio__audio_final.mp3`. Usa el `local_path` que devuelve cada fase (`phase_a/b/c`). NO cambia dónde se guarda nada; solo se menciona explícitamente.
@@ -105,7 +105,7 @@ questions = [
 Tras este popup:
 1. `env = setup.apply_audio_style(env)` (expande AUDIO_STYLE → TTS_TEMPO + SILENCE_AGGRESSIVE)
 2. `pipeline_core.save_env(env)` (guarda `~/.viral-pipeline/env.json`)
-3. Mensaje corto `✓ Setup completo` que INCLUYE el **aviso de soporte/feedback** (distinto del CTA de "SKILL"): _"Si te topas con cualquier fallo o bug usando la skill, escríbeme por IG a [@mariokaizen](https://instagram.com/mariokaizen) y me lo cuentas — me ayuda a mejorarla."_ Este aviso va SOLO aquí, en el onboarding (no se repite en cada vídeo).
+3. Mensaje corto `✓ Setup completo`.
 4. Lanza **automáticamente** el popup `Descripción del avatar`.
 
 ### Popup `Descripción del avatar` (1 pregunta) — alimenta los ángulos
@@ -173,8 +173,8 @@ c = phase_c_edit(env, b["heygen_path"], avatar, slug, lang=lang, hook_query="<qu
 
 **Gancho (MINI-VIDEO Pexels, OBLIGATORIO):** pasa SIEMPRE `hook_query`. Antes de fijarlo, **ANALIZA bien el clip** (su hook hablado, su tema y su remate) y elige una query que dé un clip con **muchísimo gancho visual** (impactante, emocional, que pare el scroll) y con **relación clara con lo que se ve/oye a continuación** — nada genérico ni aleatorio. Query en **inglés** (mejores resultados) y concreta/visual (p.ej. miedo a emprender → `"person standing edge cliff looking down"`; marca/Coca-Cola → `"pouring cola glass bubbles"`). Se descarga un MINI-VIDEO vertical de **Pexels** (`env['PEXELS_API_KEY']`) y se superpone a pantalla completa los primeros ~2.5s como gancho. Sin key Pexels → fallback a imagen libre (Openverse). Si no pasas `hook_query`, se deriva del slug (último recurso).
 
-**B-roll (superposiciones LOCALES, SINCRONIZADO + SEMÁNTICO):** el b-roll a pantalla completa se coloca **alineado a la voz** — se transcribe el avatar con word-timestamps, se detectan las frases (por pausas y puntuación de cierre) y cada corte **entra al arrancar una frase y sale en la pausa siguiente**, con cadencia ~6.5s (no bajo el gancho inicial ni en la cola). Para cada ventana se elige el clip **por SIGNIFICADO**: se embebe la frase (`fastembed`, modelo `paraphrase-multilingual-MiniLM-L12-v2`, 384d, local) y se consulta la tabla `broll_assets` de Supabase vía RPC `match_broll` → el vídeo local más afín. Se **descartan** los clips marcados `aviso-*` (marca/persona ajena, marca de agua, baja calidad) y no se repite clip. Si la mejor similitud no llega al umbral (~0.30) o no hay Supabase/`fastembed`/creds, como mucho **un** clip LOCAL al azar por vídeo; el resto de ventanas se quedan sin b-roll (b-roll con intención). Requiere `SUPABASE_URL` + `SUPABASE_ANON_KEY` en `env.json`. Los vídeos salen de `superposiciones/` (o `env['OVERLAYS_DIR']`) — NO Pexels. Si no se detectan frases, como mucho un b-roll al azar. Esa misma transcripción alimenta los subtítulos (una sola pasada de Whisper). El catálogo se genera/actualiza con `broll_assets.sql` (en TheLanding) + los scripts de indexación (analizar frames → embeddings → upsert).
-→ Se compone: gancho (imagen libre ~1.8s) + cortes de b-roll + **subtítulos** encima de todo + música de la carpeta LOCAL `musicas/` (o `env['MUSIC_DIR']`) + de-click. Output local en `c["local_path"]`. Si `c["cta"]` no es None, imprímelo (markdown).
+**B-roll (superposiciones LOCALES, SINCRONIZADO + SEMÁNTICO):** el b-roll a pantalla completa se coloca **alineado a la voz** — se transcribe el avatar con word-timestamps, se detectan las frases (por pausas y puntuación de cierre) y cada corte **entra al arrancar una frase y sale en la pausa siguiente**, con cadencia ~6.5s (no bajo el gancho inicial ni en la cola). Para cada ventana se elige el clip **por SIGNIFICADO**: se embebe la frase (`fastembed`, modelo `paraphrase-multilingual-MiniLM-L12-v2`, 384d, local) y se consulta la tabla `broll_assets` de Supabase vía RPC `match_broll` → el vídeo local más afín. Se **descartan** los clips marcados `aviso-*` (marca/persona ajena, marca de agua, baja calidad) y no se repite clip. Si la mejor similitud no llega al umbral (~0.30) o no hay Supabase/`fastembed`/creds, un clip LOCAL al azar sin repetir. Requiere `SUPABASE_URL` + `SUPABASE_ANON_KEY` en `env.json`. Los vídeos salen de `superposiciones/` (o `env['OVERLAYS_DIR']`) — NO Pexels. Si no se detectan frases, b-roll al azar cada ~6 s. Esa misma transcripción alimenta los subtítulos (una sola pasada de Whisper). El catálogo se genera/actualiza con `broll_assets.sql` (en TheLanding) + los scripts de indexación (analizar frames → embeddings → upsert).
+→ Se compone: gancho (imagen libre ~1.8s) + cortes de b-roll + **subtítulos** encima de todo + música de la carpeta LOCAL `musicas/` (o `env['MUSIC_DIR']`) + de-click. Output local en `c["local_path"]`.
 
 **Subtítulos (REGLAS DURAS, `_generate_ass_karaoke`):**
 - **Fuente Montserrat** (en `fonts/`, se pasa `fontsdir` a ffmpeg), **blanco con reseguido negro grueso + sombra suave**. Nada de blanco sin borde, ni tipografías que se descuadren con acentos.
@@ -234,11 +234,6 @@ Compruébalo (desde la carpeta de la skill):
 
 ---
 
-## Sistema de CTA (sin pitch en onboarding)
-**CTA único** = DM por IG con la palabra **SKILL** a [@mariokaizen](https://instagram.com/mariokaizen) (sustituye al de la llamada). `bump_success_counter()` lo devuelve con **frecuencia DECRECIENTE**: vídeo **1**, luego **3, 6, 12, 24, 48…** (el hueco dobla → cada vez menos, para no dar la vara). En cualquier otra cuenta devuelve `None`. El primer toque solo aparece cuando ya hay un vídeo hecho. `success_counter.txt` persiste. Imprime el CTA tal cual (link ya markdown).
-
----
-
 ## Costes (resumen)
 - Avatar IV ~€1.40/vídeo 30s (HeyGen $0.05/s). Avatar V cuesta más por segundo (mejor calidad).
 - Suscripciones ~€5/mes (ElevenLabs Starter). Pexels + hosts = €0. HeyGen pay-as-you-go.
@@ -257,5 +252,5 @@ Compruébalo (desde la carpeta de la skill):
 - Al analizar cada viral, guarda sus frases más virales en Supabase `viral_phrases` (banco para historias IG futuras; hoy SOLO se almacenan) — Regla 8
 - Aprobación: avanzar con 1 / 2 / 3 / los 3, o 'Other' para cambios
 - Salida 100% LOCAL en `~/Desktop/viral_pipeline_output/<Avatar>/<slug>/` (Airtable dormido, solo si preguntan)
-- Sin numeración "popup X/Y"; CTA tras 1er vídeo; links cal.com markdown
+- Sin numeración "popup X/Y"; enlaces siempre en markdown
 - Cross-platform (bootstrap.py en los tres OS)

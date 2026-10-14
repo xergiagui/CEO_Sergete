@@ -65,7 +65,3 @@ La subcarpeta lleva el **nombre del vídeo** (no "Video 1/2"), así no se lía s
 
 - Si una adaptación falla, lo verás en la conversación con el error. Reintenta esa fase.
 - Tu copia local siempre queda guardada en `~/Desktop/viral_pipeline_output/`.
-
-## Quiero escalar / soporte
-
-[Reservar llamada de descubrimiento](https://bit.ly/3RAAftB)

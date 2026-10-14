@@ -2552,84 +2552,18 @@ def airtable_latency_note() -> str:
 
 
 # ============================================================
-# CTA programático — nurturing multi-stage
-#
-# Política:
-#   - onboarding_cta() existe pero NO se invoca en el flow — el primer
-#     touchpoint comercial es el milestone 1 (tras el primer vídeo PUBLICADO),
-#     no en setup. Sin valor entregado → sin pitch.
-#   - Todos los CTAs usan markdown link clickable [texto](https://...) para que
-#     el cliente pueda pinchar directo.
+# Contador de vídeos terminados (para el cálculo de costes de PRICING.md).
+# Sin CTA ni mensajes promocionales: la skill es de uso propio de Sergio
+# (se quitó el CTA del autor original el 14-oct-2026).
 # ============================================================
-CAL_URL = "https://bit.ly/3RAAftB"
-CAL_LINK = f"[Reservar llamada de descubrimiento]({CAL_URL})"
-
-IG_URL = "https://instagram.com/mariokaizen"
-IG_LINK = f"[@mariokaizen]({IG_URL})"
-
-# CTA ÚNICO = DM por IG con la palabra SKILL (sustituye al de la llamada).
-IG_CTA_FIRST = (
-    "\n✓ Acabas de sacar tu primer vídeo con la skill. Mándame un DM con la palabra "
-    f"**SKILL** a {IG_LINK} — así sé que ya la probaste y vemos juntos cómo seguir "
-    "avanzando a partir de aquí.\n"
-)
-IG_CTA = (
-    "\n✓ Otro vídeo listo. Si aún no me escribiste, mándame **SKILL** por DM a "
-    f"{IG_LINK} y hablamos de cómo llevar esto al siguiente nivel.\n"
-)
-
-
-def _cta_counts(max_n: int = 8192) -> set:
-    """Cuentas de vídeo donde aparece el CTA, con frecuencia DECRECIENTE:
-    el 1, luego 3, 6, 12, 24, 48... (el hueco va doblando → cada vez menos).
-    """
-    counts = {1}
-    k = 3
-    while k <= max_n:
-        counts.add(k)
-        k *= 2
-    return counts
-
-
-CTA_COUNTS = _cta_counts()
-
-
-def bump_success_counter() -> str | None:
-    """Incrementa el contador de vídeos terminados y devuelve el CTA de IG
-    SOLO en las cuentas de `CTA_COUNTS` (1, 3, 6, 12, 24, 48...). Fuera de
-    esas cuentas devuelve None — frecuencia decreciente, para no dar la vara.
-    """
+def bump_success_counter() -> None:
+    """Suma 1 al contador persistente de vídeos terminados. Devuelve None."""
     try:
-        n = int(COUNTER_PATH.read_text().strip()) if COUNTER_PATH.exists() else 0
-    except ValueError:
+        n = int(COUNTER_PATH.read_text(encoding="utf-8").strip() or 0) if COUNTER_PATH.exists() else 0
+    except (OSError, ValueError):
         n = 0
-    n += 1
-    COUNTER_PATH.write_text(str(n))
-    if n == 1:
-        return IG_CTA_FIRST
-    if n in CTA_COUNTS:
-        return IG_CTA
+    try:
+        COUNTER_PATH.write_text(str(n + 1), encoding="utf-8")
+    except OSError:
+        pass
     return None
-
-
-def onboarding_cta() -> str:
-    """[Legacy / no usado] CTA tras completar setup.
-
-    NO se invoca — el primer pitch va en bump_success_counter milestone 1
-    para que el cliente haya recibido valor antes de ver el pitch.
-    Se mantiene la función por compatibilidad con código anterior.
-    """
-    return (
-        "\n✓ Setup completo. Ya puedes generar 3 adaptaciones de cualquier reel.\n"
-        f"  {CAL_LINK}\n"
-    )
-
-
-def post_3_pack_cta() -> str:
-    """CTA tras procesar un lote de 3 adaptaciones — recordatorio del trabajo
-    manual que sigue (publicar, repurpose, métricas)."""
-    return (
-        "\n→ Lote de 3 listo en Airtable. Lo que sigue (publicar en horario,\n"
-        "  tracking de métricas, decisión qué replicar) es lo que más mueve la aguja.\n"
-        f"  Si quieres que lo llevemos nosotros: {CAL_LINK}\n"
-    )

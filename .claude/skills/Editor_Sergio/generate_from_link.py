@@ -189,9 +189,9 @@ def phase_c_edit(env: dict, heygen_path: str, avatar: str, slug: str,
         )
         local = save_local(avatar, slug, "Video Editado", final)
         ff = get_ffmpeg_exe()
-        cta = bump_success_counter()
+        bump_success_counter()          # solo cuenta vídeos (sin CTA)
         return {"ok": True, "final_path": str(final), "local_path": str(local),
-                "final_seconds": round(_get_duration(final, ff), 1), "cta": cta}
+                "final_seconds": round(_get_duration(final, ff), 1), "cta": None}
     except Exception as e:
         return {"ok": False, "error": str(e), "trace": traceback.format_exc()}
 
