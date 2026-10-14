@@ -30,8 +30,14 @@ export default function Footer() {
           <a href="/contacto" className="transition-colors hover:text-[var(--text)]">
             Contacto
           </a>
+          <a href="/aviso-legal" className="transition-colors hover:text-[var(--text)]">
+            Aviso legal
+          </a>
           <a href="/privacidad" className="transition-colors hover:text-[var(--text)]">
-            Privacidad
+            Política de privacidad
+          </a>
+          <a href="/cookies" className="transition-colors hover:text-[var(--text)]">
+            Política de cookies
           </a>
         </div>
       </div>

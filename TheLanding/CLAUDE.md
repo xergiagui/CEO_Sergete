@@ -54,7 +54,7 @@ una sesión de Claude abierta en TheLanding, no desde el subagente `landing`.
 - **`public/llms.txt`**: guía para crawlers de IA. **Si cambias
   `src/lib/products.ts`, actualiza `llms.txt`** (nombres, precios, cifras).
 - **Open Graph** `src/app/opengraph-image.tsx` (imagen dinámica 1200×630).
-- **Privacidad** `src/app/privacidad/page.tsx` (Nav + Footer; datos, uso,
+- **Legales** `/privacidad`, `/aviso-legal`, `/cookies` (todas `noindex`, fuera del sitemap; layout común `src/components/legal.tsx`). Privacidad: `src/app/privacidad/page.tsx` (Nav + Footer; datos, uso,
   Supabase, derechos y aviso de afiliado), con `robots: index:false`.
   **Todo formulario que recoge datos enlaza a `/privacidad`** (hoy: `LeadModal`
   y `ContactForm`).
