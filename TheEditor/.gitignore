@@ -1,0 +1,47 @@
+# Recursos locales del banco común — NO sincronizar con git
+musicas/
+superposiciones/
+_musicas_eliminadas/
+
+# whisper.cpp (binario + modelo ~3GB) — NO sincronizar
+whisper/
+
+# Proyectos: se versiona su configuración (proyecto.json, reglas.md) y la
+# estructura (.gitkeep); NO los vídeos, la música, el trabajo ni los logs.
+proyectos/*/input/*
+proyectos/*/transcripciones/*
+proyectos/*/logs/*
+proyectos/*/recursos/*/*
+!proyectos/*/**/.gitkeep
+# …salvo las descripciones del b-roll propio (texto, se escriben a mano)
+!proyectos/*/recursos/broll/_descripciones.json
+
+# Entradas y salidas antiguas (antes de los proyectos)
+/input/
+/transcripciones/
+/logs/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Sistema / editor
+desktop.ini
+.DS_Store
+
+# Configuración local de Claude Code — no subir…
+.claude/*
+# …excepto la skill Editor_Sergio (código versionado; sin secretos dentro)
+!.claude/skills/
+
+# Credenciales locales
+.env
+
+# Logs de ejecuciones (batch, fixes)
+*.log
+
+# Salidas de la indexación del catálogo común (broll_index/): se regeneran
+.claude/skills/Editor_Sergio/broll_index/frames/
+.claude/skills/Editor_Sergio/broll_index/sem/
+.claude/skills/Editor_Sergio/broll_index/broll_*.json

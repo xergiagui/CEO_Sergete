@@ -1,0 +1,28 @@
+{
+  "id": "<id>",
+  "nombre": "<Nombre>",
+  "tipo": "clipping",
+  "idioma": "es",
+  "recursos": {
+    "broll": "propio",
+    "musica": "propia",
+    "internet": false,
+    "gancho_visual": "ninguno",
+    "gancho_texto": true,
+    "guardar_frases": false
+  },
+  "encuadre": {
+    "modo_por_defecto": "follow",
+    "carpetas": {}
+  },
+  "silencios": {
+    "umbral": "6%",
+    "margen": "0.15s"
+  },
+  "gancho": {
+    "texto_duracion_s": 2.5
+  },
+  "frases": {
+    "etiquetas_extra": []
+  }
+}
