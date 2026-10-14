@@ -82,8 +82,10 @@ proyecto). Credenciales en `.env` (copia de `.env.example`).
 
 ## Añadir un departamento
 
-1. Carpeta hermana en `PruebasIA/` con su repo git (`main`, `github.com/xergiagui/<Nombre>`)
-   y, si usa Python, `.venv` + `requirements.txt`.
+1. Carpeta hermana en `PruebasIA/` (**sin repo propio**: todo va en el repo único) y, si
+   usa Python, `.venv` + `requirements.txt`. Añade la línea `!/<Nombre>/` a
+   `PruebasIA/.gitignore` (lista blanca) para que entre en git, y un `.gitignore` propio
+   para sus datos (vídeos, salidas, `.env`, `.venv`…).
 2. Su `CLAUDE.md` (qué hace, entorno, reglas, flujo, salida) y `README.md`, **por proyecto**
    desde el principio (`proyectos/<id>/` + `proyectos/_plantilla/`).
 3. Entrada en `departamentos.json` y subagente en `.claude/agents/<id>.md`: puntero fino
@@ -92,8 +94,17 @@ proyecto). Credenciales en `.env` (copia de `.env.example`).
 4. Ruta en `additionalDirectories` de `.claude/settings.local.json` y fila en la tabla del
    `CLAUDE.md`.
 
-## Repos
+## Repo (único desde el 14-oct-2026)
 
-Bajo `xergiagui` en GitHub: CEO_Sergete y uno por departamento (TheDescarga,
-TheEditor, TheLanding, TheHistoria, TheCopy, TheTextos, ThePerfil). La fusión de todos en
-el repo CEO_Sergete está preparada pero pendiente de permiso.
+Todo el sistema está en **un solo repo**: la raíz local es la carpeta `PruebasIA` y se
+sube a `github.com/xergiagui/CEO_Sergete`, con una carpeta por departamento y el
+historial de cada uno conservado. El `.gitignore` de la raíz es una **lista blanca**
+(solo entran `CEO_Sergete/` y las carpetas `The*/`): tus carpetas personales de
+`PruebasIA`, `_Historico/` y los datos nunca entran. Nunca `git clean -x` en la raíz.
+
+- Commits y push, desde cualquier carpeta (es el mismo repo).
+- **TheLanding** sigue desplegando en Vercel desde su repo propio
+  (`github.com/xergiagui/TheLanding`): desde la raíz,
+  `git subtree push --prefix=TheLanding https://github.com/xergiagui/TheLanding.git main`.
+- Los repos antiguos de los demás departamentos están **archivados** en GitHub (solo
+  lectura). Copia de seguridad de sus `.git` en `PruebasIA/_backup_git_20261014/`.

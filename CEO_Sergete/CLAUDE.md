@@ -48,7 +48,9 @@ que hace un departamento.
 | «descárgame esto» (sin editar) | `cmd //c ..\TheDescarga\descargar.bat "URL" best <id>` |
 
 ## Reglas de orquestación
-- **Avatar IA** (Editor_Sergio): la skill desde el **hilo principal**, nunca el subagente.
+- **Avatar IA** (Editor_Sergio): **excluido por decisión de Sergio** (sin claves de
+  HeyGen/ElevenLabs). No lo propongas ni preguntes por él; si Sergio lo pide algún día,
+  la skill va desde el hilo principal, nunca el subagente.
 - **Historias:** solo cuando Sergio las pide; no se encadenan con descarga/edición.
 - **Carruseles:** a demanda o por huecos. Tras `copy … --planificar`, si la línea `FALTAN`
   pide carruseles, `py ceo.py huecos --proyecto <id>` (descuenta los pendientes de OK) y,
@@ -74,6 +76,9 @@ que hace un departamento.
 
 ## Entorno
 Windows (PowerShell + Git Bash). `python3` no funciona: `py` o el `.venv` del departamento.
-Commits en español con la línea `Co-Authored-By` de Claude; nunca se suben `.env`,
-`.venv/`, vídeos, logs ni registros Excel. Supabase compartido: credenciales en `.env`.
-Añadir un departamento: ver `README.md`.
+**Git: un solo repo** (raíz = carpeta `PruebasIA` → `github.com/xergiagui/CEO_Sergete`,
+lista blanca en `PruebasIA/.gitignore`). Commits en español con la línea
+`Co-Authored-By` de Claude; nunca se suben `.env`, `.venv/`, vídeos, logs ni registros
+Excel. **Deploy de la landing** (con OK): desde la raíz,
+`git subtree push --prefix=TheLanding https://github.com/xergiagui/TheLanding.git main`.
+Supabase compartido: credenciales en `.env`. Añadir un departamento: ver `README.md`.

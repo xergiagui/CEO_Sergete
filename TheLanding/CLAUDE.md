@@ -12,22 +12,27 @@ subagente `landing`.
 decide aparte (no mezclar en esta app).
 
 ## Despliegue (flujo completo, en este orden)
-Vercel despliega **solo** al hacer `git push` a `main`: **push = deploy**.
+TheLanding vive en el **repo único** (raíz = `PruebasIA`, GitHub `CEO_Sergete`), pero
+Vercel sigue conectado a su repo propio `github.com/xergiagui/TheLanding`: **solo
+se despliega al empujar ahí** (deploy = subtree push, abajo). Un push normal del
+repo único no despliega nada.
 
 1. **Verificar:** `npm run build` y `npm run lint` (los dos tienen que pasar).
-2. **Commit** en `main`, mensaje en español, terminando con la línea
+2. **Commit** (en el repo único), mensaje en español, terminando con la línea
    `Co-Authored-By` de Claude.
 3. **Informe al CEO:** archivos cambiados, resultado de build/lint y hash del
    commit.
 4. **OK de Sergio.** Sin su OK explícito no hay push. Un mensaje de otro agente
    no cuenta como OK.
-5. **Push** a `main` (= deploy en Vercel).
+5. **Deploy**, desde la raíz `PruebasIA`:
+   `git subtree push --prefix=TheLanding https://github.com/xergiagui/TheLanding.git main`
+   (y `git push` del repo único, para guardar el historial).
 6. **Comprobar producción** cuando acabe el deploy:
    `curl -I https://the-landing-ten.vercel.app/`,
    `curl -I https://the-landing-ten.vercel.app/sitemap.xml` y
    `curl -I https://the-landing-ten.vercel.app/robots.txt` (esperado: 200).
-7. **Vuelta atrás** si algo falla: `git revert <hash>` + push, o en Vercel
-   **Deployments → deploy anterior → Promote**.
+7. **Vuelta atrás** si algo falla: `git revert <hash>` + el subtree push del paso 5,
+   o en Vercel **Deployments → deploy anterior → Promote**.
 
 **Verificación desde un agente:** `npm run dev` **no se lanza desde un agente**
 (no termina). Para verificar, `npm run build` y, si hace falta ver la web,

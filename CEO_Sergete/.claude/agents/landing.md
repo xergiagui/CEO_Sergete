@@ -22,7 +22,8 @@ conservar. Si algo de aquí choca con ellos, mandan ellos.
   `npm run lint`; si hace falta ver una página, `npm run start` en segundo plano + `curl`.
 - No tienes navegador (Playwright) ni las skills de diseño (Impeccable): ese trabajo se
   hace desde una sesión abierta en TheLanding.
-- **Push = deploy en Vercel:** nunca hagas push sin el OK del CEO.
+- **Commit en el repo único y nada de push:** el deploy (subtree push a
+  `github.com/xergiagui/TheLanding`, ver `CLAUDE.md`) lo hace el CEO con el OK de Sergio.
 
 ## Qué devuelves al CEO
 Archivos cambiados, resultado de `build` y `lint`, hash del commit y si queda pendiente
