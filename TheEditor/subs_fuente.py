@@ -8,7 +8,8 @@ caja oscura). Al recortar a 9:16 quedan cortados por los lados y asoman justo
 debajo de NUESTROS subtítulos. Este paso, previo a la Fase C, los detecta en la
 franja inferior del clip (`zona_y`) fotograma a fotograma y, SOLO mientras están
 en pantalla, los tapa con un desenfoque fuerte de bordes suaves (o una banda
-oscura) ajustado a la altura real de cada rótulo. Va sobre el plano del
+oscura) ajustado a la altura real de cada rótulo (con todas sus líneas, aunque
+la primera quede por encima de `zona_y`). Va sobre el plano del
 ponente: el gancho visual, el b-roll, el gancho de texto y nuestros subtítulos
 se componen después, encima, así que nunca quedan tapados. Si el clip no trae
 rótulos, no se toca (ni se recodifica).
@@ -61,6 +62,12 @@ _HOLGURA_S = 0.07             # se tapa un poco antes y un poco después
 _FUNDIDO_DIF = 35             # salto de gris entre píxeles a 2 px que cuenta como borde
 _FUNDIDO_MIN = 40             # bordes por fila (máximo de sus filas) para seguir tapando
 _FUNDIDO_MAX_S = 0.8          # como mucho, esto antes y después
+# Rótulos de VARIAS líneas: la caja detectada crece por las líneas contiguas del
+# mismo rótulo (también por encima de `zona_y`, que solo sirve para encontrarlo).
+_CRECER_ARRIBA = 300          # px (sobre 1920) que puede subir por encima de zona_y
+_CRECER_HUECO = 140           # hueco máximo entre líneas del mismo rótulo (px sobre 1920)
+_CRECER_MIN = 3               # mediana de px blanco-junto-a-oscuro por fila = línea de texto
+_CRECER_FPS = 10              # fotogramas por segundo para el perfil del tramo
 
 
 def config(cfg_proyecto: dict | None) -> dict | None:
@@ -117,6 +124,56 @@ def _bordes_fila(f):
     import numpy as np
     g = np.abs(f[:, 2:].astype(np.int16) - f[:, :-2].astype(np.int16)) > _FUNDIDO_DIF
     return g.sum(axis=1).astype(np.int16)
+
+
+def _crecer_vertical(video: Path, ff: str, unidos: list[dict], w: int, h: int,
+                     k: float, z0: int, z1: int) -> None:
+    """Amplía [ya, yb] de cada tramo por las líneas contiguas del mismo rótulo.
+
+    Un rótulo de 2-3 líneas solo se detecta por la parte que cae en `zona_y`
+    (o por las líneas con caja oscura): las demás asomaban encima o debajo del
+    tapado. Por tramo, saca el perfil por filas (mediana, sobre sus fotogramas,
+    de píxeles blancos junto a oscuros) en [z0 - _CRECER_ARRIBA, z1] y extiende la
+    caja mientras haya filas de texto a menos de _CRECER_HUECO. Modifica `unidos`."""
+    import numpy as np
+    ze0 = _par(max(0, z0 - _CRECER_ARRIBA * k))
+    aw, ah = _par(w / 2), _par((z1 - ze0) / 2)
+    hueco = int(_CRECER_HUECO * k)
+    for u in unidos:
+        t0 = u["j0"] / FPS_ANALISIS
+        dur = max((u["j1"] + 1) / FPS_ANALISIS - t0, 1.0 / FPS_ANALISIS)
+        p = subprocess.run(
+            [ff, "-v", "error", "-ss", f"{t0:.3f}", "-t", f"{dur:.3f}", "-i", str(video),
+             "-an", "-vf", f"crop={w}:{z1 - ze0}:0:{ze0},scale={aw}:{ah}:flags=area,"
+             f"fps={_CRECER_FPS},format=gray", "-f", "rawvideo", "-"],
+            capture_output=True)
+        a = np.frombuffer(p.stdout, np.uint8)
+        n = a.size // (aw * ah)
+        if n == 0:
+            continue
+        perfiles = []
+        for f in a[:n * aw * ah].reshape(n, ah, aw):
+            blanco, oscuro = f > _BLANCO, f < _OSCURO
+            cerca = oscuro.copy()
+            for s in (1, 2):
+                cerca[:, s:] |= oscuro[:, :-s]
+                cerca[:, :-s] |= oscuro[:, s:]
+            perfiles.append((blanco & cerca).sum(axis=1))
+        texto = np.median(np.array(perfiles), axis=0) >= _CRECER_MIN
+
+        def fila(y):  # px del vídeo -> fila del perfil
+            return min(max((y - ze0) // 2, 0), ah - 1)
+
+        for paso, borde in ((-1, "ya"), (1, "yb")):
+            r, ultimo, sin_texto = fila(u[borde]), fila(u[borde]), 0
+            while 0 <= r + paso < ah and sin_texto * 2 <= hueco:
+                r += paso
+                if texto[r]:
+                    ultimo, sin_texto = r, 0
+                else:
+                    sin_texto += 1
+            y = ze0 + 2 * ultimo + (2 if paso > 0 else 0)
+            u[borde] = min(u[borde], y) if paso < 0 else max(u[borde], y)
 
 
 def _misma_altura(ya: int, yb: int, t: dict, tol: int = 40) -> bool:
@@ -200,6 +257,10 @@ def detectar(video: Path, c: dict) -> list[dict]:
             u["ya"], u["yb"] = min(u["ya"], t["ya"]), max(u["yb"], t["yb"])
         else:
             unidos.append(dict(t))
+    try:
+        _crecer_vertical(video, ff, unidos, w, h, k, z0, z1)
+    except Exception as e:  # best-effort: sin crecer, la caja de siempre
+        print(f"   [subs_fuente] no pude ampliar los rótulos de varias líneas ({e})")
 
     pad = int(c["margen_px"] * k) + (int(c["difuminado_px"] * k) if c["tapar"] == "desenfoque" else 0)
     out = []

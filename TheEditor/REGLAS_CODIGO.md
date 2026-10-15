@@ -122,7 +122,10 @@ línea en blanco tras una pausa de más de 1,5 s.
 clave, no se hace nada). Lee el clip 9:16 a 30 fps en la franja `zona_y`
 (1290–1920 de 1920, bajo nuestros subtítulos, que acaban en ~1280) y marca los
 fotogramas con rótulo blanco sobre caja oscura; alarga cada tramo durante el
-fundido del rótulo. Por tramo, tapa solo su altura (+40 px de margen) y solo
+fundido del rótulo. Si el rótulo tiene varias líneas, la caja crece por las
+contiguas del mismo rótulo (mediana por fila de blanco junto a oscuro ≥ 3, huecos
+≤ 140 px), también hasta 300 px por encima de `zona_y`: antes asomaban la primera
+línea por encima o una línea corta («ti») por debajo. Por tramo, tapa solo su altura (+40 px de margen) y solo
 mientras dura: desenfoque fuerte con 24 px de borde suave (`sigma` 70) o banda
 negra al 85 %. Va sobre el plano del ponente, antes del gancho visual, el b-roll,
 el gancho de texto y nuestros subtítulos, que quedan encima. Audio, duración y
