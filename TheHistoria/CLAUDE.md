@@ -40,7 +40,9 @@ no lo leas salvo para diseño o un esquema poco habitual.
 ## Carruseles (sí llevan copy y entran en el calendario)
 1. **Material**: `carruseles.py --listar` (lo hecho y de dónde, para no repetir
    temas) y `carruseles.py --fuente <video|ruta>` (transcripción sin tiempos,
-   cortes, clips y campos válidos; también un `articulo.md`). **Nunca leas el
+   cortes, clips y campos válidos; también un `articulo.md` o un email `.eml` de
+   `..\CEO_Sergete\mails\`, por nombre o ruta: da asunto + cuerpo y `fuente.tipo:
+   tema`; el `credito` se pone a mano). **Nunca leas el
    `.json` ni el `.srt` de Whisper.**
 2. **Plan** en `proyectos/<id>/planes/<slug>.json` (esqueleto abajo).
 3. **`carruseles.py --plan <plan>`**: valida, audita con TheCopy y renderiza; con
@@ -48,7 +50,7 @@ no lo leas salvo para diseño o un esquema poco habitual.
    errores y avisos (también los de la auditoría) y repite: el re-render sustituye
    la salida anterior del mismo slug. Mira `_vista.jpg`.
 4. **OK**: `carruseles.py --aprobar <carpeta>` la mueve a
-   `..\CEO_Sergete\REVISADOS\<id>\1. pte Publicar\` e imprime la orden de TheCopy.
+   `..\CEO_Sergete\REELS\<id>\1. pte Publicar\` e imprime la orden de TheCopy.
 
 ```json
 {
@@ -94,5 +96,5 @@ TheEditor.
 
 ## Pruebas
 `--destino <dir>`: otro destino en `--aprobar` y otra carpeta de salida en `--plan`
-(no toca HISTORIAS, REVISADOS ni las salidas pendientes). `--no-marcar` en
+(no toca HISTORIAS, REELS ni las salidas pendientes). `--no-marcar` en
 `--aprobar`: no marca frases.

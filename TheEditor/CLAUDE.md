@@ -61,4 +61,4 @@ Global: 6 % / 0,15 s (`proyecto.json → silencios`); nunca lo cambies. Si un cl
 ## Al dar OK
 Por script, nunca a mano:
 `proyecto.py aprobar <id> --video "<video|carpeta>" [--clips a.mp4,b.mp4] [--cerrar]`.
-Mueve los finales a `../CEO_Sergete/REVISADOS/<id>/1. pte Publicar/` y, si `finales/` queda vacío, archiva el vídeo y su fuente en `../_Historico/<id>/<v>/`. Después va TheCopy (`copys.py pendientes --proyecto <id>`).
+Mueve los finales a `../CEO_Sergete/REELS/<id>/1. pte Publicar/` y, si `finales/` queda vacío, archiva el vídeo y su fuente en `../_Historico/<id>/<v>/`. Después va TheCopy (`copys.py pendientes --proyecto <id>`).

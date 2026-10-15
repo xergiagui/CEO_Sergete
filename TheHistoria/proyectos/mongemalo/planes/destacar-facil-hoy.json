@@ -1,0 +1,17 @@
+{
+  "tipo": "carrusel",
+  "proyecto": "mongemalo",
+  "slug": "destacar-facil-hoy",
+  "tema": "Por qué hoy destacar es más fácil que nunca y qué hacer con eso",
+  "formula": "IG5_lista",
+  "objetivo": "guardados",
+  "pilar": "educativo",
+  "fuente": {"tipo": "tema", "ruta": "", "credito": ""},
+  "slides": [
+    {"titulo": "Triunfar es **más fácil** que nunca", "texto": "Tres motivos que nadie mira"},
+    {"titulo": "Hay incompetencia por todas partes", "texto": "Incompetencia, sumisión y docilidad como nunca. Con tanta gente a medio gas, hacer bien lo básico ya te **separa** del resto."},
+    {"titulo": "Millones piden ayuda para lo básico", "texto": "Hay quien necesita un robot para escribir un email o llamar a un cliente. Hacerlo tú, con criterio, te pone **por delante**."},
+    {"titulo": "Nunca estuvo tan claro", "texto": "Hay un camino para los dóciles y otro para quien decide. Ahora se ve a simple vista y puedes **elegir** el tuyo."},
+    {"titulo": "Luis Monge lo resume en una frase", "puntos": ["Mucha incompetencia: haz lo básico bien", "Muchos delegan lo simple: hazlo tú", "Dos caminos a la vista: elige"], "texto": "Respirar casi basta para pasarse el juego: no sobrecompliques el éxito.", "peticion": "Guárdalo para cuando dudes de si vale la pena."}
+  ]
+}

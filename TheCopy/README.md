@@ -83,8 +83,8 @@ plataforma cuyas cifras de hashtags no cuadren con sus fijos (p. ej. `total_max`
 
 | Clave | Por defecto | Quién la crea |
 |---|---|---|
-| `carpetas.pendiente` | `CEO_Sergete/REVISADOS/<id>/1. pte Publicar` | el CEO |
-| `carpetas.publicado` | `CEO_Sergete/REVISADOS/<id>/2. Publicados` | el CEO |
+| `carpetas.pendiente` | `CEO_Sergete/REELS/<id>/1. pte Publicar` | el CEO |
+| `carpetas.publicado` | `CEO_Sergete/REELS/<id>/2. Publicados` | el CEO |
 | `calendario.historias.carpeta` | `CEO_Sergete/HISTORIAS/<id>/1. Pte publicar` | el CEO |
 | `carpetas.contexto` | `TheEditor/proyectos/<id>/transcripciones`, `_Historico/<id>` | TheEditor / el CEO al dar OK |
 
@@ -113,7 +113,7 @@ Lo que no se sepa se pregunta a Sergio. **Plataformas:** cada proyecto define `i
 `tiktok` y `youtube` (Shorts, con título); activar una = `"activa": true` (y revisar sus fijos en
 `hashtags.json`), solo cuando Sergio lo pida. A una pieza ya registrada se le añade una plataforma
 nueva con el mismo ID con `pendientes --plataformas <p>`; si la pieza ya está publicada, apunta a
-su carpeta: `pendientes --plataformas <p> --carpeta "CEO_Sergete\REVISADOS\<id>\2. Publicados"`.
+su carpeta: `pendientes --plataformas <p> --carpeta "CEO_Sergete\REELS\<id>\2. Publicados"`.
 
 ## Carruseles (contrato con TheHistoria)
 

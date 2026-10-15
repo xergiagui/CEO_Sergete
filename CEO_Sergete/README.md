@@ -15,7 +15,7 @@ PruebasIA/
 │   ├── ceo.py                 órdenes diarias sin subagente (hoy, semana, huecos, aprobar, estado)
 │   ├── docs/alta_proyecto.md  pasos para dar de alta un proyecto
 │   ├── .claude/agents/        un subagente por departamento
-│   ├── REVISADOS/<proyecto>/  1. pte Publicar · 2. Publicados   (fuera de git)
+│   ├── REELS/<proyecto>/      1. pte Publicar · 2. Publicados   (fuera de git)
 │   ├── HISTORIAS/<proyecto>/  1. Pte publicar · 2. Publicadas   (fuera de git)
 │   ├── .env                   Supabase compartido (fuera de git)
 │   └── supabase/              ceo_tasks.sql (historial opcional)
@@ -59,7 +59,7 @@ parte. Detalle en [`CLAUDE.md`](CLAUDE.md) → «Añadir un proyecto».
 
 ## Flujo de publicación
 
-1. Apruebas clips o carruseles (`py ceo.py aprobar …`) → pasan a `REVISADOS/<proyecto>/1. pte Publicar`.
+1. Apruebas clips o carruseles (`py ceo.py aprobar …`) → pasan a `REELS/<proyecto>/1. pte Publicar`.
 2. TheCopy escribe copy y hashtags (con auditoría) y el calendario les pone fecha y hora.
 3. Cada día: «¿qué publico hoy?» (`py ceo.py hoy`) → pieza, hora y texto listo para pegar.
 4. Al publicar, mueves la pieza a `2. Publicados`: el calendario lo detecta solo la próxima

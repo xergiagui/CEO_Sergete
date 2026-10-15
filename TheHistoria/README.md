@@ -155,7 +155,7 @@ Post del feed de **2–10 imágenes 4:5 (1080×1350)**. **Lleva copy y hashtags*
 [`CLAUDE.md`](CLAUDE.md#carruseles) y en `proyectos/<id>/reglas.md`.
 
 ```powershell
-# Qué hay hecho (plan / en salidas / en REVISADOS / publicado) y vídeos de _Historico
+# Qué hay hecho (plan / en salidas / en REELS / publicado) y vídeos de _Historico
 ..\TheEditor\.venv\Scripts\python.exe carruseles.py --listar --proyecto mongemalo
 
 # Material para escribir el plan (texto sin tiempos + cortes + clips + campos válidos)
@@ -164,7 +164,7 @@ Post del feed de **2–10 imágenes 4:5 (1080×1350)**. **Lleva copy y hashtags*
 # Generar (valida, audita y renderiza; con errores no escribe nada)
 ..\TheEditor\.venv\Scripts\python.exe carruseles.py --plan proyectos\mongemalo\planes\clientes-toxicos.json
 
-# OK: a REVISADOS/<id>/1. pte Publicar/ (imprime la orden de TheCopy)
+# OK: a REELS/<id>/1. pte Publicar/ (imprime la orden de TheCopy)
 ..\TheEditor\.venv\Scripts\python.exe carruseles.py --aprobar carrusel_20261013-1741_clientes-toxicos --proyecto mongemalo
 ```
 
@@ -172,8 +172,8 @@ Post del feed de **2–10 imágenes 4:5 (1080×1350)**. **Lleva copy y hashtags*
 |---|---|
 | `--plan RUTA` | plan.json de entrada |
 | `--fuente VIDEO\|RUTA` | imprime la fuente compacta: el `.txt` de la transcripción en párrafos sin tiempos (o los `textos/*.txt` de una carpeta de extractos; el `.srt` sin tiempos solo si no hay `.txt`), títulos y frases de `cortes.json`, clips para la portada y los campos válidos. Admite ruta (relativa a PruebasIA), nombre exacto o aproximado de un vídeo de `_Historico/<id>/` o `TheEditor/proyectos/<id>/transcripciones/`, o un `articulo.md` de `TheTextos/textos/<id>/` |
-| `--listar` | carruseles del proyecto (slug, tema, fórmula, fuente, fecha y estado: plan / en salidas / en REVISADOS / publicado) y vídeos de `_Historico/<id>` por fecha con cuántos carruseles tiene cada uno |
-| `--aprobar CARPETA` | mueve la carpeta entera a `CEO_Sergete/REVISADOS/<id>/1. pte Publicar/` (nombre único; comprueba proyecto y QC) e imprime `copys.py pendientes --proyecto <id> --clip <carpeta>` |
+| `--listar` | carruseles del proyecto (slug, tema, fórmula, fuente, fecha y estado: plan / en salidas / en REELS / publicado) y vídeos de `_Historico/<id>` por fecha con cuántos carruseles tiene cada uno |
+| `--aprobar CARPETA` | mueve la carpeta entera a `CEO_Sergete/REELS/<id>/1. pte Publicar/` (nombre único; comprueba proyecto y QC) e imprime `copys.py pendientes --proyecto <id> --clip <carpeta>` |
 | `--proyecto ID` | con `--plan`, opcional: manda el `proyecto` del plan y debe coincidir; en el resto, obligatorio si hay más de un proyecto |
 | `--destino DIR` | pruebas: carpeta base de la salida (`--plan`) o destino (`--aprobar`) |
 | `--solo-validar` | valida, comprueba que el texto cabe y audita; no escribe nada (no hace falta antes del render: el render ya valida) |
@@ -184,7 +184,7 @@ Post del feed de **2–10 imágenes 4:5 (1080×1350)**. **Lleva copy y hashtags*
 
 **Re-render del mismo slug**: si en la carpeta de salida hay otra
 `carrusel_<fecha>_<slug>/` sin aprobar, se borra tras un render correcto (no se
-acumulan carpetas). Las aprobadas ya están en REVISADOS y no se tocan.
+acumulan carpetas). Las aprobadas ya están en REELS y no se tocan.
 
 Códigos de salida: `0` OK · `1` errores de validación o QC · `2` uso, proyecto o
 fichero ilegible.
@@ -246,7 +246,7 @@ fichero ilegible.
   `credito`; cierre sin `peticion`.
 - **Material del proyecto** (portada): `proyectos/<id>/`, `_Historico/<id>/`,
   `TheEditor/proyectos/<id>/`, `TheDescarga/descargas/<id>/`,
-  `CEO_Sergete/{REVISADOS,HISTORIAS}/<id>/`, el banco común si la política es
+  `CEO_Sergete/{REELS,HISTORIAS}/<id>/`, el banco común si la política es
   `banco_comun` y las carpetas de `carruseles.material_extra` del `proyecto.json`.
 - **Auditoría de estilo (TheCopy):** una sola llamada para todo el carrusel,
   `TheCopy\.venv\Scripts\python.exe TheCopy\copys.py auditar --solo-estilo --json --proyecto <id> --stdin`
@@ -273,7 +273,7 @@ texto, …}]`, `creado` y los extras del plan (`portada_fondo`, `portada_texto`;
 en las slides `numero`, `puntos`, `peticion`). Los textos conservan `**…**`.
 
 Al dar OK: `carruseles.py --aprobar <carpeta>` (mueve la carpeta entera a
-`CEO_Sergete/REVISADOS/<id>/1. pte Publicar/`) y después `copy` con la orden que
+`CEO_Sergete/REELS/<id>/1. pte Publicar/`) y después `copy` con la orden que
 imprime.
 
 ### Diseño (`proyectos/<id>/estilo.json` + identidad)

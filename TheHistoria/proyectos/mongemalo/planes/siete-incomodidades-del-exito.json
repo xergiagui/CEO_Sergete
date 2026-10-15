@@ -1,0 +1,21 @@
+{
+  "tipo": "carrusel",
+  "proyecto": "mongemalo",
+  "slug": "siete-incomodidades-del-exito",
+  "tema": "Las siete incomodidades que separan a quien aprende de quien lo deja",
+  "formula": "IG5_lista",
+  "objetivo": "guardados",
+  "pilar": "educativo",
+  "fuente": {"tipo": "tema", "ruta": "CEO_Sergete/mails/El email más corto y valioso que recibirás hoy.eml", "credito": "Ideas de Luis Monge"},
+  "slides": [
+    {"titulo": "7 cosas **incómodas** que el éxito exige", "texto": "La última, casi nadie"},
+    {"titulo": "La humildad de admirar", "texto": "Reconocer que alguien ya hace bien lo que tú quieres hacer. Admirar a quien va por delante es el **primer paso**."},
+    {"titulo": "La pereza de estudiar", "texto": "Estudiar cuesta, y casi siempre apetece menos que cualquier otra cosa. Toca hacerlo **aunque dé pereza**."},
+    {"titulo": "El aburrimiento de copiar", "texto": "Copiar lo que ya funciona aburre. Es parte del camino y no hay que saltárselo, solo **aguantarlo**."},
+    {"titulo": "El cansancio de repetir", "texto": "Repetir una y otra vez cansa. Lo que se repite **se acaba dominando**."},
+    {"titulo": "La vergüenza de fracasar", "texto": "Fracasar da vergüenza. Es el precio de intentarlo, así que **asúmelo** y sigue."},
+    {"titulo": "El dolor de criticarte", "texto": "Mirar tus propios errores duele. Criticarte con honestidad es lo que te permite **corregir**."},
+    {"titulo": "La soledad de perseverar", "texto": "Perseverar se hace muchas veces sin compañía. Es la incomodidad que **casi nadie** aguanta."},
+    {"titulo": "Las 7 incomodidades, de un vistazo", "puntos": ["Admirar con humildad", "Estudiar aunque dé pereza", "Copiar aunque aburra", "Repetir aunque canse", "Fracasar sin vergüenza", "Criticarte aunque duela", "Perseverar en soledad"], "texto": "No sobrecompliques el éxito.", "peticion": "Guárdalo para cuando te pese alguna."}
+  ]
+}

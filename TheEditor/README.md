@@ -120,7 +120,7 @@ subtítulos palabra a palabra, una sola vez. Salida en `finales/`. Exporta
 .venv\Scripts\python.exe qc.py --proyecto <id> "<video|carpeta>"      :: una línea por clip + finales\_qc.jpg
 .venv\Scripts\python.exe proyecto.py aprobar <id> --video "<video|carpeta>" [--clips a.mp4,b.mp4] [--cerrar]
 ```
-`aprobar` mueve los finales a `CEO_Sergete/REVISADOS/<id>/1. pte Publicar/` y, si
+`aprobar` mueve los finales a `CEO_Sergete/REELS/<id>/1. pte Publicar/` y, si
 `finales/` queda vacío, archiva el vídeo (y su fuente) en `_Historico/<id>/<v>/`.
 
 ## Corregir un solo clip (`--solo`)

@@ -39,7 +39,7 @@ CLI:
     python proyecto.py nuevo <id> --nombre "Nombre" [--tipo clipping|largos]
     python proyecto.py aprobar <id> --video "<video|carpeta>" [--clips a.mp4,b.mp4]
                                [--cerrar] [--destino-pruebas <dir>]
-        -> mueve los finales aprobados a CEO_Sergete/REVISADOS/<id>/1. pte Publicar/
+        -> mueve los finales aprobados a CEO_Sergete/REELS/<id>/1. pte Publicar/
            y, si finales/ queda vacío (o con --cerrar), archiva transcripciones/<v>/
            en PruebasIA/_Historico/<id>/<v>/ (sin _prep/) y la fuente de input/ en
            …/<v>/_fuente/.
@@ -64,7 +64,7 @@ BANCO_MUSICA = RAIZ / "musicas"            # banco común de música
 SKILL_DIR = RAIZ / ".claude" / "skills" / "Editor_Sergio"
 PRUEBAS_IA = RAIZ.parent
 HISTORICO = PRUEBAS_IA / "_Historico"                # aprobados: <id>/<video>/
-REVISADOS = PRUEBAS_IA / "CEO_Sergete" / "REVISADOS"  # <id>/1. pte Publicar/
+REELS = PRUEBAS_IA / "CEO_Sergete" / "REELS"  # <id>/1. pte Publicar/
 PTE_PUBLICAR = "1. pte Publicar"
 EXT_VIDEO = (".mp4", ".mkv", ".mov", ".avi", ".webm", ".m4a", ".mp3", ".wav")
 EXT_CLIPS = (".mp4", ".mov", ".m4v", ".mkv")   # clips ya cortados (vía 2)
@@ -633,7 +633,7 @@ def _fuente_en_input(p: Proyecto, v: str) -> Path | None:
 
 
 def _cmd_aprobar(a) -> int:
-    """Mueve los finales aprobados a REVISADOS y, al cerrar, archiva el vídeo."""
+    """Mueve los finales aprobados a REELS y, al cerrar, archiva el vídeo."""
     p = cargar(a.id)
     v = (a.video or "").strip().rstrip("/\\")
     if v.lower().endswith(".mp4"):
@@ -661,9 +661,9 @@ def _cmd_aprobar(a) -> int:
         raise ProyectoError(f"[!] No hay finales que aprobar en {fin} (usa --cerrar para archivar).")
 
     pruebas = Path(a.destino_pruebas).resolve() if a.destino_pruebas else None
-    revisados = (pruebas / "REVISADOS") if pruebas else REVISADOS
+    reels = (pruebas / "REELS") if pruebas else REELS
     historico = (pruebas / "_Historico") if pruebas else HISTORICO
-    destino = revisados / p.id / PTE_PUBLICAR
+    destino = reels / p.id / PTE_PUBLICAR
     hist = historico / p.id / v
     restantes = [x for x in disponibles if x not in pedidos]
     cerrar = bool(a.cerrar or not restantes)
@@ -673,7 +673,7 @@ def _cmd_aprobar(a) -> int:
         raise ProyectoError(f"[!] Ya existe {hist}: no archivo encima. Revísalo antes "
                             f"(no se ha movido nada).")
     if pruebas:
-        print(f"[aprobar] MODO PRUEBA: destino {pruebas} (ni REVISADOS ni _Historico reales).")
+        print(f"[aprobar] MODO PRUEBA: destino {pruebas} (ni REELS ni _Historico reales).")
 
     destino.mkdir(parents=True, exist_ok=True)
     for name in pedidos:
@@ -736,7 +736,7 @@ def main() -> int:
     n.add_argument("id")
     n.add_argument("--nombre", required=True)
     n.add_argument("--tipo", choices=TIPOS, default=None)
-    ok = sub.add_parser("aprobar", help="mueve finales aprobados a REVISADOS y archiva el vídeo")
+    ok = sub.add_parser("aprobar", help="mueve finales aprobados a REELS y archiva el vídeo")
     ok.add_argument("id")
     ok.add_argument("--video", required=True, help="Vídeo (vía 1) o carpeta de extractos (vía 2).")
     ok.add_argument("--clips", default=None,
@@ -744,7 +744,7 @@ def main() -> int:
     ok.add_argument("--cerrar", action="store_true",
                     help="Archiva el vídeo aunque queden finales sin aprobar.")
     ok.add_argument("--destino-pruebas", default=None,
-                    help="Raíz de prueba en vez de REVISADOS y _Historico reales.")
+                    help="Raíz de prueba en vez de REELS y _Historico reales.")
     a = ap.parse_args()
     if a.cmd == "nuevo":
         return _cmd_nuevo(a)

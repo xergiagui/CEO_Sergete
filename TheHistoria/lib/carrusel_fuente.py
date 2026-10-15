@@ -5,14 +5,18 @@ CARRUSELES · material para escribir el plan, en el menor nº de tokens.
                    transcripción en párrafos SIN tiempos (del `.txt`; nunca del
                    `.json` de Whisper) + títulos y frases de su `cortes.json` +
                    clips para la portada. También admite un `articulo.md` de
-                   TheTextos (o su carpeta).
+                   TheTextos (o su carpeta) y un email `.eml` (por ruta o por
+                   nombre, de CEO_Sergete/mails/): asunto + cuerpo, tipo `tema`.
   listado          `carruseles.py --listar`: carruseles del proyecto (plan / en
-                   salidas / en REVISADOS / publicado) y vídeos de `_Historico`
+                   salidas / en REELS / publicado) y vídeos de `_Historico`
                    con cuántos carruseles tiene cada uno.
 """
 from __future__ import annotations
 
 import datetime as dt
+import email
+import email.policy
+import html
 import json
 import re
 import unicodedata
@@ -61,11 +65,12 @@ def resolver_fuente(arg: str, proyecto: Proyecto) -> Path:
             return cand
     bases = [proyecto.historico_dir, proyecto.transcripciones_dir, proyecto.textos_dir]
     dirs = [d for b in bases if b.is_dir() for d in sorted(b.iterdir()) if d.is_dir()]
-    exactos = [d for d in dirs if d.name == arg]
+    dirs += _emails_disponibles()                     # los .eml de CEO_Sergete/mails
+    exactos = [d for d in dirs if arg in (d.name, d.stem if d.is_file() else d.name)]
     if exactos:
         return exactos[0]
     q = _plano(arg)
-    aprox = [d for d in dirs if q and q in _plano(d.name)]
+    aprox = [d for d in dirs if q and q in _plano(d.stem if d.is_file() else d.name)]
     if len(aprox) == 1:
         return aprox[0]
     if len(aprox) > 1:
@@ -74,6 +79,40 @@ def resolver_fuente(arg: str, proyecto: Proyecto) -> Path:
     disp = [d.name for d in dirs]
     raise ProyectoError(f"no encuentro «{arg}» en el material de «{proyecto.id}». "
                         f"Disponibles: {' | '.join(disp) or '(ninguno)'}.")
+
+
+def _emails_disponibles() -> list[Path]:
+    return sorted(config.MAILS_DIR.glob("*.eml")) if config.MAILS_DIR.is_dir() else []
+
+
+def _html_a_texto(h: str) -> str:
+    h = re.sub(r"(?is)<(script|style|head).*?</\1>", " ", h)
+    h = re.sub(r"(?i)<br\s*/?>|</(p|div|li|tr|h[1-6]|table)>", "\n", h)
+    return html.unescape(re.sub(r"<[^>]+>", " ", h))
+
+
+def _email(eml: Path) -> str:
+    """Asunto + cuerpo de un .eml (quoted-printable/base64 ya decodificados; si solo
+    hay HTML, sin etiquetas). Sin cabeceras técnicas: remitente, rutas, etc."""
+    with eml.open("rb") as f:
+        msg = email.message_from_binary_file(f, policy=email.policy.default)
+    cuerpo = ""
+    for pref in ("plain", "html"):
+        parte = msg.get_body(preferencelist=(pref,))
+        if parte is None:
+            continue
+        try:
+            cuerpo = parte.get_content()
+        except (LookupError, UnicodeError):           # charset raro: byte a byte
+            cuerpo = (parte.get_payload(decode=True) or b"").decode("utf-8", "replace")
+        if pref == "html":
+            cuerpo = _html_a_texto(cuerpo)
+        if cuerpo.strip():
+            break
+    lineas = [re.sub(r"[ \t\xa0]+", " ", l).strip() for l in cuerpo.splitlines()]
+    cuerpo = re.sub(r"\n{3,}", "\n\n", "\n".join(lineas)).strip()
+    asunto = str(msg["subject"] or "").strip()
+    return (f"Asunto: {asunto}\n\n" if asunto else "") + (cuerpo or "(email sin cuerpo de texto)")
 
 
 def _parrafos(texto: str) -> str:
@@ -138,6 +177,12 @@ def _cortes(d: Path) -> list[str]:
 
 def fuente_compacta(path: Path, proyecto: Proyecto) -> tuple[str, str, str]:
     """(texto para imprimir, fuente.tipo sugerido, fuente.ruta)."""
+    if path.is_file() and path.suffix.lower() == ".eml":
+        # un email no tiene tipo propio en el plan: se usa `tema` (la ruta es informativa)
+        return _email(path), "tema", _rel(path)
+    if path.is_dir() and list(path.glob("*.eml")) and not list(path.glob("*.txt")):
+        return ("(carpeta de emails: indica uno con --fuente <nombre o ruta>)\n"
+                + "\n".join(f"- {e.name}" for e in sorted(path.glob("*.eml"))), "tema", _rel(path))
     if path.is_file() and path.suffix.lower() == ".md":
         return _articulo(path), "articulo", _rel(path)
     if path.is_dir() and (path / "articulo.md").exists():
@@ -183,12 +228,12 @@ def _leer_json(p: Path) -> dict | None:
 
 def carruseles(proyecto: Proyecto) -> list[dict]:
     """Un registro por slug con su estado más avanzado:
-    plan < en salidas < en REVISADOS < publicado."""
+    plan < en salidas < en REELS < publicado."""
     fuentes = [("plan", 0, p) for p in sorted(proyecto.planes_dir.glob("*.json"))
                if not p.name.startswith("_")]
     for estado, rango, base in (("en salidas", 1, proyecto.salidas_dir),
-                                ("en REVISADOS", 2, proyecto.revisados_pte),
-                                ("publicado", 3, proyecto.revisados_publicados)):
+                                ("en REELS", 2, proyecto.reels_pte),
+                                ("publicado", 3, proyecto.reels_publicados)):
         if base.is_dir():
             fuentes += [(estado, rango, d / "carrusel.json") for d in sorted(base.iterdir())
                         if d.is_dir() and (d / "carrusel.json").exists()]

@@ -215,7 +215,7 @@ def cmd_pendientes(args) -> int:
         return 1
     if not carpeta.exists():
         print(f"[!] No existe la carpeta pendiente de {p.nombre}: {carpeta}\n"
-              f"    La crea el CEO (CEO_Sergete/REVISADOS/{p.id}/…); hasta entonces no hay piezas que buscar.")
+              f"    La crea el CEO (CEO_Sergete/REELS/{p.id}/…); hasta entonces no hay piezas que buscar.")
         return 1
     plataformas = args.plataformas.split(",") if args.plataformas else p.plataformas_activas()
     for pid in plataformas:
@@ -954,7 +954,7 @@ def cmd_campos(args) -> int:
 def cmd_nuevo_proyecto(args) -> int:
     """Crea proyectos/<id>/ desde la plantilla (solo en TheCopy) y dice qué falta rellenar.
 
-    Las carpetas del CEO (REVISADOS/<id>, HISTORIAS/<id>) NO se crean aquí: si faltan, se avisa.
+    Las carpetas del CEO (REELS/<id>, HISTORIAS/<id>) NO se crean aquí: si faltan, se avisa.
     """
     proy.valida_id(args.id)
     if args.prefijo and args.prefijo.upper() in proy.prefijos_usados():

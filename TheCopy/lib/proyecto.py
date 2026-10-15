@@ -56,7 +56,7 @@ def dentro_de(ruta_hija: Path | str, carpeta: Path | str) -> bool:
 
 
 def _lleva_id(carpeta: Path, pid: str) -> bool:
-    """True si el id del proyecto es una de las carpetas de la ruta (…/REVISADOS/<id>/…)."""
+    """True si el id del proyecto es una de las carpetas de la ruta (…/REELS/<id>/…)."""
     return pid.lower() in (x.lower() for x in Path(carpeta).parts)
 
 

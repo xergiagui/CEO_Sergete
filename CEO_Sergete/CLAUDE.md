@@ -56,6 +56,13 @@ que hace un departamento.
   Si la línea `FALTAN` pide carruseles, **solo avísale en una línea** (`py ceo.py huecos`
   da la cifra); no los generes por tu cuenta. Al hacerlos, usa material de los clips
   aprobados más recientes (`carruseles.py --listar` para no repetir) y enséñale el `_vista.jpg`.
+- **Carruseles desde emails** (`mails/*.eml`): un `historia` por email, en paralelo,
+  con la ruta del .eml en `fuente.ruta` del plan (`carruseles.py --fuente` lee `.eml`).
+  No se aprueban ni pasan a `copy` sin el OK de Sergio. **Con su OK**, tras
+  `ceo.py aprobar carrusel` **borra de `mails/` el `.eml` de cada carrusel aprobado**
+  (el de su `fuente.ruta`), sin pedir confirmación: es orden permanente de Sergio. Solo
+  esos: si un carrusel no tiene la ruta en el plan y no sabes cuál era, pregunta; no
+  borres los emails de carruseles aún sin aprobar.
 - **Atrasados:** si `ceo.py semana` marca ATRASADOS, avisa y ofrece replanificarlos.
 - **Textos:** `textos` → el CEO lanza `blog-reviewer` con la carpeta (`articulo.md` +
   `schema.json` + tabla de datos del brief) y esta lista **N/A**: autor/bio, confianza del
@@ -71,7 +78,7 @@ que hace un departamento.
 - **Clipping:** clips en `TheEditor/proyectos/<id>/input/<carpeta>/` → `editor` (batch en 3
   pasos, solo recursos del proyecto).
 - **Publicación:** OK → `ceo.py aprobar …` → `copy` (copy + hashtags + calendario) →
-  Sergio publica y mueve la pieza a `REVISADOS/<id>/2. Publicados` (el calendario lo
+  Sergio publica y mueve la pieza a `REELS/<id>/2. Publicados` (el calendario lo
   detecta solo).
 
 ## Entorno

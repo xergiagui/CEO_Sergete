@@ -30,6 +30,7 @@ CEO_ROOT = PRUEBAS_IA / "CEO_Sergete"
 EDITOR_ROOT = PRUEBAS_IA / "TheEditor"
 DESCARGA_ROOT = PRUEBAS_IA / "TheDescarga"
 HISTORICO_DIR = PRUEBAS_IA / "_Historico"     # _Historico/<id>/<video>/
+MAILS_DIR = CEO_ROOT / "mails"                      # emails .eml de Sergio como fuente de carruseles
 TEXTOS_DIR = PRUEBAS_IA / "TheTextos" / "textos"   # textos/<id>/<AAAA-MM-DD>_<slug>/articulo.md
 # Índice común de proyectos (solo se lee): nombre, tipo y la IDENTIDAD de cada
 # uno (cuenta_ig, voz, palabras prohibidas, marca…). Fuente única: no se copia.
@@ -37,8 +38,8 @@ CEO_PROYECTOS_JSON = CEO_ROOT / "proyectos.json"
 
 # Carpetas de publicación (al aprobar con `--aprobar`). `{id}` = proyecto.
 HISTORIAS_PTE = CEO_ROOT / "HISTORIAS" / "{id}" / "1. Pte publicar"
-REVISADOS_PTE = CEO_ROOT / "REVISADOS" / "{id}" / "1. pte Publicar"
-REVISADOS_PUBLICADOS = CEO_ROOT / "REVISADOS" / "{id}" / "2. Publicados"
+REELS_PTE = CEO_ROOT / "REELS" / "{id}" / "1. pte Publicar"
+REELS_PUBLICADOS = CEO_ROOT / "REELS" / "{id}" / "2. Publicados"
 APROBADAS_LOG = "_aprobadas.log"              # salidas/<id>/_aprobadas.log (jsonl)
 
 # Caché local (git-ignored): última respuesta de `copys.py campos` por proyecto.

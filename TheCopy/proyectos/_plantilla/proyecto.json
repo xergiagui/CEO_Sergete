@@ -11,8 +11,8 @@
   ],
   "carpetas": {
     "_ayuda": "Relativas a PruebasIA/; <id> = id del proyecto. pendiente/publicado e historias las crea el CEO. contexto = dónde buscar cortes.json + .srt (largos) o textos/<clip>.txt (clipping) de cada clip.",
-    "pendiente": "CEO_Sergete/REVISADOS/<id>/1. pte Publicar",
-    "publicado": "CEO_Sergete/REVISADOS/<id>/2. Publicados",
+    "pendiente": "CEO_Sergete/REELS/<id>/1. pte Publicar",
+    "publicado": "CEO_Sergete/REELS/<id>/2. Publicados",
     "contexto": ["TheEditor/proyectos/<id>/transcripciones", "_Historico/<id>"]
   },
   "registro": "registro_PLANTILLA.xlsx",

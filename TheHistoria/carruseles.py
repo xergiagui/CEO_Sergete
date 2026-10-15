@@ -17,10 +17,11 @@ opcional y, si se da, debe coincidir. Maquetación: proyectos/<id>/estilo.json;
 colores, handle y emojis: identidad del proyecto (CEO_Sergete/proyectos.json).
 
 Uso:
-  python carruseles.py --fuente <video|ruta> [--proyecto ID]    material para el plan
+  python carruseles.py --fuente <video|ruta|email.eml> [--proyecto ID]  material para el plan
+                       (un .eml, por ruta o nombre de CEO_Sergete/mails/, sale como tipo `tema`)
   python carruseles.py --listar [--proyecto ID]                 qué hay hecho y de dónde
   python carruseles.py --plan proyectos/<id>/planes/<slug>.json [--solo-validar]
-  python carruseles.py --aprobar <carpeta> [--proyecto ID]      → REVISADOS/<id>/1. pte Publicar
+  python carruseles.py --aprobar <carpeta> [--proyecto ID]      → REELS/<id>/1. pte Publicar
   python carruseles.py --candidatos-portada <video.mp4> [--n 8] [--hoja ruta.jpg]
   (`--destino DIR` en --plan/--aprobar: otra carpeta base, para pruebas)
 
@@ -53,13 +54,13 @@ from lib.carrusel_render import (Maquetador, NoCabe, candidatos_portada, guardar
 def _args(argv=None):
     p = argparse.ArgumentParser(description="Genera un CARRUSEL de Instagram (4:5) desde un plan.json.")
     p.add_argument("--plan", help="ruta del plan.json")
-    p.add_argument("--fuente", metavar="VIDEO|RUTA",
+    p.add_argument("--fuente", metavar="VIDEO|RUTA|EMAIL",
                    help="imprime el material para escribir el plan (transcripción sin tiempos, "
-                        "cortes, clips y campos válidos)")
+                        "cortes, clips y campos válidos; de un .eml: asunto y cuerpo)")
     p.add_argument("--listar", action="store_true",
                    help="carruseles del proyecto con su estado y vídeos de _Historico")
     p.add_argument("--aprobar", metavar="CARPETA",
-                   help="mueve la carpeta del carrusel a REVISADOS/<id>/1. pte Publicar/")
+                   help="mueve la carpeta del carrusel a REELS/<id>/1. pte Publicar/")
     p.add_argument("--proyecto", default=None,
                    help="id del proyecto (con --plan, opcional: manda el del plan y debe coincidir)")
     p.add_argument("--destino", default=None,
@@ -97,7 +98,9 @@ def _fuente(args) -> int:
     print(f"# Fuente · proyecto «{proyecto.id}»\n"
           f"\"fuente\": {json.dumps(fuente, ensure_ascii=False)}"
           + (f"   (credito por defecto: «{proyecto.credito_defecto}»)"
-             if tipo == "video" and proyecto.credito_defecto else "") + "\n")
+             if tipo == "video" and proyecto.credito_defecto else "")
+          + ("   (tema: pon `credito` a mano si quieres pie, p. ej. «Ideas de <autor>»)"
+             if tipo == "tema" else "") + "\n")
     print(texto)
     campos, origen = thecopy.campos(proyecto.id)
     print(f"\n## Campos del plan (de {origen})\n{thecopy.resumen_campos(campos)}")
@@ -115,7 +118,7 @@ def _listar(args) -> int:
 
 
 def _aprobar(args) -> int:
-    """Mueve la carpeta del carrusel a REVISADOS/<id>/1. pte Publicar/ (nombre único)."""
+    """Mueve la carpeta del carrusel a REELS/<id>/1. pte Publicar/ (nombre único)."""
     arg = Path(args.aprobar)
     carpeta = None
     for cand in ([arg] if arg.is_absolute() else [Path.cwd() / arg, config.PROJECT_ROOT / arg]):
@@ -157,7 +160,7 @@ def _aprobar(args) -> int:
         for f in fallos:
             print(f"  - {f}")
         return 1
-    base = Path(args.destino).resolve() if args.destino else proyecto.revisados_pte
+    base = Path(args.destino).resolve() if args.destino else proyecto.reels_pte
     base.mkdir(parents=True, exist_ok=True)
     destino = nombre_unico(base, carpeta.name)
     shutil.move(str(carpeta), str(destino))
@@ -299,7 +302,7 @@ def _carpeta_salida(base: Path, slug: str) -> Path:
 
 def _salidas_previas(base: Path, slug: str, nueva: Path) -> list[Path]:
     """Salidas NO aprobadas del mismo slug en `base` (las aprobadas ya no están
-    aquí: viven en REVISADOS). Se sustituyen tras un render correcto."""
+    aquí: viven en REELS). Se sustituyen tras un render correcto."""
     patron = re.compile(r"^carrusel_\d{8}-\d{4}_" + re.escape(slug) + r"$")
     if not base.is_dir():
         return []

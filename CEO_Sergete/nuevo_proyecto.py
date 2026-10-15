@@ -35,8 +35,8 @@ TEXTO = {".json", ".md", ".txt"}        # archivos donde se sustituyen <id> y <N
 
 def carpetas_datos(pid: str) -> list[Path]:
     return [
-        CEO / "REVISADOS" / pid / "1. pte Publicar",
-        CEO / "REVISADOS" / pid / "2. Publicados",
+        CEO / "REELS" / pid / "1. pte Publicar",
+        CEO / "REELS" / pid / "2. Publicados",
         CEO / "HISTORIAS" / pid / "1. Pte publicar",
         CEO / "HISTORIAS" / pid / "2. Publicadas",
         RAIZ / "_Historico" / pid,

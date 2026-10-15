@@ -47,8 +47,8 @@ TIPOS = {
 # Cada proyecto las fija en su proyecto.json (carpetas.* y calendario.historias.carpeta);
 # esto solo se usa si allí falta alguna. Las carpetas del CEO las crea el CEO, no TheCopy.
 CARPETAS_POR_DEFECTO = {
-    "pendiente": "CEO_Sergete/REVISADOS/<id>/1. pte Publicar",
-    "publicado": "CEO_Sergete/REVISADOS/<id>/2. Publicados",
+    "pendiente": "CEO_Sergete/REELS/<id>/1. pte Publicar",
+    "publicado": "CEO_Sergete/REELS/<id>/2. Publicados",
     "historias": "CEO_Sergete/HISTORIAS/<id>/1. Pte publicar",
 }
 

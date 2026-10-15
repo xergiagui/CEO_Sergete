@@ -130,12 +130,12 @@ class Proyecto:
         return Path(str(config.HISTORIAS_PTE).format(id=self.id))
 
     @property
-    def revisados_pte(self) -> Path:
-        return Path(str(config.REVISADOS_PTE).format(id=self.id))
+    def reels_pte(self) -> Path:
+        return Path(str(config.REELS_PTE).format(id=self.id))
 
     @property
-    def revisados_publicados(self) -> Path:
-        return Path(str(config.REVISADOS_PUBLICADOS).format(id=self.id))
+    def reels_publicados(self) -> Path:
+        return Path(str(config.REELS_PUBLICADOS).format(id=self.id))
 
     @property
     def historico_dir(self) -> Path:
@@ -265,7 +265,7 @@ class Proyecto:
             config.HISTORICO_DIR / self.id,
             config.EDITOR_PROYECTOS_DIR / self.id,
             config.DESCARGA_ROOT / "descargas" / self.id,
-            config.CEO_ROOT / "REVISADOS" / self.id,
+            config.CEO_ROOT / "REELS" / self.id,
             config.CEO_ROOT / "HISTORIAS" / self.id,
         ]
         if self.broll == "banco_comun":

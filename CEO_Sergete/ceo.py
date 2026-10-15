@@ -169,7 +169,7 @@ def cmd_estado(a) -> int:
         # 2) bandejas
         def contar(c: Path, patron: str = "*") -> int:
             return sum(1 for _ in c.glob(patron)) if c.exists() else 0
-        rev = CEO / "REVISADOS" / pid / "1. pte Publicar"
+        rev = CEO / "REELS" / pid / "1. pte Publicar"
         his = CEO / "HISTORIAS" / pid / "1. Pte publicar"
         sal = DEP["historia"] / "salidas" / pid
         inp = DEP["editor"] / "proyectos" / pid / "input"

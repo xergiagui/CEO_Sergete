@@ -23,4 +23,4 @@ escribir: de tú, y Luis Monge siempre en tercera persona (nunca hablar como él
 
 ## Publicación (por script)
 - Historias: `historias.py --aprobar <tanda>` → `CEO_Sergete/HISTORIAS/mongemalo/1. Pte publicar/`.
-- Carruseles: `carruseles.py --aprobar <carpeta>` → `CEO_Sergete/REVISADOS/mongemalo/1. pte Publicar/` (+ `copy`).
+- Carruseles: `carruseles.py --aprobar <carpeta>` → `CEO_Sergete/REELS/mongemalo/1. pte Publicar/` (+ `copy`).
