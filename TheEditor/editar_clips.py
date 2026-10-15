@@ -79,10 +79,13 @@ import validar  # noqa: E402
 WORKBASE = RAIZ / "whisper"
 
 
+EXT_VIDEO = {".mp4", ".mov", ".mkv", ".webm", ".m4v", ".avi", ".wmv", ".flv", ".mpg", ".mpeg", ".ts", ".mts"}
+
+
 def resolver_nombre(arg: str) -> str:
     """Nombre del video (para ubicar transcripciones/<nombre>/)."""
     p = Path(arg)
-    return p.stem if p.suffix else arg
+    return p.stem if p.suffix.lower() in EXT_VIDEO else p.name
 
 
 def guardar_frases_virales(nombre: str, cortes_path: Path,

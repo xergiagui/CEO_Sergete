@@ -187,3 +187,8 @@ Salida en `~/Desktop/viral_pipeline_output/<Avatar>/<slug>/`. Corre con el
 `.venv` de TheEditor y baja con `..\TheDescarga\tools\yt-dlp.exe`. El setup solo
 se salta si `env.json` tiene las claves de HeyGen y ElevenLabs (`setup.py
 faltan` dice `SETUP_OK` o cuáles faltan).
+
+## Nombre del vídeo (`resolver_nombre`)
+`editar_clips.py` quita solo extensiones de vídeo conocidas (`.mp4 .mov .mkv .webm .m4v
+.avi…`); cualquier otro punto es parte del título («Tengo 41 Años. Si Estás…» se pasa
+igual con o sin `.mp4`).
