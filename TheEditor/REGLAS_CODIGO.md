@@ -74,6 +74,11 @@ línea en blanco tras una pausa de más de 1,5 s.
 - **Un solo recorte FIJO por plano** (por corte de cámara); nunca sub-ventanas
   ni microrreajustes. Los cortes de escena se detectan a 320 px.
 - En primeros planos se centra la **cara dominante** (Haar + filtro de piel YCrCb).
+  Si en un plano el filtro de piel descarta la cara real (gradación fría o
+  contraluz: Cr < 133, p. ej. la terraza de Monge) y solo deja pasar falsos
+  positivos del fondo (ladrillo), se usan las frontales **sin filtro**: solo si
+  son ≥ 2× las filtradas (y ≥ 4), estables (MAD de cx ≤ 8 % del ancho) y no más
+  pequeñas (`_usar_brutas` en `clips.py`). Con piel normal no cambia nada.
 - La detección de hablante por movimiento de boca está **desactivada** (poco
   fiable). No se reactiva sin que Sergio lo pida.
 - Fuente ya vertical (alto ≥ 1,7 × ancho, con la rotación aplicada): solo se
