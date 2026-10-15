@@ -6,6 +6,7 @@
 # OJO: nunca «git clean -x» en la raíz (borraría todo lo ignorado).
 /*
 !/.gitignore
+!/.gitattributes
 !/README.md
 
 !/CEO_Sergete/
