@@ -45,7 +45,7 @@ que hace un departamento.
 | «OK al carrusel» | `py ceo.py aprobar carrusel --proyecto <id> "<carpeta>"` → `copy` |
 | «OK a las historias» | `py ceo.py aprobar historias --proyecto <id> <tandas>\|--todas` (sin copy) |
 | «¿qué falta del proyecto X?» | `py ceo.py estado --proyecto <id>` |
-| «descárgame esto» (sin editar) | `cmd //c ..\TheDescarga\descargar.bat "URL" best <id>` |
+| «descárgame esto» (sin editar) | `py ..\TheDescarga\descargar.py "URL" best <id>` |
 
 ## Reglas de orquestación
 - **Avatar IA** (Editor_Sergio): **excluido por decisión de Sergio** (sin claves de

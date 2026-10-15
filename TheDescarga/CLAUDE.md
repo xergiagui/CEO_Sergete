@@ -18,6 +18,10 @@ local. Lo dirige CEO_Sergete con el subagente `descarga`. Uso detallado en
 - Contenido privado o que pide login: `--cookies-from-browser chrome`.
 - El aviso de «JavaScript runtime» es normal. Si falla una web que antes iba,
   actualiza primero: `tools\yt-dlp.exe -U`.
+- **Desde Bash (Git Bash) usa siempre `py descargar.py "URL" [modo] <proyecto>`** (mismos argumentos y
+  salida que el .bat). `cmd //c descargar.bat` parte la URL en `=`/`&` y falla (el ID acaba como
+  calidad: «Invalid filter specification»). Prueba sin descargar: `DESCARGA_SIMULAR=1 py descargar.py "URL"`.
+  Desde PowerShell o doble clic vale `descargar.bat "URL" ...` (con comillas).
 - **Lo normal:** `descargar.bat "URL" [modo] <proyecto>`. Va en silencio, imprime **solo la
   ruta final** del archivo y sale con código ≠ 0 si falla (no hace falta listar la carpeta).
 
