@@ -55,8 +55,11 @@ Global: 6 % / 0,15 s (`proyecto.json → silencios`); nunca lo cambies. Si un cl
 - Vía 1: `clips.py … --solo <clip> --umbral 3% --margen 0.3s` → `editar_clips.py … --solo <clip> --sin-frases`.
 - Vía 2: `procesar_batch_clip.py … "<CARPETA>" --solo "<clip>" --umbral 3% --margen 0.3s --sin-frases`.
 
+## Subtítulos de la fuente
+Si el vídeo largo trae subtítulos o rótulos incrustados, el render de la vía 1 los tapa solo (desenfoque mientras están en pantalla) cuando el proyecto lo tiene activo en `proyecto.json → subs_fuente` (`proyecto.py ver` lo enseña; hoy, `mongemalo`). La línea del clip dice `subs fuente tapados N`. Si en un clip se escapa alguno o el desenfoque molesta, corrige solo ese clip (`--solo <clip> --sin-frases`, y `--sin-tapar-subs` para quitarlo).
+
 ## QC
-`qc.py --proyecto <id> "<video|carpeta>"`: una línea por clip (`OK`/`REVISAR`/`FALLA`) y `finales/_qc.jpg`. Mira la hoja: gancho en el primer fotograma, cola limpia y sin restos de superposiciones. Nada con `FALLA` se entrega.
+`qc.py --proyecto <id> "<video|carpeta>"`: una línea por clip (`OK`/`REVISAR`/`FALLA`) y `finales/_qc.jpg`. Mira la hoja: gancho en el primer fotograma, cola limpia y sin restos de superposiciones ni texto de la fuente bajo nuestros subtítulos. Nada con `FALLA` se entrega.
 
 ## Al dar OK
 Por script, nunca a mano:

@@ -110,6 +110,22 @@ línea en blanco tras una pausa de más de 1,5 s.
   cruza un fin de frase ni una pausa larga y cabe en la zona segura (920 px).
   Un grupo que no cabe en pantalla se parte. Dos grupos nunca se solapan.
 
+## Subtítulos incrustados de la fuente (vía 1)
+
+`subs_fuente.py`, paso previo de `editar_clips.py` si el proyecto lo pide
+(`proyecto.json → subs_fuente.tapar`: `desenfoque` | `banda` | `no`; sin la
+clave, no se hace nada). Lee el clip 9:16 a 30 fps en la franja `zona_y`
+(1290–1920 de 1920, bajo nuestros subtítulos, que acaban en ~1280) y marca los
+fotogramas con rótulo blanco sobre caja oscura; alarga cada tramo durante el
+fundido del rótulo. Por tramo, tapa solo su altura (+40 px de margen) y solo
+mientras dura: desenfoque fuerte con 24 px de borde suave (`sigma` 70) o banda
+negra al 85 %. Va sobre el plano del ponente, antes del gancho visual, el b-roll,
+el gancho de texto y nuestros subtítulos, que quedan encima. Audio, duración y
+fotogramas no cambian; sin rótulos, el clip no se recodifica. Si falla, avisa y
+el clip sale sin tapar. `--sin-tapar-subs` lo quita en una ejecución; prueba
+suelta: `subs_fuente.py --proyecto <id> "<clip>.mp4" [--salida x.mp4] [--modo …]`.
+La vía 2 no lo usa.
+
 ## Gancho de texto (render)
 
 PNG transparente (`render_hook_text_png`) en la franja superior (bajo el 12,5 %

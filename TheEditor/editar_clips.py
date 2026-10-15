@@ -18,6 +18,10 @@ Por cada clip de proyectos/<id>/transcripciones/<video>/clips/ aplica:
   b-roll (banco común superposiciones/ o el propio del proyecto) + música (banco
   común musicas/ o la propia) + de-click + subtitulos palabra a palabra (una sola
   vez, enmascarando palabrotas).
+  Antes de todo eso, si el proyecto lo pide (`proyecto.json → subs_fuente`), se
+  tapan los rótulos/subtítulos que la FUENTE trae incrustados en la franja
+  inferior, solo mientras están en pantalla (ver subs_fuente.py;
+  `--sin-tapar-subs` lo desactiva en una ejecución).
 
 Reproducible: la música y el b-roll al azar salen de una semilla con el nombre
 del clip, así que re-renderizar un clip (--solo) da lo mismo y no cambia los
@@ -66,6 +70,7 @@ sys.path.insert(0, str(RAIZ / ".claude" / "skills" / "Editor_Sergio"))
 import pipeline_core as pc  # noqa: E402
 import herramientas  # noqa: E402
 import proyecto  # noqa: E402
+import subs_fuente  # noqa: E402
 import validar  # noqa: E402
 
 # Raíz ASCII bajo la que se crea el work dir ÚNICO por ejecución (ver main()).
@@ -201,6 +206,8 @@ def linea_clip(name: str, info: dict, visual: bool) -> str:
            f"b-roll {info.get('broll', 0)} ({info.get('broll_sem', 0)} sem) · música {mus}")
     if visual:
         out += f" · visual {info.get('gancho_visual') or 'no'}"
+    if info.get("subs_fuente") is not None:
+        out += f" · subs fuente tapados {info['subs_fuente']}"
     return out
 
 
@@ -221,6 +228,9 @@ def main():
                     help="Sin música en esta ejecución (p. ej. un proyecto propio aún sin música).")
     ap.add_argument("--sin-broll", action="store_true",
                     help="Sin b-roll en esta ejecución.")
+    ap.add_argument("--sin-tapar-subs", action="store_true",
+                    help="No tapa los subtítulos incrustados de la fuente aunque el proyecto lo pida "
+                         "(proyecto.json → subs_fuente).")
     ap.add_argument("--solo", action="append", metavar="NOMBRE",
                     help="Solo este clip (repetible o separado por comas): corrige uno sin tocar los demás.")
     args = ap.parse_args()
@@ -232,6 +242,13 @@ def main():
     recursos = p.politica_render(sin_broll=args.sin_broll, sin_musica=args.sin_musica)
     sin_gancho_texto = args.sin_gancho_texto or not p.gancho_texto
     sin_frases = args.sin_frases or not p.guardar_frases
+    # Subtítulos incrustados en la fuente: config del proyecto (None = no se tapan).
+    try:
+        tapar_cfg = None if args.sin_tapar_subs else subs_fuente.config(p.cfg)
+    except ValueError as e:
+        raise SystemExit(f"[!] {e}")
+    if tapar_cfg:
+        print(f"   [subs fuente] se tapan: {subs_fuente.describir(tapar_cfg)}", flush=True)
 
     nombre = resolver_nombre(args.video)
     base = p.transcripciones_dir / nombre
@@ -320,8 +337,27 @@ def main():
         info = {}
         try:
             words = cargar_o_transcribir_words(clip, ascii_in, p.idioma)
+            base_in = ascii_in
+            if tapar_cfg:
+                # Paso previo: tapar los rótulos de la fuente en el plano del
+                # ponente (el gancho, el b-roll y nuestros subtítulos van encima).
+                # Si falla, se avisa y el clip sigue sin tapar (no rompe el render).
+                tapado = work / "in_tapado.mp4"
+                try:
+                    tramos = subs_fuente.tapar(ascii_in, tapado, tapar_cfg)
+                    print(f"   [subs fuente] {subs_fuente.resumen_tramos(tramos)}"
+                          + "".join(f"\n      {t['t0']:.2f}-{t['t1']:.2f} s · y {t['y0']}-{t['y1']}"
+                                    for t in tramos), flush=True)
+                    if tramos:
+                        base_in = tapado
+                    info["subs_fuente"] = len(tramos)
+                except Exception as e:
+                    traceback.print_exc(file=sys.stdout)
+                    proyecto.decir(f"AVISO {name}.mp4 · no pude tapar los subtítulos de la fuente "
+                                   f"({herramientas.describir_error(e)}): sale sin tapar")
+                    info["subs_fuente"] = "no (fallo)"
             pc.burn_subs_and_music(
-                ascii_in, MUSIC, out_tmp,
+                base_in, MUSIC, out_tmp,
                 lang=p.idioma, env=env, overlays_dir=OVERLAYS, hook_query=hook,
                 music_typology=music_typology, clip_text=clip_text,
                 words=words,

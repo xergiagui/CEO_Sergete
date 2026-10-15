@@ -6,7 +6,7 @@ Proyectos de TheEditor (cuentas o clientes de contenido).
 Cada proyecto vive en `proyectos/<id>/` (fuente de verdad):
 
     proyecto.json     tipo, idioma, recursos (política), encuadre, silencios,
-                      gancho y frases
+                      gancho, subs_fuente (tapar rótulos de la fuente) y frases
     reglas.md         reglas de edición propias del proyecto
     input/            buzón (vídeos largos, o clips ya cortados por subcarpetas)
     transcripciones/  trabajo y salidas (<video>/{clips,finales,cortes.json…})
@@ -766,6 +766,11 @@ def main() -> int:
               f"{(p.cfg.get('encuadre') or {}).get('carpetas') or '-'}")
         print(f"  silencios    {p.silencios}")
         print(f"  gancho texto {p.gancho_duracion or 2.5} s · frases etiqueta {p.etiqueta}")
+        try:
+            import subs_fuente
+            print(f"  subs fuente  {subs_fuente.describir(subs_fuente.config(p.cfg))}  (vía 1)")
+        except Exception as e:
+            print(f"  subs fuente  [!] {e}")
         reglas = p.dir / "reglas.md"
         print(f"\n--- {reglas.relative_to(RAIZ).as_posix()} ---")
         print(reglas.read_text(encoding="utf-8").strip() if reglas.exists() else "(no hay reglas.md)")

@@ -22,6 +22,21 @@ Estas reglas se suman a las generales de `TheEditor/CLAUDE.md`.
   (vía 1) y gancho de texto. Guarda frases en `viral_phrases` con la etiqueta
   `proyecto:mongemalo`.
 
+## Subtítulos incrustados de la fuente (vía 1)
+Los vídeos de YouTube de Luis traen rótulos quemados (texto blanco sobre caja
+oscura) que, al recortar a 9:16, salen cortados por los lados justo debajo de
+nuestros subtítulos. Decisión de Sergio (15-oct-2026): **se tapan siempre que
+aparezcan**.
+- Activo en `proyecto.json → subs_fuente: {"tapar": "desenfoque"}`. El render
+  los detecta en la franja inferior (y ≥ 1290 de 1920) y les pone un desenfoque
+  fuerte de bordes suaves **solo mientras están en pantalla** y a su altura;
+  nuestros subtítulos, el gancho y el b-roll van encima y no se tocan.
+- Alternativa: `"banda"` (banda negra al 85 %); `"no"` o quitar la clave lo
+  desactiva. Para un solo clip: `editar_clips.py … --solo <clip> --sin-frases
+  --sin-tapar-subs`.
+- En el QC, mira la franja bajo nuestros subtítulos (sobre todo el principio y
+  la cola): no debe asomar texto de la fuente.
+
 ## Encuadre de los extractos (vía 2)
 Los extractos van en `proyectos/mongemalo/input/<Largo N Extractos>/`. El modo de
 cada carpeta está en `proyecto.json → encuadre.carpetas` y el batch lo toma

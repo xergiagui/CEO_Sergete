@@ -22,6 +22,9 @@
   "gancho": {
     "texto_duracion_s": 2.5
   },
+  "subs_fuente": {
+    "tapar": "no"
+  },
   "frases": {
     "etiquetas_extra": []
   }

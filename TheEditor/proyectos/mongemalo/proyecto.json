@@ -30,6 +30,9 @@
   "gancho": {
     "texto_duracion_s": 2.5
   },
+  "subs_fuente": {
+    "tapar": "desenfoque"
+  },
   "frases": {
     "etiquetas_extra": []
   }
