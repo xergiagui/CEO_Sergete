@@ -528,11 +528,41 @@ def escalar_vertical(video: Path, destino: Path, ss: float = 0.0, t: float | Non
     return "vertical: solo escala"
 
 
-def quitar_silencios(origen, destino, umbral: str = "6%", margen: str = "0.15s"):
-    """auto-editor: ajuste global 6 % / 0,15 s (o el del proyecto)."""
+def fps_fuente(video: Path) -> str | None:
+    """Tasa nominal de la fuente ("30/1", "30000/1001"...) si es CONSTANTE
+    (r_frame_rate ≈ avg_frame_rate); None si no se lee o es VFR.
+
+    El concat por planos de `_render_segmentado` deja huecos de timestamps y la
+    media del intermedio baja (p. ej. 29,92 en vez de 30); sin fijar la tasa,
+    auto-editor la hereda y `qc.py` da FALLA por fps ≠ fuente."""
+    if not herramientas.FFPROBE:
+        return None
+    r = subprocess.run([herramientas.FFPROBE, "-v", "error", "-select_streams", "v:0",
+                        "-show_entries", "stream=r_frame_rate,avg_frame_rate",
+                        "-of", "json", str(video)],
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
+    try:
+        st = (json.loads(r.stdout or "{}").get("streams") or [{}])[0]
+        nominal = str(st.get("r_frame_rate") or "")
+
+        def _f(s):
+            n, _, d = str(s).partition("/")
+            return float(n) / float(d or 1)
+        if 10 <= _f(nominal) <= 61 and abs(_f(nominal) - _f(st.get("avg_frame_rate"))) <= 0.05:
+            return nominal
+    except (ValueError, ZeroDivisionError, TypeError):
+        pass
+    return None
+
+
+def quitar_silencios(origen, destino, umbral: str = "6%", margen: str = "0.15s",
+                     fps: str | None = None):
+    """auto-editor: ajuste global 6 % / 0,15 s (o el del proyecto). Con `fps`
+    (ver `fps_fuente`), el clip sale a la tasa de la fuente."""
     run([PY, "-m", "auto_editor", str(origen),
-         "--edit", f"audio:threshold={umbral}", "--margin", margen,
-         "-o", str(destino), "--no-open"])
+         "--edit", f"audio:threshold={umbral}", "--margin", margen]
+        + (["--frame-rate", fps] if fps else [])
+        + ["-o", str(destino), "--no-open"])
 
 
 def main():
@@ -589,6 +619,7 @@ def main():
     salida.mkdir(parents=True, exist_ok=True)
     tmp.mkdir(parents=True, exist_ok=True)
     src_w, src_h = probe_dims(video)
+    src_fps = fps_fuente(video)
     vertical = herramientas.es_vertical(src_w, src_h)
     encuadre = ("fuente vertical: solo escala" if vertical else
                 "seguimiento de cara ON" if _CV2_OK
@@ -612,7 +643,8 @@ def main():
                 desc = escalar_vertical(video, vert, ss=ini, t=fin - ini)
             else:
                 desc = cortar_vertical(video, ini, fin, vert, src_w=src_w, src_h=src_h)
-            quitar_silencios(vert, final, umbral=sil["umbral"], margen=sil["margen"])
+            quitar_silencios(vert, final, umbral=sil["umbral"], margen=sil["margen"],
+                             fps=src_fps)
         except Exception as e:
             fallos.append(cn)
             proyecto.decir(f"FALLO {cn}.mp4 · {herramientas.describir_error(e)} (detalle en el log)")

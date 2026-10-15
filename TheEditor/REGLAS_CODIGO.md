@@ -159,6 +159,9 @@ marcas ajenas, matrículas, datos privados ni marcas de agua (los b-roll con
 -bufsize 24M`), AAC 192k 48 kHz estéreo (`pipeline_core.VIDEO_ENC`/`AUDIO_ENC`,
 las tres vías). `qc.py` comprueba todo eso más negros (0,25 s), congelados (2 s)
 y silencios (−40 dB, 1,5 s).
+- Vía 1: `clips.py` pasa a auto-editor `--frame-rate` con la tasa nominal de la
+  fuente (`fps_fuente`, solo si es constante). El concat por planos deja huecos
+  de timestamps y, sin eso, el clip heredaba la media (29,92 en vez de 30).
 
 ## Bancos
 
