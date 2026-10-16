@@ -221,7 +221,8 @@ pasa por aquí.
   `finales/<clip>.portada.jpg` (fotograma de `portada_t` + título en panel).
 - QC (`trailer.qc_clip`): gancho visible 0–3 s y CTA al final comparando los fotogramas con
   sus PNG, choques de cajas con el manifiesto, audio = original por correlación por
-  ventanas tras alinear cada tramo (FALLA < 0,97 de mediana o < 0,92 de p10), metadatos sin
+  ventanas a 48 kHz tras alinear cada tramo (FALLA < 0,97 de mediana o < 0,92 de p10;
+  REVISAR < 0,985 o < 0,98), metadatos sin
   editores, duración y portada. No cuentan los negros del propio tráiler, la cartela fija
   de la CTA ni el silencio de su cola.
 - Genérico para cualquier proyecto: `silencios.quitar: false` (clips.py y el batch no

@@ -1152,9 +1152,12 @@ def _audio_mono(cmd_in: list[str], sr=8000):
 def _correlacion_audio(mp4: Path, man: dict, c: Config) -> tuple[float | None, float | None]:
     """(mediana, p10) de la correlación por ventanas de 1 s entre el audio del clip
     y los tramos originales del tráiler (≈1 = solo audio original; una música o una
-    voz añadidas la bajan). Alinea cada tramo antes (retardo del códec AAC)."""
+    voz añadidas la bajan). Alinea cada tramo antes (retardo del códec AAC).
+    Se mide a 48 kHz, la frecuencia del render: los cortes y el retardo caen en
+    muestras enteras. A 8 kHz el desfase podía quedar en media muestra y la
+    correlación de las ventanas con agudos bajaba a ~0,77 con audio idéntico."""
     import numpy as np
-    sr = 8000
+    sr = 48000
     out = _audio_mono(["-i", str(mp4)], sr).astype(np.float64)
     cors = []
     for tr in man["tramos"]:
@@ -1163,7 +1166,7 @@ def _correlacion_audio(mp4: Path, man: dict, c: Config) -> tuple[float | None, f
         ref = _audio_mono(["-ss", f"{tr['inicio']:.3f}", "-t", f"{d:.3f}", "-i", str(src)],
                           sr).astype(np.float64)
         o = int(round(tr["salida"] * sr))
-        m = 600                                    # ±75 ms de margen para alinear
+        m = int(0.075 * sr)                        # ±75 ms de margen para alinear
         seg = out[max(0, o - m):o + len(ref) + m]
         pre = o - max(0, o - m)
         if len(seg) < len(ref) // 2 or len(ref) < sr:
@@ -1279,10 +1282,11 @@ def qc_clip(p, mp4: Path, dur: float) -> dict:
     if med is None:
         out["avisos"].append("audio: no se pudo medir la correlación")
     elif med < 0.97 or p10 < 0.92:
-        # (calibrado: el original da ~0,99/0,98; con un fondo añadido a -11 dB, 0,97/0,86)
+        # (calibrado a 48 kHz: el original da ≥0,998/0,990; con ruido, tonos o música
+        # añadidos a -11 dB, 0,95–0,96/0,70–0,89; con un fondo a -16/-17 dB, ~0,99/0,91–0,96)
         out["fallos"].append(f"audio no coincide con el original (corr. med {med:.3f}, p10 "
                              f"{p10:.3f}): ¿música o voz añadidas?")
-    elif med < 0.985:
+    elif med < 0.985 or p10 < 0.98:
         out["avisos"].append(f"audio: correlación con el original algo baja (med {med:.3f}, "
                              f"p10 {p10:.3f}): escúchalo")
     else:
