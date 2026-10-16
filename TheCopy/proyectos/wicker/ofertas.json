@@ -1,0 +1,10 @@
+{
+  "_ayuda": "WICKER no tiene ofertas, landing ni afiliado: el destino es la cuenta oficial @vertice360_spain. Sin campo 'oferta' en campos_extra.",
+  "generico": {
+    "id": "generico",
+    "nombre": "Genérico",
+    "cta": "",
+    "cuando_usarla": "No aplica (sin ofertas)."
+  },
+  "ofertas": []
+}

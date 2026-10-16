@@ -9,6 +9,7 @@ distintas. Viaja con la pieza al moverla de «pte Publicar» a «Publicados».
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 
@@ -39,10 +40,26 @@ def escribir(proyecto, ruta: Path, filas: list[dict]) -> Path | None:
         if f.get("Título"):
             lineas += [f"Título: {f['Título']}", ""]
         lineas.append(str(f.get("Texto para pegar") or "").strip())
+        lineas += _checklist(proyecto, _pid(proyecto, f.get("Plataforma")), nombre, str(f.get("Copy") or ""))
 
     destino = ruta_txt(ruta)
     destino.write_text("\n".join(lineas) + "\n", encoding="utf-8")
     return destino
+
+
+def _checklist(proyecto, pid: str | None, nombre: str, copy: str) -> list[str]:
+    """Checklist de publicación (NO es parte del caption), si la plataforma la define:
+    proyecto.json → plataformas.<p>.checklist_publicacion = {titulo, lineas: ["... {clip} {ubicacion}"],
+    ubicacion: {por_defecto, ciudades}}. {ubicacion} = la ciudad que nombre el caption o la de por defecto."""
+    chk = (proyecto.plataforma(pid).get("checklist_publicacion") if pid else None) or {}
+    if not chk.get("lineas"):
+        return []
+    ub = chk.get("ubicacion") or {}
+    ciudad = next((c for c in ub.get("ciudades") or [] if re.search(rf"\b{re.escape(c)}\b", copy, re.IGNORECASE)),
+                  ub.get("por_defecto") or "")
+    out = ["", f"── {chk.get('titulo') or 'CHECKLIST DE PUBLICACIÓN (no forma parte del caption)'} ──"]
+    out += [f"[ ] {l.format(clip=nombre, ubicacion=ciudad)}" for l in chk["lineas"]]
+    return out
 
 
 def _pid(proyecto, nombre_plat) -> str | None:

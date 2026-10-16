@@ -144,6 +144,9 @@ class Conf:
         self.franjas = {k: a_hora(v) for k, v in (c.get("franjas") or {}).items() if not k.startswith("_")}
         self.segunda = a_hora(c.get("segunda_franja")) if c.get("segunda_franja") else None
         self.semanas = int(c.get("semanas_por_defecto") or 2)
+        # Ventana de la campaña (opcional, AAAA-MM-DD): no se planifica antes de `inicio` ni después de `fin`.
+        self.inicio = a_fecha(c.get("inicio")) if c.get("inicio") else None
+        self.fin = a_fecha(c.get("fin")) if c.get("fin") else None
         self.reserva_dias = int(c.get("reserva_formatos_dias", 7))
         self.prioridad_dias = int(c.get("prioridad_tras_dias", 14))
         b = c.get("balance") or {}
@@ -368,7 +371,12 @@ def planificar(proyecto, piezas: list[Pieza], inicio: dt.date, semanas: int, hoy
                replanificar_atrasados: bool = False) -> dict:
     """Pone fecha y hora a las piezas Pendientes sin fecha. Modifica las Pieza en sitio."""
     cfg = Conf(proyecto)
+    cfg0 = Conf(proyecto)
+    if cfg0.inicio and inicio < cfg0.inicio:
+        inicio = cfg0.inicio
     fin = lunes(inicio) + dt.timedelta(days=7 * max(1, semanas) - 1)
+    if cfg0.fin:
+        fin = min(fin, cfg0.fin)
     res = {"cfg": cfg, "inicio": inicio, "fin": fin, "hoy": hoy, "asignadas": [], "horas": [],
            "movidas": [], "atrasadas": [], "atrasadas_manuales": [], "sin_hueco": []}
     vivas = [p for p in piezas if p.estado != "Descartado"]

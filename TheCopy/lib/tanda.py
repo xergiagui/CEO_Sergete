@@ -61,6 +61,7 @@ def esqueleto(proyecto, piezas: list[dict]) -> dict:
         extra = {c["id"]: (pz.get("extra") or {}).get(c["id"]) or "" for c in proyecto.campos_extra()}
         if "oferta" in extra and not extra["oferta"]:
             extra["oferta"] = sugerir_oferta(proyecto, ctx)
+        tipo = proyecto.tipo_de_clip(Path(pz["ruta"]).name) if proyecto.tipos_clip else None
         clips.append({
             "clip": Path(pz["ruta"]).name,
             "formato": pz.get("formato") or "reel",
@@ -68,7 +69,10 @@ def esqueleto(proyecto, piezas: list[dict]) -> dict:
             "contexto": ctx,
             "tema": pz.get("tema") or str(ctx.get("titulo") or ctx.get("tema") or ""),
             "extra": extra,
-            "hashtags_temas": sugerir_temas(proyecto, ctx),
+            **({"tipo_clip": {"tipo": tipo, "caption_literal": proyecto.tipos_clip["tipos"][tipo]["caption"],
+                              "hashtags": " ".join(proyecto.hashtags_de_tipo(tipo))}} if tipo else
+               {"tipo_clip": {"tipo": None, "aviso": "el nombre del clip no empieza por la letra de tipo"}}
+               if proyecto.tipos_clip else {"hashtags_temas": sugerir_temas(proyecto, ctx)}),
             "plataformas": {p: hueco_plataforma(proyecto.conf_formato(p, pz.get("formato") or "reel"))
                             for p in pz["plataformas"]},
         })
@@ -192,7 +196,8 @@ def hashtags_finales(proyecto, pid: str, tematicos: list[str]) -> list[str]:
     for t in proyecto.fijos(pid) + [normalizar_hashtag(t) for t in tematicos]:
         if t and t not in out:
             out.append(t)
-    return out
+    # Con tipos_clip, cada etiqueta sale con las mayúsculas literales del briefing (#WickerLaPelicula).
+    return [proyecto.literal_hashtag(t) for t in out] if proyecto.tipos_clip else out
 
 
 def elegir_hashtags(proyecto, pid: str, temas: list[str], forzados: list[str],
@@ -316,6 +321,15 @@ def validar(proyecto, tanda: dict, copys_existentes: dict[str, dict[str, str]],
     recientes = recientes or {}
     vistos: dict[str, set[str]] = {}
     sets_tanda: dict[str, dict[frozenset[str], str]] = {}
+    # tipos_clip: tipos que ya tienen algún clip registrado (por plataforma) y los vistos en esta tanda
+    tipos_reg: dict[str, dict[str, set[str]]] = {}
+    if proyecto.tipos_clip:
+        for pid_, copys in copys_existentes.items():
+            for cl in copys.values():
+                t_ = proyecto.tipo_de_clip(cl)
+                if t_:
+                    tipos_reg.setdefault(pid_, {}).setdefault(t_, set()).add(cl.lower())
+    tipos_tanda: dict[str, set[str]] = {}
 
     for c in clips:
         et = c.get("clip") or "(sin nombre)"
@@ -404,6 +418,22 @@ def validar(proyecto, tanda: dict, copys_existentes: dict[str, dict[str, str]],
                     avisos.append(f"{ep} estilo: {h.mensaje}")
                     estilo.append(avisos[-1])
                 # "literal": frase literal del clip → se permite, no se avisa
+
+            # --- tipos_clip: hashtags y caption literal según el tipo (letra) del nombre del clip ---
+            if proyecto.tipos_clip:
+                tipo = proyecto.tipo_de_clip(et)
+                if tipo is None:
+                    errores.append(f"{ep} el nombre del clip tiene que empezar por la letra del tipo "
+                                   f"({', '.join(proyecto.tipos_clip['tipos'])}) según tipos_clip.patron "
+                                   f"«{proyecto.tipos_clip.get('patron')}».")
+                else:
+                    b["hashtags"] = proyecto.hashtags_de_tipo(tipo)  # siempre los del tipo, literales y en orden
+                    literal = proyecto.tipos_clip["tipos"][tipo]["caption"]
+                    ya = bool(tipos_reg.get(pid, {}).get(tipo, set()) - {et.lower()}) or tipo in tipos_tanda.get(pid, set())
+                    tipos_tanda.setdefault(pid, set()).add(tipo)
+                    if not ya and " ".join(copy.split()) != " ".join(literal.split()):
+                        errores.append(f"{ep} es el primer clip del tipo «{tipo}»: el caption va LITERAL de la tabla del "
+                                       f"briefing: «{literal}».")
 
             # --- hashtags (automáticos si vienen hashtags_temas y faltan) ---
             temas = b.get("hashtags_temas") or c.get("hashtags_temas")
@@ -517,7 +547,7 @@ def _validar_hashtags(proyecto, pid: str, bloque: dict, pool: set[str], clip: st
 
     # --- rotación: no repetir el mismo conjunto de temáticos ---
     conjunto = frozenset(tem)
-    if conjunto:
+    if conjunto and not proyecto.tipos_clip:  # con tipos_clip los conjuntos son fijos por tipo: no se rotan
         en_tanda = sets_tanda.setdefault(pid, {})
         if conjunto in en_tanda and en_tanda[conjunto].lower() != clip.lower():
             avisos.append(f"mismo conjunto de temáticos que {en_tanda[conjunto]} en esta tanda: rótalos.")

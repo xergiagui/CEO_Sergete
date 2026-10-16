@@ -292,6 +292,19 @@ def cmd_pendientes(args) -> int:
                 ids = {v: k for k, v in (p.valores_campo(campo) or {}).items()}
                 bloque["extra"][campo["id"]] = ids.get(visible, visible) or ""
 
+    # tipos_clip: ¿es la primera vez que sale ese tipo? (sí → caption LITERAL de la tabla; no → variante)
+    if p.tipos_clip:
+        vistos = {str(d.get("Clip") or "").lower() for _, d in (reg.filas() if reg else [])}
+        tipos_hechos: set[str] = set()  # tipos ya vistos antes, en esta misma tanda
+        for bloque in tanda["clips"]:
+            tc = bloque["tipo_clip"]
+            if tc.get("tipo"):
+                ya_en_reg = any(p.tipo_de_clip(x) == tc["tipo"] and x != bloque["clip"].lower() for x in vistos)
+                tc["primera_vez"] = not ya_en_reg and tc["tipo"] not in tipos_hechos
+                tc["regla"] = ("caption = caption_literal, tal cual" if tc["primera_vez"] else
+                               "variante distinta de las ya usadas (keyword al principio, España, 1 línea, ≤ 1 emoji)")
+                tipos_hechos.add(tc["tipo"])
+
     n_r = len(clips)
     n_c = len(carrs)
     print(f"Proyecto {p.nombre} · carpeta: {carpeta}")
@@ -724,6 +737,8 @@ def _linea_sync(sync: dict, guardado: bool) -> str | None:
 def _cal_planificar(args, p, cfg, excel: Path, reg: Registro, sync: dict, carpeta_hist: Path | None,
                     hoy: dt.date) -> int:
     inicio = _fecha_arg(args.desde, "--desde") or hoy + dt.timedelta(days=1)
+    if cfg.inicio and inicio < cfg.inicio:
+        inicio = cfg.inicio  # ventana de la campaña (calendario.inicio / calendario.fin)
     semanas = args.semanas or cfg.semanas
     piezas = _piezas(p, reg, sync, BuscadorMetadatos(p))
     ilegibles = [pz for pz in piezas if pz.fecha is None and _celda_llena(reg, pz, "Fecha prevista")]
@@ -888,7 +903,7 @@ def _cal_ver(args, p, cfg, excel: Path, reg: Registro, sync: dict, carpeta_hist:
     if linea:
         print(linea)
     for w in semanas:
-        b = cal.balance(w, piezas, cfg, manana, dt.date.max, hist_por_dia, hoy)
+        b = cal.balance(w, piezas, cfg, max(manana, cfg.inicio or manana), cfg.fin or dt.date.max, hist_por_dia, hoy)
         print("\n" + cal.linea_semana(b))
         lineas = [(pz.momento, f"  {cal.dia_corto(pz.cuando)} {cal.hhmm(pz.hora) or '--:--'}  {pz.fmt:<9} {pz.id}  "
                                f"{pz.clip:<34} {pz.objetivo or '—'} · {pz.pilar or '—'}{cal._marca(pz, hoy)}")

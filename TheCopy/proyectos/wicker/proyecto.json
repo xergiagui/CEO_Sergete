@@ -1,0 +1,240 @@
+{
+  "id": "wicker",
+  "nombre": "WICKER",
+  "descripcion": "Campaña de clipping de WICKER (Vértice 360 España) para su estreno en cines el 30-oct-2026: Reels con material oficial para generar visitas en IG y llevar tráfico a @vertice360_spain.",
+  "_identidad": "Cuenta, landing, afiliado, voz (persona, tono, idioma, emojis_max), palabras prohibidas y marca: CEO_Sergete/proyectos.json → identidad (fuente única; la añade el CEO, no se copia aquí).",
+  "prefijo_id": "WK",
+  "tipo": "clipping",
+  "_tipo": "largos (vídeos largos cortados en clips por TheEditor) | clipping (vídeos ya cortados que entrega el proyecto). El mismo que en CEO_Sergete/proyectos.json.",
+  "como_reconocerlo": [
+    "Clips de la película WICKER (Vértice 360 España) hechos con el material oficial del briefing.",
+    "El nombre del clip empieza por la letra del tipo del briefing y un guion bajo: a_…, b_…, c_…, d_…, e_… (contrato con TheEditor)."
+  ],
+  "carpetas": {
+    "_ayuda": "Relativas a PruebasIA/; <id> = id del proyecto. pendiente/publicado e historias las crea el CEO. contexto = dónde buscar cortes.json + .srt (largos) o textos/<clip>.txt (clipping) de cada clip.",
+    "pendiente": "CEO_Sergete/REELS/<id>/1. pte Publicar",
+    "publicado": "CEO_Sergete/REELS/<id>/2. Publicados",
+    "contexto": [
+      "TheEditor/proyectos/<id>/transcripciones",
+      "_Historico/<id>"
+    ]
+  },
+  "registro": "registro_wicker.xlsx",
+  "reglas_copy": [
+    "Solo Instagram y solo Reels. El briefing manda al 100 %: nada que no venga en él.",
+    "Una sola línea: keyword WICKER al principio, «España» o «cines de España», español de España (peli, en cines, flipar, vosotras).",
+    "La PRIMERA vez que sale cada tipo (a–e), el caption es LITERAL de la tabla de TIPOS DE CLIP. Las siguientes, variantes distintas entre sí: keyword al principio, España, una línea, como mucho 1 emoji y el tono del briefing. Ganchos de comentario permitidos: «¿Con quién vas a ir a verla?», «Etiqueta a tu amiga de Madrid que necesita un marido de mimbre», «Barcelona, ¿estáis preparadas?».",
+    "Sin hashtags dentro (los 5 del tipo los pone el script), sin la mención @vertice360_spain (la añade el script) y sin URL. Sin CTA a la bio: el destino es la cuenta oficial.",
+    "Prohibido: críticas o reseñas (embargo hasta el 17-oct 10:45 y fuera del material), destripar el final, cifras o datos que no estén en el briefing, lenguaje explícito, giros de otros países.",
+    "Datos permitidos: reparto (Olivia Colman, Alexander Skarsgård, Peter Dinklage, Elizabeth Debicki), Sundance 2026 (estreno mundial), BFI London Film Festival (estreno europeo), clausura de Sitges 2026 y estreno en todos los cines de España el 30 de octubre.",
+    "Estilo: lo marca el auditor al registrar; corrige los avisos reescribiendo."
+  ],
+  "campos_extra": [
+    {
+      "id": "objetivo",
+      "columna": "Objetivo",
+      "obligatorio": true,
+      "valores": [
+        "guardados",
+        "compartidos",
+        "comentarios",
+        "seguidores"
+      ],
+      "ayuda": "señal que busca la pieza: guardados = lista, método o pasos; compartidos = algo que se le manda a alguien; comentarios = situación que invita a responder; seguidores = historia, antes/después"
+    },
+    {
+      "id": "pilar",
+      "columna": "Pilar",
+      "obligatorio": true,
+      "valores": [
+        "educativo",
+        "historia",
+        "interaccion",
+        "promocion"
+      ],
+      "ayuda": "educativo = enseña; historia = historia contada; interaccion = situación con la que se identifica la audiencia; promocion = solo si la pieza va sobre todo de vender un producto. En los carruseles vienen de carrusel.json; en los Reels se eligen al escribir el copy"
+    }
+  ],
+  "calendario": {
+    "activo": true,
+    "_nota_campana": "Ventana de la campaña (briefing): 1 Reel al día del lunes 19 al viernes 30 de octubre de 2026 (12 huecos, fines de semana incluidos), ni antes ni después. Horas: las mismas por defecto que el resto de proyectos (lun-vie 13:30, dom 20:30; el sábado cae en segunda_franja 20:30).",
+    "zona_horaria": "Europe/Madrid",
+    "inicio": "2026-10-19",
+    "fin": "2026-10-30",
+    "publicaciones_semana": 7,
+    "dias": [
+      "lun",
+      "mar",
+      "mie",
+      "jue",
+      "vie",
+      "sab",
+      "dom"
+    ],
+    "franjas": {
+      "lun": "13:30",
+      "mar": "13:30",
+      "mie": "13:30",
+      "jue": "13:30",
+      "vie": "13:30",
+      "dom": "20:30"
+    },
+    "segunda_franja": "20:30",
+    "semanas_por_defecto": 2,
+    "reserva_formatos_dias": 7,
+    "prioridad_tras_dias": 14,
+    "balance": {
+      "formato_min": {},
+      "objetivo_min": {},
+      "pilar_max": {},
+      "evitar_seguidas": []
+    },
+    "historias": {
+      "carpeta": "",
+      "por_dia_min": 0,
+      "por_dia_max": 0
+    }
+  },
+  "plataformas": {
+    "instagram": {
+      "activa": true,
+      "nombre": "Instagram",
+      "formatos": {
+        "reel": {}
+      },
+      "max_caracteres": 2200,
+      "copy_recomendado": [
+        40,
+        220
+      ],
+      "requiere_titulo": false,
+      "cta_obligatorio": false,
+      "gancho_max": 125,
+      "_ayuda": "Caption de 1 sola línea (briefing). formato_texto añade la mención @vertice360_spain tras el caption y luego los 5 hashtags del tipo (tipos_clip). permitir_cebos: ganchos de comentario del briefing que el auditor marcaría. copy_reglas: ver lib/auditoria.py → reglas_copy.",
+      "hashtags": {
+        "tematicos_min": 5,
+        "tematicos_max": 5,
+        "total_min": 5,
+        "total_max": 5
+      },
+      "formato_texto": "{copy} @vertice360_spain {hashtags}",
+      "guia": "Caption de Reel: UNA línea, keyword WICKER al principio y España. Sin hashtags, sin @ y sin URL dentro: el script añade @vertice360_spain y los 5 hashtags del tipo.",
+      "permitir_cebos": [
+        "^etiqueta\\s+a\\s+tu$"
+      ],
+      "copy_reglas": {
+        "una_linea": true,
+        "debe_incluir": [
+          "España"
+        ],
+        "keyword": "WICKER",
+        "keyword_max_pos": 40,
+        "sin_url": true,
+        "prohibido": [
+          {
+            "regex": "@",
+            "motivo": "la mención @vertice360_spain la añade el script (no la escribas en el copy)"
+          },
+          {
+            "regex": "(?<![\\w])(?!(?:30|2026)\\b)\\d+",
+            "motivo": "cifra o dato que no está en el briefing (solo valen «30 de octubre» y «2026»)"
+          },
+          {
+            "regex": "\\b(?:millones?|miles|millar(?:es)?)\\b|[€$%]",
+            "motivo": "cifra o dato que no está en el briefing"
+          },
+          {
+            "regex": "cr[ií]tic|rese[ñn]a|estrellas?\\b|puntuaci[oó]n|calificaci[oó]n|valoraci[oó]n|rotten|metacritic|imdb|filmaffinity|\\bnota\\b",
+            "motivo": "críticas y reseñas: embargo hasta el 17-oct 10:45 y no son parte del material"
+          },
+          {
+            "regex": "spoiler|destrip|\\bfinal(?:es)?\\b|\\bdesenlace\\b|\\bmuere\\b|\\bmueren\\b|\\bmat[oó]\\b",
+            "motivo": "no se destripa el final"
+          },
+          {
+            "regex": "\\bsex(?:o|ual|uales|ualmente)\\b|desnud|porn|er[oó]tic|org[ií]a|orgasm|\\bfoll|\\bco[ñn]o\\b|\\bpolla\\b|\\bputa\\b|\\bjoder\\b|\\bmierda\\b|\\bcarajo\\b|\\bcojones\\b|\\bpene\\b|\\bteta",
+            "motivo": "lenguaje explícito: picante sí, explícito no"
+          },
+          {
+            "regex": "\\bustedes\\b|\\bch[eé]vere\\b|\\bg[uü]ey\\b|\\bwey\\b|\\bchido\\b|\\bbac[aá]n\\b|\\bparcero\\b|\\bahorita\\b|\\bplaticar\\b|\\bcelular\\b|\\bboletos?\\b|\\bpochoclos?\\b|\\bpiola\\b|\\bche\\b|\\bvos\\b",
+            "motivo": "giro de otro país: español de España (peli, en cines, flipar, vosotras)"
+          }
+        ]
+      },
+      "checklist_publicacion": {
+        "titulo": "CHECKLIST DE PUBLICACIÓN (no forma parte del caption)",
+        "lineas": [
+          "Etiquetar a @vertice360_spain en la publicación («Etiquetar personas»).",
+          "Ubicación: {ubicacion}.",
+          "Portada: {clip}.portada.jpg (junto al vídeo; lleva uno de los títulos de portada del briefing)."
+        ],
+        "ubicacion": {
+          "por_defecto": "España",
+          "ciudades": [
+            "Madrid",
+            "Barcelona",
+            "Valencia",
+            "Sevilla"
+          ]
+        }
+      }
+    }
+  },
+  "tipos_clip": {
+    "_ayuda": "Contrato con TheEditor: el nombre del clip empieza por la letra del tipo y un guion bajo (a_…, b_…). Tabla literal del briefing (Keywords por tipo de clip). Los hashtags salen SIEMPRE los 5 del tipo, literales y en ese orden. La primera vez de cada tipo el caption es el literal; las siguientes, variantes.",
+    "patron": "^([a-e])_",
+    "nota": "1.ª vez de cada tipo: caption LITERAL. Siguientes: variantes distintas (keyword al principio, España, 1 línea, ≤ 1 emoji).",
+    "tipos": {
+      "a": {
+        "caption": "WICKER, el marido de mimbre que todas queremos 🧺 en todos los cines de España el 30 de octubre",
+        "hashtags": [
+          "#WickerLaPelicula",
+          "#Romantasy",
+          "#MaridoDeMimbre",
+          "#EstrenosEspaña",
+          "#CineEspaña"
+        ]
+      },
+      "b": {
+        "caption": "WICKER junta a Olivia Colman, Alexander Skarsgård y Peter Dinklage 😍 en cines de España el 30 de octubre",
+        "hashtags": [
+          "#WickerLaPelicula",
+          "#AlexanderSkarsgard",
+          "#OliviaColman",
+          "#CarteleraEspaña",
+          "#España"
+        ]
+      },
+      "c": {
+        "caption": "WICKER, el romantasy que las lectoras estábamos esperando 📚 en los cines de España el 30 de octubre",
+        "hashtags": [
+          "#WickerLaPelicula",
+          "#Romantasy",
+          "#BookTok",
+          "#EstrenosEspaña",
+          "#CinesEspaña"
+        ]
+      },
+      "d": {
+        "caption": "¿Con quién vas a ir a ver WICKER en Madrid? 🔥 En cines de España el 30 de octubre",
+        "hashtags": [
+          "#WickerLaPelicula",
+          "#MonsterRomance",
+          "#Fantasía",
+          "#CineEspaña",
+          "#España"
+        ]
+      },
+      "e": {
+        "caption": "WICKER, el plan de cine para el 30 de octubre en toda España 🎬",
+        "hashtags": [
+          "#QuéVerEnElCine",
+          "#WickerLaPelicula",
+          "#Comedia",
+          "#EstrenosEspaña",
+          "#CinesEspaña"
+        ]
+      }
+    }
+  }
+}

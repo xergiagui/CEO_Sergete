@@ -17,6 +17,8 @@ Niveles de cada hallazgo:
              slides del carrusel. Se permite: no cuenta como aviso.
 
 Configuración (conf efectiva = identidad < plataforma < formato, ver Proyecto.conf_formato):
+  permitir_cebos  lista de regex: cebos concretos que el proyecto permite a propósito.
+  copy_reglas  reglas de caption propias del proyecto (ver reglas_copy); no se aplican en solo_estilo.
   gancho_max   máx. de caracteres de la primera frase/línea.
   emojis_max   máx. de emojis en el copy (identidad.voz.emojis_max salvo que la plataforma
                lo sobrescriba; sin valor = no se comprueba).
@@ -264,6 +266,41 @@ def _corto(t: str, n: int = 70) -> str:
     return t if len(t) <= n else t[: n - 1] + "…"
 
 
+def reglas_copy(texto: str, reglas: dict | None) -> list[Hallazgo]:
+    """Reglas de caption propias de un proyecto (proyecto.json → plataformas.<p>.copy_reglas). Todas ERROR.
+
+      una_linea        true: el caption no lleva saltos de línea.
+      debe_incluir     lista: textos que tienen que aparecer (sin distinguir mayúsculas ni tildes).
+      keyword          texto que tiene que salir en los primeros `keyword_max_pos` caracteres (def. 60).
+      sin_url          true: ni http(s):// ni www. ni dominios.
+      prohibido        lista de {"regex": "...", "motivo": "..."} (sin distinguir mayúsculas).
+    """
+    out: list[Hallazgo] = []
+    r = reglas or {}
+    if not r or not (texto or "").strip():
+        return out
+    if r.get("una_linea") and "\n" in texto.strip():
+        out.append(Hallazgo("error", "una_linea", "el caption tiene que ser UNA sola línea (sin saltos de línea)."))
+    for x in r.get("debe_incluir") or []:
+        if normalizar(x) not in normalizar(texto):
+            out.append(Hallazgo("error", "debe_incluir", f"falta «{x}» en el caption.", x))
+    kw = r.get("keyword")
+    if kw:
+        mx = int(r.get("keyword_max_pos") or 60)
+        pos = texto.find(kw)
+        if pos < 0 or pos > mx:
+            out.append(Hallazgo("error", "keyword", f"la keyword «{kw}» tiene que estar al principio "
+                                                    f"(en los primeros {mx} caracteres).", kw))
+    if r.get("sin_url") and re.search(r"https?://|www\.|\b[\w-]+\.(?:com|es|net|org|io|ly)\b", texto, I):
+        out.append(Hallazgo("error", "url", "ninguna URL en el caption: el destino es la cuenta oficial."))
+    for item in r.get("prohibido") or []:
+        m = re.search(item["regex"], texto, I)
+        if m:
+            out.append(Hallazgo("error", "prohibido", f"«{m.group(0)}»: {item.get('motivo', 'prohibido en este proyecto')}.",
+                                m.group(0)))
+    return out
+
+
 # ------------------------------------------------------------------ auditoría
 def auditar(texto: str, conf_plat: dict | None = None, contexto: dict | None = None,
             plataforma: str = "", solo_estilo: bool = False, identidad: dict | None = None) -> list[Hallazgo]:
@@ -289,16 +326,24 @@ def auditar(texto: str, conf_plat: dict | None = None, contexto: dict | None = N
                                 f"gancho de {len(g)} caracteres (máx. {mx}): «{_corto(g, 60)}». "
                                 "Acórtalo para que se entienda antes del «más».", g))
 
-    # ERROR · cebos y cierres vacíos (no tienen excepción de literal)
+    # ERROR · cebos y cierres vacíos (no tienen excepción de literal; salvo los que el proyecto
+    # permita a propósito con conf.permitir_cebos: lista de regex, p. ej. los ganchos de un briefing)
+    permitidos = [re.compile(x, I) for x in conf.get("permitir_cebos") or []]
     for regla in ("cebo", "cierre_vacio"):
         for rx in _C[regla]:
             for m in rx.finditer(texto):
+                if regla == "cebo" and any(pp.search(m.group(0)) for pp in permitidos):
+                    continue
                 out.append(Hallazgo("error", regla, MENSAJES[regla].format(f=_corto(m.group(0))), m.group(0)))
 
     # ERROR · palabras prohibidas de la identidad (sin excepciones)
     ident = identidad or {}
     for frag in palabras_prohibidas(texto, ident.get("palabras_prohibidas") or []):
         out.append(Hallazgo("error", "palabra_prohibida", MENSAJES["palabra_prohibida"].format(f=frag), frag))
+
+    # ERROR · reglas propias del proyecto (conf.copy_reglas), solo en el caption completo
+    if not solo_estilo:
+        out += reglas_copy(texto, conf.get("copy_reglas"))
 
     # AVISO · estilo (salvo que sea literal del clip)
     vistos: set[tuple[int, int]] = set()

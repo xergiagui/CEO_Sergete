@@ -142,6 +142,7 @@ class Proyecto:
                                    f"(usa {', '.join(config.FORMATOS)}).")
             errores += self._comprobar_cuotas(pid)
         errores += self._comprobar_calendario()
+        errores += self._comprobar_tipos()
         for propia in self.carpetas_propias():
             for ajena, otro in carpetas_ajenas(self.id, internas=False).items():
                 if dentro_de(propia, ajena) or dentro_de(ajena, propia):
@@ -248,6 +249,38 @@ class Proyecto:
     # ---------- hashtags ----------
     def fijos(self, pid: str) -> list[str]:
         return [normalizar_hashtag(t) for t in (self.hashtags.get("fijos") or {}).get(pid, [])]
+
+    # ---------- tipos de clip (opcional, por proyecto): caption y hashtags fijos por tipo ----------
+    # proyecto.json → "tipos_clip": {"patron": "^([a-e])_", "tipos": {"a": {"caption": "...",
+    # "hashtags": ["#A", "#B"]}}}. El tipo sale del nombre del clip (grupo 1 del patrón, en
+    # minúsculas). Sin "tipos_clip" no cambia nada (p. ej. mongemalo).
+    @property
+    def tipos_clip(self) -> dict:
+        return self.conf.get("tipos_clip") or {}
+
+    def tipo_de_clip(self, nombre: str) -> str | None:
+        """Letra/id de tipo del clip según tipos_clip.patron (None si no encaja o no hay tipos)."""
+        patron = self.tipos_clip.get("patron")
+        if not patron:
+            return None
+        m = re.match(patron, Path(str(nombre)).name, re.IGNORECASE)
+        t = (m.group(1) if m and m.groups() else "").lower()
+        return t if t in self.tipos_clip.get("tipos", {}) else None
+
+    def hashtags_de_tipo(self, tipo: str) -> list[str]:
+        """Hashtags del tipo, tal y como se escriben (con sus mayúsculas), en su orden."""
+        return [t if t.startswith("#") else "#" + t for t in self.tipos_clip["tipos"][tipo].get("hashtags", [])]
+
+    def literal_hashtag(self, tag: str) -> str:
+        """Hashtag con las mayúsculas de tipos_clip/fijos (internamente todo va en minúsculas)."""
+        mapa = getattr(self, "_literales", None)
+        if mapa is None:
+            mapa = {}
+            for t in self.tipos_clip.get("tipos", {}):
+                for h in self.hashtags_de_tipo(t):
+                    mapa.setdefault(normalizar_hashtag(h), h)
+            self._literales = mapa
+        return mapa.get(normalizar_hashtag(tag), tag)
 
     def banco_por_tamano(self) -> dict[str, dict[str, list[str]]]:
         """tema → {nicho: [...], medio: [...], amplio: [...], sin_tamano: [...]}.
@@ -417,6 +450,24 @@ class Proyecto:
             falta.append("banco_copys.json (opcional: copys de referencia de tono)")
         return falta
 
+    def _comprobar_tipos(self) -> list[str]:
+        tc = self.tipos_clip
+        if not tc:
+            return []
+        err = []
+        try:
+            re.compile(tc.get("patron") or "")
+        except re.error as e:
+            err.append(f"tipos_clip.patron no es una expresión regular válida ({e}).")
+        if not tc.get("patron") or not tc.get("tipos"):
+            err.append("tipos_clip necesita 'patron' (con un grupo) y 'tipos'.")
+        for t, d in (tc.get("tipos") or {}).items():
+            if t != t.lower():
+                err.append(f"tipos_clip.tipos: el id '{t}' va en minúsculas.")
+            if not (d.get("caption") or "").strip() or not d.get("hashtags"):
+                err.append(f"tipos_clip.tipos.{t}: faltan 'caption' o 'hashtags'.")
+        return err
+
     def _comprobar_calendario(self) -> list[str]:
         cal = self.calendario
         if not cal:
@@ -426,6 +477,9 @@ class Proyecto:
         malos = [d for d in dias if d not in config.DIAS]
         if malos:
             err.append(f"calendario.dias: {malos} no valen (usa {', '.join(config.DIAS)}).")
+        for k in ("inicio", "fin"):
+            if cal.get(k) and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(cal[k])):
+                err.append(f"calendario.{k} = '{cal[k]}' (formato AAAA-MM-DD).")
         franjas = cal.get("franjas") or {}
         for d, h in franjas.items():
             if d.startswith("_"):

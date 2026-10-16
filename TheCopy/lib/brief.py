@@ -76,6 +76,15 @@ def brief(p, recientes: dict[str, list[tuple[str, frozenset[str]]]] | None = Non
             linea = f"- {cid}{ob}" + (f" ({' | '.join(vals)})" if vals else " (texto libre)")
             L.append(linea + (f": {campo['ayuda']}" if campo.get("ayuda") else ""))
 
+    # ---- tipos de clip (proyecto.json → tipos_clip): caption y hashtags fijos por tipo
+    tc = p.tipos_clip
+    if tc:
+        L += ["", f"TIPOS DE CLIP (el tipo = primera letra del nombre del clip, patrón {tc.get('patron')})"]
+        if tc.get("nota"):
+            L.append(f"- {tc['nota']}")
+        for t, d in tc["tipos"].items():
+            L.append(f"- {t}: «{d['caption']}» · {' '.join(p.hashtags_de_tipo(t))}")
+
     # ---- plataformas activas, por formato
     L += ["", "PLATAFORMAS ACTIVAS"]
     for pid in p.plataformas_activas():
@@ -94,18 +103,22 @@ def brief(p, recientes: dict[str, list[tuple[str, frozenset[str]]]] | None = Non
 
     # ---- hashtags (cifras: plataformas.<p>.hashtags · banco: hashtags.json)
     L += ["", "HASHTAGS"]
-    for pid in p.plataformas_activas():
+    if tc:
+        L.append("- Fijos por tipo (tabla de arriba): los pone el script, literales y en ese orden; deja "
+                 "\"hashtags\": []. No hay banco temático ni rotación.")
+    for pid in [] if tc else p.plataformas_activas():
         fijos = " ".join(f"{t} ({p.tamano_hashtag(t) or '?'})" for t in p.fijos(pid)) or "ninguno"
         L.append(f"- {p.nombre_plataforma(pid)}: fijos {fijos}, los pone el script · {p.texto_reglas_hashtags(pid)}.")
-    L.append("- Automáticos: \"hashtags\": [] + \"hashtags_temas\" en la pieza (viene sugerido) → registrar elige "
-             "un conjunto válido y rotado. Escribe hashtags solo para forzar alguno (completa el resto).")
-    L.append("- Banco, tema: nicho | medio | amplio")
-    for tema, g in p.banco_por_tamano().items():
-        partes = [" ".join(g[t]) or "—" for t in ("nicho", "medio", "amplio")]
-        if g["sin_tamano"]:
-            partes.append("sin tamaño: " + " ".join(g["sin_tamano"]))
-        L.append(f"  {tema}: {' | '.join(partes)}")
-    for pid in p.plataformas_activas():
+    if not tc:
+        L.append("- Automáticos: \"hashtags\": [] + \"hashtags_temas\" en la pieza (viene sugerido) → registrar elige "
+                 "un conjunto válido y rotado. Escribe hashtags solo para forzar alguno (completa el resto).")
+        L.append("- Banco, tema: nicho | medio | amplio")
+        for tema, g in p.banco_por_tamano().items():
+            partes = [" ".join(g[t]) or "—" for t in ("nicho", "medio", "amplio")]
+            if g["sin_tamano"]:
+                partes.append("sin tamaño: " + " ".join(g["sin_tamano"]))
+            L.append(f"  {tema}: {' | '.join(partes)}")
+    for pid in [] if tc else p.plataformas_activas():
         n = int(p.reglas_hashtags(pid).get("rotacion_ultimos", config.ROTACION_ULTIMOS) or 0)
         ult = (recientes or {}).get(pid, [])[-n:] if n else []
         txt = "; ".join(f"{c}: {' '.join(sorted(s)) or '—'}" for c, s in ult) if ult else "ninguno aún"
@@ -114,9 +127,13 @@ def brief(p, recientes: dict[str, list[tuple[str, frozenset[str]]]] | None = Non
     # ---- tanda y registro
     L += ["", "TANDA",
           "- Por pieza: completa extra y el copy de cada plataforma (+ titulo si aparece); revisa lo sugerido "
-          "(tema, oferta, hashtags_temas). Copys distintos, sin hashtags dentro.",
-          f"- Solo `aviso` (sin contexto): copys.py banco --proyecto {p.id} y adapta uno (libre), o pide una línea al CEO.",
+          + ("(tema, tipo_clip: trae el caption_literal y si es la primera vez del tipo). Copys distintos, sin hashtags dentro."
+             if tc else "(tema, oferta, hashtags_temas). Copys distintos, sin hashtags dentro."),
+          ("- Un clip con `aviso` (sin contexto) no bloquea: el caption sale del tipo (tabla de arriba); para el `tema`, "
+           "pide una línea al CEO." if tc else
+           f"- Solo `aviso` (sin contexto): copys.py banco --proyecto {p.id} y adapta uno (libre), o pide una línea al CEO."),
           "- registrar --entrada <tanda> --simular → corrige → registrar --entrada <tanda> --planificar. Al CEO: ID, "
-          "oferta, texto final y la línea FALTAN. Excel abierto: avisa, no reintentes.",
+          + ("texto final, fecha y hora, y la línea FALTAN." if tc else "oferta, texto final y la línea FALTAN.")
+          + " Excel abierto: avisa, no reintentes.",
           "- Cambiar un copy: pendientes --clip <pieza> --incluir-registrados → registrar --reemplazar (solo esa)."]
     return "\n".join(L)

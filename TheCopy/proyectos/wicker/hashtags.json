@@ -1,0 +1,8 @@
+{
+  "_regla": "Con tipos_clip (proyecto.json) los hashtags son FIJOS por tipo y literales (los 5 del briefing); aquí no hay fijos ni banco temático.",
+  "fijos": {
+    "instagram": []
+  },
+  "tamano_fijos": {},
+  "tematicos": {}
+}
