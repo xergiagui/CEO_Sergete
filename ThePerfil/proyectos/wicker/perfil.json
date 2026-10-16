@@ -1,0 +1,14 @@
+{
+ "proyecto": "wicker",
+ "_identidad": "Cuenta, enlace (landing), posicionamiento, voz, palabras prohibidas y marca: CEO_Sergete/proyectos.json → identidad (fuente única). Aquí solo lo propio del perfil.",
+ "plataforma": "instagram",
+ "objetivo": "visitas en IG (Reels con material oficial) y tráfico a la cuenta oficial @vertice360_spain antes del estreno del 30-oct-2026; sin afiliación, leads ni ventas",
+ "reglas": {
+  "palabras_clave_nombre": ["WICKER"],
+  "emojis_max_bio": 3,
+  "_emojis_max_bio": "La bio obligatoria del briefing admite emojis decorativos; la identidad (emojis_max=1) rige los captions. Bio: máx. 3."
+ },
+ "historial": [
+  {"fecha": "2026-10-16", "tipo": "propuesta inicial (cuenta aún no creada)", "ruta": "auditorias/2026-10-16_propuesta.md"}
+ ]
+}

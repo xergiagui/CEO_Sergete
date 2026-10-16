@@ -1,0 +1,39 @@
+{
+  "id": "wicker",
+  "nombre": "WICKER",
+  "_nota": "Configuración de TheHistoria para este proyecto (copiada de proyectos/_plantilla; CEO_Sergete/nuevo_proyecto.py sustituye wicker y WICKER). Reglas propias en reglas.md; identidad (cuenta, voz, marca) en CEO_Sergete/proyectos.json. La política de recursos (b-roll banco_comun | propio | ninguno, internet…) NO se define aquí: se lee de TheEditor/proyectos/wicker/proyecto.json → recursos. `recursos_respaldo` solo se usa mientras TheEditor no la tenga.",
+
+  "historias": {
+    "activas": false,
+    "n_por_defecto": 5,
+    "duracion": 6,
+    "orientacion": null,
+    "frases": {
+      "_nota": "Siempre se filtra por la etiqueta proyecto:wicker en tags y used_in_story=false. Filtros extra opcionales:",
+      "categorias": [],
+      "min_virality": null,
+      "lang": null
+    }
+  },
+
+  "especiales": {
+    "activas": false,
+    "variaciones": 3,
+    "duracion": 6,
+    "reserva_inferior": 0.25
+  },
+
+  "carruseles": {
+    "activos": false,
+    "estilo": "estilo.json",
+    "credito": "",
+    "_credito": "fuente.credito por defecto de los carruseles de vídeo/clip (p. ej. «Ideas de <autor>» si el contenido es de otra persona; vacío = sin crédito).",
+    "material_extra": [],
+    "_material_extra": "Carpetas extra (relativas a PruebasIA) que valen como material del proyecto para la portada. Por defecto solo las suyas: _Historico/wicker, TheEditor/proyectos/wicker, TheDescarga/descargas/wicker, proyectos/wicker…"
+  },
+
+  "fondo_liso": null,
+  "_fondo_liso": "Color #rrggbb para la política «ninguno» o especiales sin vídeos; null = identidad.marca.fondo (CEO_Sergete/proyectos.json).",
+
+  "recursos_respaldo": {"broll": "propio", "internet": false}
+}

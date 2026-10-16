@@ -29,3 +29,6 @@ mongemalo_videos_largos.xlsx
 # Carpetas de publicación (vídeos, historias y sus .txt): fuera de git
 REELS/
 HISTORIAS/
+
+# Briefings originales de clientes (docx/pdf): solo en local
+docs/*/Briefing_*
