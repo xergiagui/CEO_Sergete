@@ -61,13 +61,49 @@ function StructuredData() {
             description: `${p.hook}. ${p.subhook}`,
             category: p.kind,
             url: p.href,
-            brand: { "@id": `${SITE_URL}/#luis-monge-malo` },
+            image: `${SITE_URL}/opengraph-image`,
+            brand: { "@type": "Brand", name: "Luis Monge Malo" },
             offers: {
               "@type": "Offer",
               price: p.priceValue,
               priceCurrency: "EUR",
               url: p.href,
               availability: "https://schema.org/InStock",
+              // Web de afiliación: la compra, el envío y las devoluciones
+              // los gestiona el vendedor original (producto digital).
+              shippingDetails: {
+                "@type": "OfferShippingDetails",
+                shippingRate: {
+                  "@type": "MonetaryAmount",
+                  value: 0,
+                  currency: "EUR",
+                },
+                shippingDestination: {
+                  "@type": "DefinedRegion",
+                  addressCountry: "ES",
+                },
+                deliveryTime: {
+                  "@type": "ShippingDeliveryTime",
+                  handlingTime: {
+                    "@type": "QuantitativeValue",
+                    minValue: 0,
+                    maxValue: 0,
+                    unitCode: "DAY",
+                  },
+                  transitTime: {
+                    "@type": "QuantitativeValue",
+                    minValue: 0,
+                    maxValue: 0,
+                    unitCode: "DAY",
+                  },
+                },
+              },
+              hasMerchantReturnPolicy: {
+                "@type": "MerchantReturnPolicy",
+                applicableCountry: "ES",
+                returnPolicyCategory:
+                  "https://schema.org/MerchantReturnNotPermitted",
+              },
             },
           },
         })),
