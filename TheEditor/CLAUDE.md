@@ -60,9 +60,10 @@ Solo el clip pedido, con `--solo <clip>` y `--sin-frases`; el resto no se toca, 
 - Después, QC otra vez.
 
 ## Silencios
-Global: 6 % / 0,15 s (`proyecto.json → silencios`); nunca lo cambies. Excepción: un proyecto con `silencios.quitar: false` no recorta silencios (solo si Sergio lo aprueba para ese proyecto; hoy, `wicker`). Si un clip queda atropellado, reprocesa solo ese con 3 % / 0,3 s (no se guarda en `proyecto.json`):
+Global: 6 % / 0,15 s (`proyecto.json → silencios`); nunca lo cambies. Excepción: un proyecto con `silencios.quitar: false` no recorta silencios (solo si Sergio lo aprueba para ese proyecto; hoy, `wicker`). Si un clip queda atropellado, reprocesa solo ese con 3 % / 0,3 s (no se guarda en `proyecto.json`; si aún se come palabras, 1,5 % / 0,3 s):
 - Vía 1: `clips.py … --solo <clip> --umbral 3% --margen 0.3s` → `editar_clips.py … --solo <clip> --sin-frases`.
 - Vía 2: `procesar_batch_clip.py … "<CARPETA>" --solo "<clip>" --umbral 3% --margen 0.3s --sin-frases`.
+- No esperes a que Sergio lo note: en la línea de `clips.py` (`NN s (tramo MM s)`) lo normal es perder un 5–25 %. Si un clip pierde **más del 25 %**, el recorte se está comiendo palabras (pasa con audio bajo, media por debajo de unos −28 dB): reprocésalo así antes de editar.
 
 ## Subtítulos de la fuente
 Si el vídeo largo trae subtítulos o rótulos incrustados, el render de la vía 1 los tapa solo (desenfoque mientras están en pantalla) cuando el proyecto lo tiene activo en `proyecto.json → subs_fuente` (`proyecto.py ver` lo enseña; hoy, `mongemalo`). La línea del clip dice `subs fuente tapados N`. Si en un clip se escapa alguno o el desenfoque molesta, corrige solo ese clip (`--solo <clip> --sin-frases`, y `--sin-tapar-subs` para quitarlo).
