@@ -21,6 +21,14 @@ FALLA (no cumple la exportación). Sale con código 1 si algún clip FALLA.
 Además deja UNA hoja `_qc.jpg` en la carpeta de los finales con el primer y el
 último fotograma de cada clip: mírala (gancho en el primero, cola limpia en el
 último, restos de superposiciones).
+
+Proyectos en modo tráiler (`modo: "trailer"`), además, por clip (trailer.qc_clip,
+con el manifiesto clips/<clip>.render.json): gancho LITERAL visible del fotograma 0
+a los 3 s, CTA LITERAL al final (≥ 3 s entera), subtítulos sin tapar el gancho ni
+los rótulos oficiales, audio = el original del tráiler (correlación: sin música ni
+voces añadidas), sin metadatos de editores (marcas de agua), duración 15–90 s y
+portada 1080x1920 con un título literal. El silencio de la cola de la CTA no
+cuenta. La hoja enseña 0 s, el final del gancho, el final y la portada.
 """
 import argparse
 import json
@@ -109,12 +117,21 @@ def fotograma(mp4: Path, ultimo: bool, destino: Path) -> bool:
     return destino.exists() and destino.stat().st_size > 0
 
 
-def hoja(filas: list[tuple[str, Path | None, Path | None]], destino: Path) -> None:
-    """Una sola imagen: por clip, primer y último fotograma con su nombre."""
+def fotograma_t(mp4: Path, t: float, destino: Path) -> bool:
+    subprocess.run([FFMPEG, "-y", "-v", "error", "-ss", f"{max(0.0, t):.3f}", "-i", str(mp4),
+                    "-frames:v", "1", "-q:v", "3", str(destino)], capture_output=True)
+    return destino.exists() and destino.stat().st_size > 0
+
+
+def hoja(filas: list[tuple[str, list[tuple[str, Path | None]]]], destino: Path) -> None:
+    """Una sola imagen: por clip, sus miniaturas (por defecto inicio y final) con su nombre."""
     from PIL import Image, ImageDraw, ImageFont
     por_fila = 3 if len(filas) > 2 else max(1, len(filas))
     gap, cab = 16, 34
-    celda_w = 2 * THUMB_W + gap
+    n_img = max((len(ims) for _, ims in filas), default=2)
+    if n_img > 2:
+        por_fila = min(por_fila, 2)
+    celda_w = n_img * THUMB_W + (n_img - 1) * gap
     n_filas = (len(filas) + por_fila - 1) // por_fila
     W = por_fila * celda_w + (por_fila + 1) * gap
     H = n_filas * (THUMB_H + cab) + (n_filas + 1) * gap
@@ -125,13 +142,13 @@ def hoja(filas: list[tuple[str, Path | None, Path | None]], destino: Path) -> No
                                       / "Montserrat-Bold.ttf"), 16)
     except Exception:
         font = ImageFont.load_default()
-    for i, (nombre, prim, ult) in enumerate(filas):
+    for i, (nombre, ims) in enumerate(filas):
         fx, fy = i % por_fila, i // por_fila
         x0 = gap + fx * (celda_w + gap)
         y0 = gap + fy * (THUMB_H + cab + gap)
         etiqueta = nombre if len(nombre) <= 48 else nombre[:45] + "…"
         d.text((x0, y0 + 6), etiqueta, fill=(240, 240, 240), font=font)
-        for k, f in enumerate((prim, ult)):
+        for k, (rotulo, f) in enumerate(ims):
             x = x0 + k * (THUMB_W + gap)
             y = y0 + cab
             if f and f.exists():
@@ -139,8 +156,7 @@ def hoja(filas: list[tuple[str, Path | None, Path | None]], destino: Path) -> No
                 img.paste(im, (x, y))
             else:
                 d.rectangle([x, y, x + THUMB_W, y + THUMB_H], outline=(200, 60, 60), width=2)
-            d.text((x + 6, y + THUMB_H - 22), "inicio" if k == 0 else "final",
-                   fill=(255, 220, 0), font=font)
+            d.text((x + 6, y + THUMB_H - 22), rotulo, fill=(255, 220, 0), font=font)
     img.save(destino, quality=88)
 
 
@@ -193,6 +209,9 @@ def main() -> int:
     proyecto.add_argumento(ap)
     args = ap.parse_args()
     p = proyecto.resolver(args.proyecto)
+    tr = None
+    if p.es_trailer:
+        import trailer as tr       # comprobaciones extra del modo tráiler
 
     mp4s, carpeta, v = resolver_objetivo(p, args.objetivo)
     if not mp4s:
@@ -205,9 +224,23 @@ def main() -> int:
             pr = probe(mp4)
             det = detectar(mp4)
             ffps = fuente_fps(p, v, mp4.stem)
-            prim, ult = tmp / f"{i:03d}_a.jpg", tmp / f"{i:03d}_b.jpg"
-            filas.append((mp4.name, prim if fotograma(mp4, False, prim) else None,
-                          ult if fotograma(mp4, True, ult) else None))
+            tq = None
+            if tr is not None:
+                tq = tr.qc_clip(p, mp4, pr["dur"])
+                try:
+                    ffps = probe(tr.config(p).fuente)["fps"]
+                except Exception:
+                    pass
+                ims = []
+                for k, (rotulo, t) in enumerate(tq["frames"] or [("inicio", 0.0)]):
+                    f = tmp / f"{i:03d}_{k}.jpg"
+                    ims.append((rotulo, f if fotograma_t(mp4, t, f) else None))
+                ims.append(("portada", tq["portada"]))
+                filas.append((mp4.name, ims))
+            else:
+                prim, ult = tmp / f"{i:03d}_a.jpg", tmp / f"{i:03d}_b.jpg"
+                filas.append((mp4.name, [("inicio", prim if fotograma(mp4, False, prim) else None),
+                                         ("final", ult if fotograma(mp4, True, ult) else None)]))
 
             fallos = []
             if (pr["w"], pr["h"]) != (1080, 1920):
@@ -223,6 +256,17 @@ def main() -> int:
             if det["pico"] is None or det["pico"] >= 0.0:
                 fallos.append(f"pico {det['pico']} dBFS ≥ 0")
             avisos = []
+            if tq is not None:
+                fallos += tq["fallos"]
+                avisos += tq["avisos"]
+                if tq["silencio_desde"] is not None:   # la cola de la CTA puede ir en silencio
+                    det["silencios"] = [s for s in det["silencios"] if s[0] < tq["silencio_desde"]]
+                if tq["congelado_desde"] is not None:  # la cartela de la CTA es fija
+                    det["congelados"] = [s for s in det["congelados"] if s[0] < tq["congelado_desde"]]
+                nf = tq["negros_fuente"]               # negros que ya trae el tráiler oficial
+                det["negros"] = [s for s in det["negros"]
+                                 if not any(min(s[1], b) - max(s[0], a) > 0.5 * (s[1] - s[0])
+                                            for a, b in nf)]
             if det["negros"]:
                 avisos.append(f"negro {len(det['negros'])} ({_tramos(det['negros'])})")
             if det["congelados"]:
@@ -241,6 +285,8 @@ def main() -> int:
                      f"{pr['vbr']:.1f}Mb/s {pr['acodec']} {pr['ar'] // 1000 if pr['ar'] else '?'}kHz "
                      f"{pr['ac']}ch pico {pico}dBFS")
             linea += " · " + (" · ".join(avisos) if avisos else "sin negros/congelados/silencios")
+            if tq is not None and tq["ok"]:
+                linea += " · " + " · ".join(tq["ok"])
             if fallos:
                 linea += "  [" + "; ".join(fallos) + "]"
             print(linea, flush=True)

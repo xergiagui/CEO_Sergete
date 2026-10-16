@@ -56,7 +56,9 @@ veces ni acabar con subtitulos duplicados en pantalla.
 Pipeline por clip:
   1) ffmpeg  -> recorte + crop vertical 1080x1920
   2) auto-editor (umbral 6%, margen 0.15s, o los `silencios` del proyecto)
-     -> quita silencios -> clip final
+     -> quita silencios -> clip final (salvo `silencios.quitar: false`)
+Proyectos en modo tráiler (`modo: "trailer"`): aquí solo se valida (--validar,
+con las reglas de trailer.py); el montaje lo hace editar_clips.py.
 """
 import argparse
 import json
@@ -588,6 +590,20 @@ def main():
     p = proyecto.abrir(args.proyecto, "clips", log=not args.validar,
                        quiet=False if args.validar else args.quiet)
 
+    if p.es_trailer:
+        # Modo tráiler (trailer.py): cortes con tipo A–E y tramos; el montaje lo
+        # hace editar_clips.py desde la fuente oficial, en un solo encode.
+        import trailer
+        try:
+            if args.validar:
+                sys.exit(0 if trailer.validar_cli(p, args.video, Path(args.cortes) if args.cortes
+                                                  else None, args.solo) else 1)
+        except trailer.ErrorTrailer as e:
+            raise SystemExit(f"[!] {e}")
+        proyecto.decir("Modo tráiler: no hay corte aparte. Valida con --validar y lanza "
+                       "editar_clips.py (monta cada clip desde la fuente oficial).")
+        sys.exit(0)
+
     video, nombre = resolver_video(args.video, p.input_dir)
     base = p.transcripciones_dir / nombre
     cortes_path = Path(args.cortes) if args.cortes else (base / "cortes.json")
@@ -628,8 +644,9 @@ def main():
     print(f"Video: {video}  ({src_w}x{src_h})\n"
           f"Cortes: {cortes_path}  ({len(cortes)} clips"
           f"{', solo ' + ', '.join(sorted(solo)) if solo else ''})\nEncuadre 9:16: {encuadre}\n"
-          f"Silencios: umbral {sil['umbral']} · margen {sil['margen']}"
-          f"{'' if sil == p.silencios else ' (solo esta ejecución)'}\n")
+          + (f"Silencios: umbral {sil['umbral']} · margen {sil['margen']}"
+             f"{'' if sil == p.silencios else ' (solo esta ejecución)'}\n" if p.quitar_silencios
+             else "Silencios: NO se quitan (proyecto.json → silencios.quitar=false)\n"))
 
     hechos, fallos = 0, []
     for c in cortes:
@@ -643,8 +660,11 @@ def main():
                 desc = escalar_vertical(video, vert, ss=ini, t=fin - ini)
             else:
                 desc = cortar_vertical(video, ini, fin, vert, src_w=src_w, src_h=src_h)
-            quitar_silencios(vert, final, umbral=sil["umbral"], margen=sil["margen"],
-                             fps=src_fps)
+            if p.quitar_silencios:
+                quitar_silencios(vert, final, umbral=sil["umbral"], margen=sil["margen"],
+                                 fps=src_fps)
+            else:                       # silencios.quitar=false: el corte tal cual
+                shutil.move(str(vert), str(final))
         except Exception as e:
             fallos.append(cn)
             proyecto.decir(f"FALLO {cn}.mp4 · {herramientas.describir_error(e)} (detalle en el log)")

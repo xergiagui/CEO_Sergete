@@ -39,10 +39,16 @@ CLI:
     python proyecto.py nuevo <id> --nombre "Nombre" [--tipo clipping|largos]
     python proyecto.py aprobar <id> --video "<video|carpeta>" [--clips a.mp4,b.mp4]
                                [--cerrar] [--destino-pruebas <dir>]
-        -> mueve los finales aprobados a CEO_Sergete/REELS/<id>/1. pte Publicar/
-           y, si finales/ queda vacío (o con --cerrar), archiva transcripciones/<v>/
-           en PruebasIA/_Historico/<id>/<v>/ (sin _prep/) y la fuente de input/ en
-           …/<v>/_fuente/.
+        -> mueve los finales aprobados (y su <clip>.portada.jpg, si la hay) a
+           CEO_Sergete/REELS/<id>/1. pte Publicar/ y, si finales/ queda vacío (o con
+           --cerrar), archiva transcripciones/<v>/ en PruebasIA/_Historico/<id>/<v>/
+           (sin _prep/) y la fuente de input/ en …/<v>/_fuente/. Con
+           `aprobar.archivar: false` (proyectos cuya fuente se reutiliza, p. ej. el
+           modo tráiler) solo archiva con --cerrar; lo que no esté en input/ (p. ej.
+           recursos/oficial/) nunca se mueve.
+
+Otras claves de proyecto.json: `modo: "trailer"` (ver trailer.py) y
+`silencios.quitar` (por defecto true; false = no se recortan silencios).
 """
 from __future__ import annotations
 
@@ -71,6 +77,7 @@ EXT_CLIPS = (".mp4", ".mov", ".m4v", ".mkv")   # clips ya cortados (vía 2)
 EXT_MUSICA = (".mp3", ".wav", ".m4a")
 EXT_BROLL = (".mp4", ".mov", ".webm", ".mkv", ".m4v", ".avi")
 SUELTOS = "_sueltos"                           # lote de los clips sueltos en input/
+PORTADA_SUFIJO = ".portada.jpg"                # <clip>.portada.jpg: viaja con su <clip>.mp4
 
 # Modos de encuadre del batch (vía 2); alias -> modo.
 MODOS_ENCUADRE = ("right", "left", "center", "auto", "auto-right", "follow")
@@ -321,6 +328,28 @@ class Proyecto:
         return s
 
     @property
+    def quitar_silencios(self) -> bool:
+        """`silencios.quitar` (por defecto true). false = no se recortan silencios
+        (clips.py y el batch dejan el audio tal cual); solo para quien lo pida."""
+        v = (self.cfg.get("silencios") or {}).get("quitar", True)
+        if not isinstance(v, bool):
+            raise ProyectoError(f"[!] proyectos/{self.id}/proyecto.json: silencios.quitar debe "
+                                f"ser true o false.")
+        return v
+
+    @property
+    def es_trailer(self) -> bool:
+        """`modo: "trailer"`: clips montados solo con material oficial (trailer.py)."""
+        return str(self.cfg.get("modo") or "").strip().lower() == "trailer"
+
+    @property
+    def archivar_al_aprobar(self) -> bool:
+        """`aprobar.archivar` (por defecto true): al vaciarse finales/, archivar el
+        vídeo en _Historico. false = solo se archiva con --cerrar."""
+        v = (self.cfg.get("aprobar") or {}).get("archivar", True)
+        return bool(v)
+
+    @property
     def gancho_duracion(self) -> float | None:
         v = (self.cfg.get("gancho") or {}).get("texto_duracion_s")
         try:
@@ -361,7 +390,9 @@ class Proyecto:
         return (f"Proyecto: {self.id} ({self.tipo}) · b-roll {r['broll']} · música {r['musica']} · "
                 f"internet {'sí' if r['internet'] else 'NO'} · gancho visual {r['gancho_visual']} · "
                 f"gancho texto {'sí' if r['gancho_texto'] else 'no'} · "
-                f"frases {'sí' if r['guardar_frases'] else 'no'}")
+                f"frases {'sí' if r['guardar_frases'] else 'no'}"
+                + (" · MODO TRÁILER" if self.es_trailer else "")
+                + ("" if self.quitar_silencios else " · silencios no se quitan"))
 
 
 class _Tee:
@@ -666,7 +697,9 @@ def _cmd_aprobar(a) -> int:
     destino = reels / p.id / PTE_PUBLICAR
     hist = historico / p.id / v
     restantes = [x for x in disponibles if x not in pedidos]
-    cerrar = bool(a.cerrar or not restantes)
+    # aprobar.archivar=false: al vaciarse finales/ NO se archiva (solo con --cerrar)
+    no_archivar = not restantes and not a.cerrar and not p.archivar_al_aprobar
+    cerrar = bool(a.cerrar or (not restantes and not no_archivar))
     if v == SUELTOS and hist.exists():          # cada tanda de sueltos, su archivo
         hist = historico / p.id / f"{SUELTOS}_{dt.datetime.now():%Y%m%d-%H%M}"
     if cerrar and hist.exists():
@@ -682,9 +715,18 @@ def _cmd_aprobar(a) -> int:
             print(f"[aprobar] AVISO: ya había un «{name}» en {destino}: se guarda como «{dst.name}».")
         shutil.move(str(fin / name), str(dst))
         print(f"[aprobar] {name} -> {dst}")
+        # La portada del clip (<clip>.portada.jpg), si la hay, va con él y con su mismo nombre.
+        portada = fin / f"{Path(name).stem}{PORTADA_SUFIJO}"
+        if portada.exists():
+            pdst = dst.with_name(f"{dst.stem}{PORTADA_SUFIJO}")
+            shutil.move(str(portada), str(pdst))
+            print(f"[aprobar] {portada.name} -> {pdst}")
     print(f"[aprobar] {len(pedidos)} clip(s) en {destino}")
 
-    if not cerrar:
+    if no_archivar:
+        print(f"[aprobar] proyecto.json → aprobar.archivar=false: «{v}» no se archiva (su fuente y su "
+              f"transcripción se reutilizan); usa --cerrar si de verdad hay que archivarlo.")
+    elif not cerrar:
         print(f"[aprobar] Quedan {len(restantes)} final(es) en {fin}: {', '.join(restantes)}. "
               f"No se archiva (usa --cerrar para archivar igualmente).")
     else:
@@ -764,8 +806,17 @@ def main() -> int:
               + (f"  ({n['musica']} audios)" if n["musica"] is not None else ""))
         print(f"  encuadre     por defecto «{p.modo_encuadre()}»; carpetas: "
               f"{(p.cfg.get('encuadre') or {}).get('carpetas') or '-'}")
-        print(f"  silencios    {p.silencios}")
+        print(f"  silencios    {p.silencios}" if p.quitar_silencios else
+              "  silencios    NO se quitan (silencios.quitar=false)")
         print(f"  gancho texto {p.gancho_duracion or 2.5} s · frases etiqueta {p.etiqueta}")
+        if p.es_trailer:
+            try:
+                import trailer
+                print(f"  modo tráiler {trailer.describir(p)}")
+            except Exception as e:
+                print(f"  modo tráiler [!] {e}")
+        if not p.archivar_al_aprobar:
+            print("  aprobar      no archiva al vaciarse finales/ (aprobar.archivar=false)")
         try:
             import subs_fuente
             print(f"  subs fuente  {subs_fuente.describir(subs_fuente.config(p.cfg))}  (vía 1)")

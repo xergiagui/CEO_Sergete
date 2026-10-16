@@ -1,0 +1,90 @@
+{
+  "_nota": "PROPUESTA de la tanda 1 (12 Reels, 1 al día del 19 al 30-oct-2026), SIN renderizar. Mismo esquema que cortes.json: se valida con «clips.py --proyecto wicker TRL_20_VE_RRSS_9x16_v03 --validar --cortes proyectos/wicker/plan_tanda_19-30oct.json» y, con el OK de Sergio, sus clips pasan a transcripciones/TRL_20_VE_RRSS_9x16_v03/cortes.json. Tramos en segundos del tráiler 9:16 oficial; cada clip = gancho literal (0–3 s) + tramos + CTA literal (4 s). Reparto: 4 A (premisa, el gancho más fuerte), 2 B (reparto), 2 C (romantasy), 2 D (la cama), 2 E (plan de finde, el jueves y el viernes del estreno). Las citas de prensa del tráiler salen desde el 19-oct (embargo hasta el 17-oct 10:45).",
+  "fuente": "TRL_20_VE_RRSS_9x16_v03.mp4",
+  "clips": [
+    {
+      "fecha": "2026-10-19", "nombre": "a_marido_de_mimbre", "tipo": "A",
+      "tramos": [[42.54, 81.04]],
+      "portada_titulo": "WICKER: el marido perfecto es de MIMBRE 🧺", "portada_t": 77.5, "portada_pos": "abajo",
+      "momento": "La premisa seguida: «Quiero que me hagas un marido» → «Ve a la capilla en un mes» → luna y el cestero tejiendo → llega el marido de mimbre → «He venido a casarme contigo» → «Este es mi marido» → «Dicen que es fuerte y duro como un árbol» → Debicki, seca: «Es de mimbre».",
+      "por_que": "Clip de prueba ya renderizado. Pide un marido, se lo tejen, llega, el pueblo cotillea y «Es de mimbre» cumple el gancho con el chiste."
+    },
+    {
+      "fecha": "2026-10-20", "nombre": "b_reparto_de_lujo", "tipo": "B",
+      "tramos": [[42.54, 47.55], [62.48, 67.69], [114.03, 120.70], [136.45, 141.30]],
+      "portada_titulo": "Olivia Colman, Skarsgård y Dinklage en la misma peli: WICKER ✨", "portada_t": 140.0, "portada_pos": "abajo",
+      "momento": "Las tres estrellas del gancho, una a una: Colman pide el marido, Dinklage se lo hace, Skarsgård (de mimbre) llega a la capilla; luego las cartelas oficiales del reparto (Óscar y Globos de Oro) y el remate de Dinklage: «La madre naturaleza da. Yo solo aumento».",
+      "por_que": "El gancho promete a los tres y el clip los enseña con su cartela oficial; cierra con la frase más chula de Dinklage."
+    },
+    {
+      "fecha": "2026-10-21", "nombre": "c_hechos_el_uno_para_el_otro", "tipo": "C",
+      "tramos": [[62.48, 67.69], [84.42, 88.34], [102.81, 109.65]],
+      "portada_titulo": "WICKER, el romantasy que no te puedes perder 📚", "portada_t": 64.6, "portada_pos": "arriba",
+      "momento": "La boda (manos de mimbre con flores, «He venido a casarme contigo») → «Tú eres la razón por la que vivo y respiro» → cartela de prensa «Olivia Colman y Alexander Skarsgård están hechos el uno para el otro» → «Estás envalentonada, ¿no, pescadora?» → «Él tiene sus días, yo los míos, y juntos tenemos nuestras noches» y su sonrisa.",
+      "por_que": "Romance + picante sin enseñar nada: declaración, cita de prensa y la frase de las noches como remate (la mirada final de Colman)."
+    },
+    {
+      "fecha": "2026-10-22", "nombre": "d_la_cama_rota", "tipo": "D",
+      "tramos": [[125.79, 134.84], [109.65, 113.24], [134.84, 136.45]],
+      "portada_titulo": "«La cama está rota.» «La arreglaré.» 🔥 WICKER", "portada_t": 129.0, "portada_pos": "abajo",
+      "momento": "El gag de la cama: «Voy a arreglar la cama esta tarde» → «Se ha vuelto a romper» → de noche, los vecinos en la cama: «¿Están matando a alguien?» → título WICKER.",
+      "por_que": "Es el diálogo de la cama que pide el gancho D y cierra con la reacción de los vecinos. OJO: en este tráiler las frases son «Voy a arreglar la cama esta tarde» / «Se ha vuelto a romper», no «La cama está rota» / «La arreglaré» (ver aviso)."
+    },
+    {
+      "fecha": "2026-10-23", "nombre": "a_pidio_un_marido", "tipo": "A",
+      "tramos": [[10.60, 23.94], [27.24, 37.25], [42.54, 50.13], [57.22, 67.69]],
+      "portada_titulo": "Pidió un marido a medida… y salió DEMASIADO bien 😳", "portada_t": 66.9, "portada_pos": "abajo",
+      "momento": "Por qué lo pide: el pueblo la desprecia («te olemos a la legua» / «¡Cómeme el boquerón, capullo!» / «¿Ya te has pillado a un amante?»), «El amor parece más una carga que un premio», Debicki: «No es ninguna vergüenza pasar el resto de tu vida sola», un borracho: «Yo me casaré contigo» (y la mueca de Debicki) → «Quiero que me hagas un marido» → llega el de mimbre y ella se ríe.",
+      "por_que": "La historia completa de la pescadora en 45 s; remata con su carcajada en la capilla (la mirada que hace gracia)."
+    },
+    {
+      "fecha": "2026-10-24", "nombre": "c_monster_romance", "tipo": "C",
+      "tramos": [[57.22, 67.69], [72.36, 79.45], [84.42, 91.85]],
+      "portada_titulo": "WICKER, el romantasy que no te puedes perder 📚", "portada_t": 60.5, "portada_pos": "abajo",
+      "momento": "Monster romance: aparece el hombre de mimbre y la boda → «Dicen que es fuerte y duro como un árbol» → planos cálidos de la pareja → «Tú eres la razón por la que vivo y respiro» (con la cita «Una sorpresa salvaje») → «No es natural. Los hombres no son así».",
+      "por_que": "Para lectoras de romantasy: el monstruo romántico perfecto; cierra con la envidia del pueblo («Los hombres no son así»)."
+    },
+    {
+      "fecha": "2026-10-25", "nombre": "b_cuatro_estrellas", "tipo": "B",
+      "tramos": [[27.24, 30.70], [42.54, 47.55], [57.22, 65.94], [114.03, 120.70], [79.45, 81.04], [134.84, 136.45]],
+      "portada_titulo": "La película de clausura de Sitges llega a España: WICKER 🎬", "portada_t": 135.6, "portada_pos": "abajo",
+      "momento": "Una frase de cada estrella: Debicki («No es ninguna vergüenza pasar el resto de tu vida sola»), Colman («Quiero que me hagas un marido»), Dinklage («Ve a la capilla en un mes»), Skarsgård de mimbre («He venido a casarme contigo») → cartelas del reparto → Debicki: «Es de mimbre» → título WICKER.",
+      "por_que": "El reparto entero con su cartela oficial y el chiste de Debicki antes del título."
+    },
+    {
+      "fecha": "2026-10-26", "nombre": "a_todo_el_pueblo", "tipo": "A",
+      "tramos": [[62.48, 84.42], [95.39, 101.39]],
+      "portada_titulo": "Todo el pueblo envidia a su marido de mimbre 😏", "portada_t": 99.3, "portada_pos": "abajo",
+      "momento": "El marido llega y el pueblo flipa: boda → «¿Qué es eso?» «Este es mi marido» → «Dicen que es fuerte y duro como un árbol» → «Es de mimbre» → Colman: «Me ha puesto firme» → «Has causado una gran impresión. Todas las esposas están alteradas» → «No la culpo, yo me lo montaría».",
+      "por_que": "Enfoque del cotilleo del pueblo; remate picante y muy de aquí: «yo me lo montaría»."
+    },
+    {
+      "fecha": "2026-10-27", "nombre": "d_se_ha_vuelto_a_romper", "tipo": "D",
+      "tramos": [[95.39, 101.39], [125.79, 134.84], [136.45, 141.30]],
+      "portada_titulo": "«La cama está rota.» «La arreglaré.» 🔥 WICKER", "portada_t": 138.3, "portada_pos": "abajo",
+      "momento": "Las esposas alteradas («yo me lo montaría») → «Voy a arreglar la cama esta tarde» → «Se ha vuelto a romper» → «Estás compinchado con el mundo natural, ¿eh?» «La madre naturaleza da. Yo solo aumento».",
+      "por_que": "Mismo gag de la cama con otro enfoque (el cestero presume de su obra); cierra con «Yo solo aumento». Mismo aviso que el otro D."
+    },
+    {
+      "fecha": "2026-10-28", "nombre": "a_hecho_a_medida", "tipo": "A",
+      "tramos": [[42.54, 62.48], [136.45, 141.30]],
+      "portada_titulo": "WICKER: el marido perfecto es de MIMBRE 🧺", "portada_t": 47.0, "portada_pos": "abajo",
+      "momento": "El encargo y la fabricación: «Quiero que me hagas un marido» → «Ve a la capilla en un mes» → «Bien» → la luna pasa, el cestero teje (ojos, manos, cabeza) → el marido de mimbre echa a andar → remate del cestero: «La madre naturaleza da. Yo solo aumento».",
+      "por_que": "Cuenta el «hecho a medida» del gancho de principio a fin y lo remata el que lo hizo, con su frase de orgullo."
+    },
+    {
+      "fecha": "2026-10-29", "nombre": "e_plan_de_finde", "tipo": "E",
+      "tramos": [[42.54, 45.09], [62.48, 65.94], [95.39, 101.39], [109.65, 113.24], [134.84, 136.45]],
+      "portada_titulo": "WICKER: la peli que NO te puedes perder en los cines de España 🍿", "portada_t": 100.5, "portada_pos": "abajo",
+      "momento": "La peli en 20 s para decidir el plan: «Quiero que me hagas un marido» → «He venido a casarme contigo» → «Has causado una gran impresión… yo me lo montaría» → «¿Están matando a alguien?» → título WICKER.",
+      "por_que": "Jueves antes del estreno: premisa, comedia y picante en una frase cada uno; cierra con el chiste de los vecinos y el título."
+    },
+    {
+      "fecha": "2026-10-30", "nombre": "e_hoy_en_cines", "tipo": "E",
+      "tramos": [[84.42, 91.85], [95.39, 101.39], [114.03, 120.70], [136.45, 141.30]],
+      "portada_titulo": "Olivia Colman, Skarsgård y Dinklage en la misma peli: WICKER ✨", "portada_t": 138.3, "portada_pos": "abajo",
+      "momento": "Día del estreno, con olor a gran evento: «Tú eres la razón por la que vivo y respiro» + cita «Una sorpresa salvaje» → «Los hombres no son así» → cita «Irresistiblemente extraña y maravillosa» + «yo me lo montaría» → cartelas del reparto → «Yo solo aumento».",
+      "por_que": "Las dos citas de prensa y el reparto para el día del estreno; remate de Dinklage."
+    }
+  ]
+}

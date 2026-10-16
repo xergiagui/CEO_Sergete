@@ -1,0 +1,376 @@
+{
+  "id": "wicker",
+  "nombre": "WICKER",
+  "tipo": "clipping",
+  "idioma": "es",
+  "modo": "trailer",
+  "_modo": "trailer = clips montados solo con el material oficial (trailer.py): ni b-roll, ni música añadida, ni recorte de silencios. Lo despachan clips.py --validar, editar_clips.py y qc.py.",
+  "recursos": {
+    "broll": "ninguno",
+    "musica": "ninguna",
+    "internet": false,
+    "gancho_visual": "ninguno",
+    "gancho_texto": true,
+    "guardar_frases": false
+  },
+  "encuadre": {
+    "modo_por_defecto": "center",
+    "carpetas": {}
+  },
+  "silencios": {
+    "quitar": false,
+    "umbral": "6%",
+    "margen": "0.15s",
+    "_quitar": "false = no se recortan silencios (excepción aprobada por Sergio para este proyecto: rompe el ritmo del tráiler)"
+  },
+  "gancho": {
+    "texto_duracion_s": 3.0
+  },
+  "subs_fuente": {
+    "tapar": "no"
+  },
+  "frases": {
+    "etiquetas_extra": []
+  },
+  "aprobar": {
+    "archivar": false,
+    "_archivar": "false = al aprobar NO se archiva el vídeo en _Historico (el tráiler y su transcripción se reutilizan en todas las tandas); recursos/oficial/ nunca se mueve"
+  },
+  "trailer": {
+    "fuente": "recursos/oficial/TRL_20_VE_RRSS_9x16_v03.mp4",
+    "_fuente": "Tráiler oficial VE ya reencuadrado en 9:16 (composición oficial). Lleva el logo «WICKER / PRÓXIMAMENTE SOLO EN CINES» fijo arriba a la izquierda (no se tapa).",
+    "fuentes": {
+      "4k": "recursos/oficial/WICKER_TRL_VE_ST_v01.mp4"
+    },
+    "_fuentes": "Solo si un plano necesita otro encuadre: tramo {\"inicio\", \"fin\", \"fuente\": \"4k\", \"x\": 0.5}. La 4K NO lleva el logo fijo: mezclarla hace que aparezca y desaparezca.",
+    "dialogos": "dialogos.json",
+    "poster": "recursos/oficial/poster_oficial_es.jpg",
+    "tipografia": {
+      "dir": "recursos/fuentes",
+      "texto": "Fraunces[SOFT,WONK,opsz,wght].ttf",
+      "emoji": "NotoColorEmoji.ttf"
+    },
+    "marca": {
+      "fondo": "#226a72",
+      "texto": "#ead8cc",
+      "acento": "#f87870"
+    },
+    "acento_palabras": [
+      "WICKER"
+    ],
+    "tipos": {
+      "A": {
+        "gancho": "WICKER: pidió el marido perfecto… y se lo hicieron de MIMBRE 🧺",
+        "lineas": [
+          "WICKER: pidió el marido",
+          "perfecto… y se lo hicieron",
+          "de MIMBRE 🧺"
+        ]
+      },
+      "B": {
+        "gancho": "Olivia Colman + Skarsgård + Dinklage = WICKER ✨",
+        "lineas": [
+          "Olivia Colman + Skarsgård",
+          "+ Dinklage = WICKER ✨"
+        ]
+      },
+      "C": {
+        "gancho": "Si te gusta el romantasy, tienes que ver WICKER 📚🔥",
+        "lineas": [
+          "Si te gusta el romantasy,",
+          "tienes que ver WICKER 📚🔥"
+        ]
+      },
+      "D": {
+        "gancho": "«La cama está rota.» «La arreglaré.» — WICKER 🔥",
+        "lineas": [
+          "«La cama está rota.»",
+          "«La arreglaré.»",
+          "— WICKER 🔥"
+        ]
+      },
+      "E": {
+        "gancho": "Qué ver en el cine este finde: WICKER 🍿",
+        "lineas": [
+          "Qué ver en el cine",
+          "este finde: WICKER 🍿"
+        ]
+      }
+    },
+    "portadas": [
+      {
+        "titulo": "WICKER: el marido perfecto es de MIMBRE 🧺",
+        "lineas": [
+          "WICKER:",
+          "el marido perfecto",
+          "es de MIMBRE 🧺"
+        ]
+      },
+      {
+        "titulo": "Pidió un marido a medida… y salió DEMASIADO bien 😳",
+        "lineas": [
+          "Pidió un marido",
+          "a medida… y salió",
+          "DEMASIADO bien 😳"
+        ]
+      },
+      {
+        "titulo": "«La cama está rota.» «La arreglaré.» 🔥 WICKER",
+        "lineas": [
+          "«La cama está rota.»",
+          "«La arreglaré.» 🔥",
+          "WICKER"
+        ]
+      },
+      {
+        "titulo": "WICKER, el romantasy que no te puedes perder 📚",
+        "lineas": [
+          "WICKER, el romantasy",
+          "que no te puedes perder 📚"
+        ]
+      },
+      {
+        "titulo": "Olivia Colman, Skarsgård y Dinklage en la misma peli: WICKER ✨",
+        "lineas": [
+          "Olivia Colman, Skarsgård",
+          "y Dinklage en la misma peli:",
+          "WICKER ✨"
+        ]
+      },
+      {
+        "titulo": "La película de clausura de Sitges llega a España: WICKER 🎬",
+        "lineas": [
+          "La película de clausura",
+          "de Sitges llega a España:",
+          "WICKER 🎬"
+        ]
+      },
+      {
+        "titulo": "Todo el pueblo envidia a su marido de mimbre 😏",
+        "lineas": [
+          "Todo el pueblo envidia",
+          "a su marido de mimbre 😏"
+        ]
+      },
+      {
+        "titulo": "WICKER: la peli que NO te puedes perder en los cines de España 🍿",
+        "lineas": [
+          "WICKER: la peli",
+          "que NO te puedes perder",
+          "en los cines de España 🍿"
+        ]
+      }
+    ],
+    "cta": {
+      "texto": "WICKER — EN TODOS LOS CINES DE ESPAÑA EL 30 DE OCTUBRE 🎬",
+      "lineas": [
+        "WICKER —",
+        "EN TODOS LOS CINES",
+        "DE ESPAÑA EL",
+        "30 DE OCTUBRE 🎬"
+      ],
+      "duracion_s": 4.0,
+      "fundido_s": 0.3,
+      "audio": [
+        141.3,
+        144.1
+      ],
+      "_audio": "remate musical del propio tráiler (su cartela final, sin diálogo) bajo la CTA"
+    },
+    "gancho": {
+      "duracion_s": 3.0,
+      "fundido_s": 0.25,
+      "pos": "arriba",
+      "y_arriba": 355,
+      "tam_max": 88,
+      "tam_min": 60,
+      "max_lineas": 3
+    },
+    "subtitulos": {
+      "tam": 60,
+      "y_fin": 1500,
+      "ancho_max": 860
+    },
+    "zonas_protegidas": [
+      {
+        "nombre": "logo WICKER · PRÓXIMAMENTE SOLO EN CINES",
+        "t": [
+          0.0,
+          141.4
+        ],
+        "caja": [
+          100,
+          195,
+          345,
+          345
+        ]
+      },
+      {
+        "nombre": "logos Vértice 360 / Black Bear",
+        "t": [
+          5.95,
+          7.85
+        ],
+        "caja": [
+          120,
+          880,
+          960,
+          1060
+        ]
+      },
+      {
+        "nombre": "cita «UNA SORPRESA SALVAJE»",
+        "t": [
+          85.2,
+          86.8
+        ],
+        "caja": [
+          60,
+          900,
+          1020,
+          1120
+        ],
+        "prensa": true
+      },
+      {
+        "nombre": "cita «IRRESISTIBLEMENTE EXTRAÑA Y MARAVILLOSA»",
+        "t": [
+          95.45,
+          97.55
+        ],
+        "caja": [
+          60,
+          820,
+          1020,
+          1180
+        ],
+        "prensa": true
+      },
+      {
+        "nombre": "cita «OLIVIA COLMAN Y ALEXANDER SKARSGÅRD ESTÁN HECHOS EL UNO PARA EL OTRO»",
+        "t": [
+          102.7,
+          104.75
+        ],
+        "caja": [
+          40,
+          830,
+          1040,
+          1140
+        ],
+        "prensa": true
+      },
+      {
+        "nombre": "rótulos del reparto (Colman, Skarsgård, Debicki, Dinklage)",
+        "t": [
+          113.95,
+          120.65
+        ],
+        "caja": [
+          0,
+          1080,
+          1080,
+          1280
+        ]
+      },
+      {
+        "nombre": "título WICKER",
+        "t": [
+          134.7,
+          137.4
+        ],
+        "caja": [
+          150,
+          860,
+          930,
+          1060
+        ]
+      },
+      {
+        "nombre": "cartela final PRÓXIMAMENTE SOLO EN CINES",
+        "t": [
+          141.4,
+          145.0
+        ],
+        "caja": [
+          0,
+          650,
+          1080,
+          1720
+        ]
+      }
+    ],
+    "evitar": [
+      {
+        "t": [
+          0.0,
+          5.95
+        ],
+        "motivo": "arranque del tráiler: noche y rostro boca abajo, sin contexto",
+        "donde": [
+          "gancho",
+          "portada"
+        ]
+      },
+      {
+        "t": [
+          5.95,
+          7.85
+        ],
+        "motivo": "logos de las distribuidoras",
+        "donde": [
+          "gancho",
+          "portada"
+        ]
+      },
+      {
+        "t": [
+          105.55,
+          108.4
+        ],
+        "motivo": "plano íntimo (rostro en éxtasis): vale a mitad de clip, nunca en el gancho ni de portada",
+        "donde": [
+          "gancho",
+          "portada"
+        ]
+      },
+      {
+        "t": [
+          113.24,
+          114.03
+        ],
+        "motivo": "plano íntimo (en la cama con el marido de mimbre): ni gancho ni portada",
+        "donde": [
+          "gancho",
+          "portada"
+        ]
+      },
+      {
+        "t": [
+          141.4,
+          145.0
+        ],
+        "motivo": "cartela final del tráiler («Próximamente»): la sustituye nuestra CTA",
+        "donde": [
+          "todo"
+        ]
+      }
+    ],
+    "duracion": {
+      "min": 15,
+      "max": 90
+    },
+    "loudness": {
+      "lufs": -16.0,
+      "limite": 0.89,
+      "ganancia_max_db": 3.0,
+      "_nota": "El tráiler llega a -19 LUFS con picos a 0 dBFS: más ganancia aplastaría los transitorios en el limitador."
+    },
+    "embargo_prensa": "2026-10-17 10:45",
+    "portada": {
+      "max_lineas": 3,
+      "tam_max": 104,
+      "tam_min": 60
+    }
+  }
+}

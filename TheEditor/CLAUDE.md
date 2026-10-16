@@ -26,6 +26,15 @@ audio, zona segura, exportación, bancos, vía 3) está en
 - Si faltan b-roll o música propios, el batch para: díselo a Sergio, o usa `--sin-musica`/`--sin-broll` si lo autoriza.
 - Nunca dos batch a la vez (comparten `whisper/_edit_batch`).
 
+## Modo tráiler (`proyecto.json → "modo": "trailer"`; hoy, `wicker`)
+Clips montados solo con material oficial (un tráiler 9:16 + su póster), con `trailer.py`:
+gancho y CTA literales, subtítulos de `dialogos.json`, portada `<clip>.portada.jpg`; sin
+b-roll, sin música y sin recorte de silencios. Manda su `reglas.md` (las reglas de gancho
+y de silencios de aquí no aplican).
+1. Lee `…cortes.txt`, `dialogos.json` y `reglas.md`; escribe `cortes.json` (esquema en la cabecera de `trailer.py`).
+2. `clips.py --proyecto <id> "<fuente>" --validar` hasta `OK` (no hay corte aparte).
+3. `editar_clips.py --proyecto <id> "<fuente>" [--solo <clip>]` → QC.
+
 ## Vía 3 · Avatar IA
 Skill `Editor_Sergio` desde el hilo principal del CEO (popups y gates). Si te la piden, devuélvele el control.
 
@@ -36,7 +45,7 @@ Skill `Editor_Sergio` desde el hilo principal del CEO (popups y gates). Si te la
 - De 15 a 90 s por clip, sin solapes.
 
 ## Gancho de texto
-El primer fotograma lleva un texto que abre un bucle, y el clip lo cumple.
+El primer fotograma lleva un texto que abre un bucle, y el clip lo cumple. (En modo tráiler el gancho es el literal de su tipo y no se aplica lo de abajo.)
 - Como mucho 2 líneas (~45 caracteres, máx. 50), con tildes, ñ y `¿`/`¡`; sin emojis.
 - Abre el bucle sin dar la respuesta y se cumple dentro del clip: nada de cifras ni promesas que el clip no dé.
 - No repite literal la primera frase.
@@ -51,7 +60,7 @@ Solo el clip pedido, con `--solo <clip>` y `--sin-frases`; el resto no se toca, 
 - Después, QC otra vez.
 
 ## Silencios
-Global: 6 % / 0,15 s (`proyecto.json → silencios`); nunca lo cambies. Si un clip queda atropellado, reprocesa solo ese con 3 % / 0,3 s (no se guarda en `proyecto.json`):
+Global: 6 % / 0,15 s (`proyecto.json → silencios`); nunca lo cambies. Excepción: un proyecto con `silencios.quitar: false` no recorta silencios (solo si Sergio lo aprueba para ese proyecto; hoy, `wicker`). Si un clip queda atropellado, reprocesa solo ese con 3 % / 0,3 s (no se guarda en `proyecto.json`):
 - Vía 1: `clips.py … --solo <clip> --umbral 3% --margen 0.3s` → `editar_clips.py … --solo <clip> --sin-frases`.
 - Vía 2: `procesar_batch_clip.py … "<CARPETA>" --solo "<clip>" --umbral 3% --margen 0.3s --sin-frases`.
 
@@ -64,4 +73,4 @@ Si el vídeo largo trae subtítulos o rótulos incrustados, el render de la vía
 ## Al dar OK
 Por script, nunca a mano:
 `proyecto.py aprobar <id> --video "<video|carpeta>" [--clips a.mp4,b.mp4] [--cerrar]`.
-Mueve los finales a `../CEO_Sergete/REELS/<id>/1. pte Publicar/` y, si `finales/` queda vacío, archiva el vídeo y su fuente en `../_Historico/<id>/<v>/`. Después va TheCopy (`copys.py pendientes --proyecto <id>`).
+Mueve los finales (y su `<clip>.portada.jpg`, si la hay) a `../CEO_Sergete/REELS/<id>/1. pte Publicar/` y, si `finales/` queda vacío, archiva el vídeo y su fuente en `../_Historico/<id>/<v>/` (salvo `aprobar.archivar: false`: solo con `--cerrar`). Después va TheCopy (`copys.py pendientes --proyecto <id>`).

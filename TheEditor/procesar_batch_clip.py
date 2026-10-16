@@ -573,6 +573,9 @@ def main():
         p = proyecto.abrir(args.proyecto, "batch", log=False, quiet=False)
     else:
         p = proyecto.abrir(args.proyecto, "batch", quiet=args.quiet)
+    if p.es_trailer:
+        raise SystemExit(f"[!] «{p.id}» está en modo tráiler: no usa el batch. Flujo: "
+                         f"clips.py --validar → editar_clips.py → qc.py (ver reglas.md).")
     clip_root, solo_carpeta, modo_arg = repartir_posicionales(args.posicionales, p.input_dir, args.raiz)
     modo_arg = proyecto.normalizar_modo(modo_arg) if modo_arg else None
     solo_transcribir = args.solo_transcribir
@@ -655,6 +658,8 @@ def main():
         if solo is not None:
             cls = [m for m in cls if m.stem.strip() in solo]
         prep_meta = {"modo": lado, "umbral": sil["umbral"], "margen": sil["margen"]}
+        if not p.quitar_silencios:          # solo si se desactiva: no invalida los _prep/ de siempre
+            prep_meta["quitar"] = False
         print(f"\n########## {slug}  ({len(cls)} clips, encuadre {lado}"
               + (f", solo {', '.join(sorted(solo))}" if solo else "") + ") ##########", flush=True)
         frases_carpeta = []
@@ -749,13 +754,18 @@ def main():
                     else:  # follow
                         # Plano de una sola persona: seguimiento de cara centrado
                         C.cortar_vertical(mp4, 0, dur, vert, src_w=sw, src_h=sh)
-                    # 2) quitar silencios
+                    # 2) quitar silencios (salvo silencios.quitar=false)
                     desil = work / "desil.mp4"
-                    try:
-                        C.quitar_silencios(vert, desil, umbral=sil["umbral"], margen=sil["margen"])
-                    except Exception as e:
-                        print(f"   [silencios] fallo ({e}); uso el clip sin recortar", flush=True)
+                    if not p.quitar_silencios:
+                        print("   [silencios] el proyecto no los quita (silencios.quitar=false)",
+                              flush=True)
                         desil = vert
+                    else:
+                        try:
+                            C.quitar_silencios(vert, desil, umbral=sil["umbral"], margen=sil["margen"])
+                        except Exception as e:
+                            print(f"   [silencios] fallo ({e}); uso el clip sin recortar", flush=True)
+                            desil = vert
                     # 3) transcribir el 9:16 desilenciado (una vez)
                     words, texto = transcribir_words_y_texto(desil, lang=lang)
                     txt_path.write_text(texto, encoding="utf-8")

@@ -192,3 +192,38 @@ faltan` dice `SETUP_OK` o cuáles faltan).
 `editar_clips.py` quita solo extensiones de vídeo conocidas (`.mp4 .mov .mkv .webm .m4v
 .avi…`); cualquier otro punto es parte del título («Tengo 41 Años. Si Estás…» se pasa
 igual con o sin `.mp4`).
+
+## Modo tráiler (`trailer.py`; `proyecto.json → "modo": "trailer"`)
+Para campañas que solo pueden usar material oficial (hoy `wicker`). Lo despachan
+`clips.py --validar` (reglas propias; sin `--validar` no corta nada), `editar_clips.py`
+(render) y `qc.py` (comprobaciones extra); el batch lo rechaza. El resto de proyectos no
+pasa por aquí.
+- Config en `proyecto.json → trailer`: `fuente` (tráiler ya vertical), `fuentes` (otras
+  versiones, recorte 9:16 en `x`), `dialogos` (subtítulos revisados, en segundos del
+  tráiler), `poster`, `tipografia` (texto variable + emoji CBDT), `marca`, `tipos`
+  (gancho literal por tipo y su reparto de `lineas`, que debe reproducir el literal),
+  `portadas` (títulos literales), `cta` (texto, `lineas`, duración, fundido y `audio`:
+  tramo del propio tráiler bajo la cartela), `zonas_protegidas` (rótulos oficiales: t + caja),
+  `evitar` (tramos vetados en `todo`/`gancho`/`portada`), `embargo_prensa`, `loudness`.
+- Validación por corte: nombre `<tipo>_…`, tipo válido, gancho = literal, tramos dentro de la
+  fuente y sin solaparse entre sí (sí entre clips), ningún borde parte una frase de
+  `dialogos`, nada en `evitar`, 15–90 s con la CTA, portada literal y dentro de un tramo, sin
+  tapar un rótulo oficial, D con el diálogo de la cama, y citas de prensa con `fecha`
+  posterior al embargo.
+- Render (un solo encode desde la fuente): tramos con corte seco de imagen y fundidos de
+  audio de 0,06 s (0,2 s el último) → gancho PNG del fotograma 0 a `gancho.duracion_s` con
+  salida suave → subtítulos PNG (se recolocan si chocan con el gancho o con una zona
+  protegida activa) → xfade a la cartela de la CTA (póster entero + CTA literal) con el audio
+  de `cta.audio` → ganancia estática medida (ebur128) hacia `loudness.lufs` (tope
+  `ganancia_max_db`) + `alimiter`. H.264 1080x1920 a los fps de la fuente, 10 Mb/s, AAC 48 kHz,
+  metadatos limpios y audio etiquetado `spa`. Sin filtros de color.
+- Deja `clips/<clip>.render.json` (+ `<clip>.gancho.png`, `<clip>.cta.png`) y
+  `finales/<clip>.portada.jpg` (fotograma de `portada_t` + título en panel).
+- QC (`trailer.qc_clip`): gancho visible 0–3 s y CTA al final comparando los fotogramas con
+  sus PNG, choques de cajas con el manifiesto, audio = original por correlación por
+  ventanas tras alinear cada tramo (FALLA < 0,97 de mediana o < 0,92 de p10), metadatos sin
+  editores, duración y portada. No cuentan los negros del propio tráiler, la cartela fija
+  de la CTA ni el silencio de su cola.
+- Genérico para cualquier proyecto: `silencios.quitar: false` (clips.py y el batch no
+  recortan silencios) y `aprobar.archivar: false` (aprobar no archiva al vaciarse
+  `finales/`, solo con `--cerrar`). `aprobar` mueve siempre `<clip>.portada.jpg` con su mp4.

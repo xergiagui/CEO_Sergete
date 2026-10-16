@@ -42,6 +42,10 @@ Uso:
     python editar_clips.py --proyecto x "video" --sin-musica / --sin-broll   # sin ese recurso
 Si solo hay un proyecto, --proyecto se puede omitir.
 
+Proyectos en modo tráiler (`proyecto.json → "modo": "trailer"`): no usa clips/
+ni Editor_Sergio; trailer.py monta cada clip desde la fuente oficial (gancho y
+CTA literales, subtítulos, portada) en finales/<clip>.mp4 + <clip>.portada.jpg.
+
 Solo se renderizan los clips de cortes.json, y antes se VALIDA (validar.py): si
 hay errores en los clips a renderizar, para. Con --quiet (por defecto si la
 salida no es una terminal) la consola recibe una línea por clip y el RESUMEN.
@@ -236,8 +240,15 @@ def main():
                          "(proyecto.json → subs_fuente).")
     ap.add_argument("--solo", action="append", metavar="NOMBRE",
                     help="Solo este clip (repetible o separado por comas): corrige uno sin tocar los demás.")
+    ap.add_argument("--solo-portada", action="store_true",
+                    help="Modo tráiler: rehace solo <clip>.portada.jpg (título/fotograma), sin tocar el vídeo.")
     args = ap.parse_args()
     p = proyecto.abrir(args.proyecto, "editar_clips", quiet=args.quiet)
+    if p.es_trailer:
+        # Modo tráiler: montaje desde la fuente oficial con gancho/CTA/portada
+        # literales, sin b-roll ni música (trailer.py). Mismos --solo/--cortes.
+        import trailer
+        sys.exit(trailer.editar_cli(p, args))
     proyecto.decir(p.comprobar_recursos(args.sin_broll, args.sin_musica))
     MUSIC = None if args.sin_musica else p.music_dir
     OVERLAYS = None if args.sin_broll else p.overlays_dir

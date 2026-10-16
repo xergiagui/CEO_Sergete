@@ -18,6 +18,7 @@ proyecto.py                    proyectos: elegir, ver, crear, aprobar (CLI) + sa
 herramientas.py                un solo ffmpeg/ffprobe (+ dimensiones con la rotación aplicada)
 validar.py                     validación de cortes.json y ganchos.json antes de renderizar
 qc.py                          QC de los finales exportados (+ hoja _qc.jpg)
+trailer.py                     modo tráiler: clips solo con material oficial (proyecto.json → modo)
 proyectos/
   _plantilla/                  base de los proyectos nuevos (pensada para clipping)
   <id>/
