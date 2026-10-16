@@ -18,10 +18,16 @@
       "estado": "activo",
       "descripcion": "Clips de Luis Monge (ventas, copywriting, emprendimiento, dinero) para llevar tráfico a sus cursos con el enlace de afiliado de Sergio. Perfil independiente, no la cuenta oficial de Luis.",
       "cuenta_ig": "@xergi.ventas",
-      "plataformas": ["instagram"],
+      "plataformas": [
+        "instagram"
+      ],
       "prefijo_id": "MM",
       "recursos": "Banco común de TheEditor (superposiciones/ + catálogo broll_assets + Pexels) y musicas/. Detalle en TheEditor/proyectos/mongemalo/proyecto.json → recursos.",
-      "formatos": ["reels", "carruseles", "historias"],
+      "formatos": [
+        "reels",
+        "carruseles",
+        "historias"
+      ],
       "landing": "TheLanding (toda la app es de MongeMalo)",
       "alta": "2026-08",
       "identidad": {
@@ -37,8 +43,64 @@
         },
         "transparencia_afiliacion": true,
         "no_suplantar": "No es la cuenta oficial de Luis Monge: nunca dar a entender que trabaja para él ni hablar en su nombre.",
-        "palabras_prohibidas": ["muy fácil", "garantizado", "garantizo", "hazte rico", "dinero fácil", "trabajando para", "cuenta oficial"],
-        "marca": {"fondo": "#14171f", "texto": "#ffffff", "acento": "#f59e0b"}
+        "palabras_prohibidas": [
+          "muy fácil",
+          "garantizado",
+          "garantizo",
+          "hazte rico",
+          "dinero fácil",
+          "trabajando para",
+          "cuenta oficial"
+        ],
+        "marca": {
+          "fondo": "#14171f",
+          "texto": "#ffffff",
+          "acento": "#f59e0b"
+        }
+      }
+    },
+    {
+      "id": "wicker",
+      "nombre": "WICKER",
+      "tipo": "clipping",
+      "estado": "alta",
+      "descripcion": "Campaña de clipping de WICKER (Vértice 360 España) para su estreno en cines el 30-oct-2026: Reels con material oficial para generar visitas en IG y llevar tráfico a @vertice360_spain.",
+      "cuenta_ig": "@primera.fila.es",
+      "plataformas": [
+        "instagram"
+      ],
+      "prefijo_id": "WK",
+      "recursos": "Solo el material oficial del briefing, en TheEditor/proyectos/wicker/recursos/oficial/ (tráiler y spots «VE» de Drive + póster oficial de España). Sin b-roll, sin música, sin internet. Detalle en TheEditor/proyectos/wicker/proyecto.json → recursos.",
+      "formatos": [
+        "reels"
+      ],
+      "alta": "2026-10-16",
+      "briefing": "CEO_Sergete/docs/wicker/Briefing_WICKER_ESPANA_Clippers_2026-10-14.docx.pdf (solo en local). OBLIGATORIO AL 100 %: no se hace nada que no venga en el briefing.",
+      "campana": {
+        "estreno": "2026-10-30",
+        "inicio_publicacion": "2026-10-19",
+        "fin": "2026-10-30",
+        "frecuencia": "mínimo 1 Reel al día"
+      },
+      "identidad": {
+        "cuenta_ig": "@primera.fila.es",
+        "landing": "https://www.instagram.com/vertice360_spain/",
+        "afiliado": "",
+        "posicionamiento": "Página fan no oficial de la película WICKER: Reels con el material oficial en español de Vértice 360 España para generar hype en romantasy, booktok/bookstagram y cine de autor, y llevar el tráfico a la cuenta oficial @vertice360_spain antes del estreno en todos los cines de España el 30 de octubre de 2026. Objetivo: visitas en IG (sin enlaces de afiliado, leads ni ventas).",
+        "voz": {
+          "persona": "Fan que habla a otras fans, como en el briefing: «vosotras», «¿estáis preparadas?», «todas queremos», «las lectoras estábamos esperando». Nunca habla como la distribuidora, la película ni el reparto.",
+          "tono": "Fábula moderna en clave de comedia romántica: humor, ternura y un punto picante sin ser explícito; hype de gran estreno. Español de España («peli», «en cines», «flipar», «vosotras»), sin giros de otros países.",
+          "idioma": "es-ES",
+          "emojis_max": 1
+        },
+        "transparencia_afiliacion": false,
+        "no_suplantar": "Página fan NO oficial («Página fan no oficial» en la bio): nunca presentarse como la cuenta oficial de la película, de Vértice 360 ni del reparto, ni hablar en su nombre.",
+        "palabras_prohibidas": [],
+        "marca": {
+          "fondo": "#226a72",
+          "texto": "#ead8cc",
+          "acento": "#f87870"
+        }
       }
     }
   ]
